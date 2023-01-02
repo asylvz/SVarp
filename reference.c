@@ -3,9 +3,7 @@
 #include <string.h>
 #include "common.h"
 #include "reference.h"
-
-
-static gfa *hashtab[HASHSIZE]; /* pointer table */
+#include <stdbool.h>
 
 /*treenode insert_treenode(treenode *root)
 {
@@ -13,7 +11,7 @@ static gfa *hashtab[HASHSIZE]; /* pointer table */
 }
 */
 
-int read_reference_graph(parameters* params)
+int read_reference_graph(parameters* params, gfa* hashtab[])
 {
 	FILE* fp;
     char* line = NULL;
@@ -21,14 +19,17 @@ int read_reference_graph(parameters* params)
     ssize_t read;
 	char *mytoken = NULL, *str_tmp = NULL;
 	int field_cnt = 0;
-
+	bool insert_line;
+	
 	reference* ref;
-	init_reference(&ref);
-
+	//init_reference(&ref);
 	fp = safe_fopen(params->ref_graph, "r");
+	
 	while ((read = getline(&line, &len, fp)) != -1) {
         //printf("%s", line);
 		
+		init_reference(&ref);
+		insert_line = true;
 		field_cnt = 0;
 		mytoken = strtok(line, "\t" );
 		while(mytoken != NULL)
@@ -37,7 +38,10 @@ int read_reference_graph(parameters* params)
 			{
 				case 0:
 					if (strcmp(mytoken, "S") != 0)
+					{
+						insert_line = false;
 						goto exit_while_loop;
+					}
 					break;
 				case 1:
 					set_str(&(ref->node), mytoken);
@@ -66,6 +70,8 @@ int read_reference_graph(parameters* params)
 			mytoken = strtok(NULL, "\t");
 		}
 		exit_while_loop:;
+		if (insert_line)
+			gfa_insert(hashtab, ref->node, ref);	
     }
 
     fclose(fp);
@@ -74,6 +80,16 @@ int read_reference_graph(parameters* params)
         free(line);
     
 	return RETURN_SUCCESS;
+}
+
+void gfa_traverse(gfa** hashtab)
+{
+	gfa *ptr;
+	for(int i = 0; i < HASHSIZE; i++)
+	{
+		for(ptr = hashtab[i]; ptr != NULL; ptr = ptr->next)
+			printf("%s - %s\n", ptr->node_name, ptr->node->contig);
+	}
 }
 
 void init_reference(reference** ref)
@@ -86,32 +102,66 @@ void init_reference(reference** ref)
 	(*ref)->offset = -1;
 }
 
-gfa *gfa_lookup(char *s)
+gfa *gfa_lookup(gfa **hashtab, char *s)
 {
     gfa *np;
+	//printf("lookup %s - %u", s, hash(s));
     for (np = hashtab[hash(s)]; np != NULL; np = np->next)
+	{
         if (strcmp(s, np->node_name) == 0)
-          return np; /* found */
-    return NULL; /* not found */
+        	return np;
+	}
+	return NULL;
 }
 
-gfa *gfa_insert(char *node_name, char *defn)
+gfa *gfa_insert(gfa **hashtab, char *node_name, reference *node)
 {
     gfa *np;
     unsigned hashval;
-    
-	if ((np = gfa_lookup(node_name)) == NULL) /* not found */
-	{ 
+	
+	if ((np = gfa_lookup(hashtab, node_name)) == NULL)
+	{
         np = (gfa*) malloc(sizeof(*np));
         if (np == NULL || (np->node_name = strdup(node_name)) == NULL)
         	return NULL;
-        hashval = hash(node_name);
-        np->next = hashtab[hashval];
+		np->node_name = strdup(node_name);
+		np->node = node;
+        hashval = hash(node_name); 
+		//printf(" Hash value = %u", hashval);
+		np->next = hashtab[hashval];
         hashtab[hashval] = np;
     } 
-	else /* already there */
-        free((void *) np->defn); /*free previous defn */
-    if ((np->defn = strdup(defn)) == NULL)
+	else
+	{
+		printf("Burası"); 
+        free((gfa *) np->node_name);
+	}
+    if ((np->node = node) == NULL)
     	return NULL;
-    return np;
+   
+	//printf("\n");
+   	return np;
 }
+
+
+int free_gfa(gfa** hash_table)
+{
+	gfa *ptr, *ptr_next;
+	for (int i = 0; i < HASHSIZE; i++)
+	{
+		for (ptr = hash_table[i]; ptr != NULL; ptr = ptr->next)
+		{
+			if (ptr->node_name != NULL)
+				free(ptr->node_name);
+			if (ptr->node->node != NULL)	
+				free(ptr->node->node);
+			if (ptr->node->contig != NULL)	
+				free(ptr->node->contig);
+			if (ptr->node->sequence != NULL)
+				free(ptr->node->sequence);
+		}
+		free(hash_table[i]);
+	}
+	return RETURN_SUCCESS;
+}
+

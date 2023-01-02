@@ -1,5 +1,5 @@
 CC=clang
-CFLAGS = -O3 -funroll-loops -g
+CFLAGS = -O0 -funroll-loops -g
 LDFLAGS = -lz -lm -lpthread -llzma -lbz2
 SOURCES = psvpan.c cmdline.c common.c alignment.c reference.c
 OBJECTS = $(SOURCES:.c=.o)

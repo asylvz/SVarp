@@ -20,12 +20,14 @@ typedef struct _treenode
 typedef struct _gfa { /* table entry: */
     struct _gfa *next; /* next entry in chain */
     char *node_name; /* defined name */
-    char *defn; /* replacement text */
+    reference *node; /* replacement text */
 } gfa;
 
 
-gfa *gfa_insert(char *name, char *defn);
-gfa *gfa_lookup(char *s);
+gfa *gfa_insert(gfa **hashtab, char *name, reference *node);
+gfa *gfa_lookup(gfa **hashtab, char *s);
+void gfa_traverse(gfa** hashtab);
 
-int read_reference_graph(parameters* params);
+int free_gfa(gfa** hash_table);
+int read_reference_graph(parameters* params, gfa**);
 void init_reference(reference** ref);

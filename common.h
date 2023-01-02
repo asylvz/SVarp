@@ -7,13 +7,14 @@ extern long long memUsage;
 #define RETURN_SUCCESS 1
 #define RETURN_ERROR 0
 
-#define HASHSIZE 101
+#define HASHSIZE 1001
 
 typedef struct _parameters
 {
 	char* gaf;
 	char* ref_graph;
 } parameters;
+
 
 /* String functions */
 void set_str(char **target, char *source); /* Even safer than strncpy */
