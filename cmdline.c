@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <getopt.h>
-#include "common.h"
+#include "cmdline.h"
+
 
 int parse_command_line(int argc, char** argv, parameters* params)
 {

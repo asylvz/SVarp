@@ -43,19 +43,47 @@ void set_str(char** target, char* source)
 	}
 }
 
+char *substring(char *string, int position, int length)
+{
+   char *p;
+   int c;
+
+   p = malloc(length+1);
+
+   if (p == NULL)
+   {
+      printf("Unable to allocate memory.\n");
+      exit(1);
+   }
+
+   for (c = 0; c < length; c++)
+   {
+      *(p+c) = *(string+position-1);
+      string++;
+   }
+
+   *(p+c) = '\0';
+
+   return p;
+}
+
 char* substr(const char *src, int start_index, int end_index)
 {
     int len = end_index - start_index;
-    char *dest = (char*)malloc(sizeof(char) * (len + 1));
+    char *dest = (char*) malloc(sizeof(char) * (len + 1));
+	
+	strncpy(dest, (src + start_index), len);
 
-    for (int i = start_index; i < end_index && (*(src + i) != '\0'); i++)
+    return dest;
+    
+	/*for (int i = start_index; i < end_index && (*(src + i) != '\0'); i++)
     {
         *dest = *(src + i);
         dest++;
     }
 
     *dest = '\0';
-    return dest - len;
+    return dest - len;*/
 }
 
 

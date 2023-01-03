@@ -1,3 +1,7 @@
+#ifndef __REFERENCE
+#define __REFERENCE
+#include "common.h"
+
 
 typedef struct _refs
 {
@@ -7,15 +11,6 @@ typedef struct _refs
 	int len; /*node length, e.g., LN:i:74 */
 	int offset; /*node offset within the contig e.g., SO:i:10746 */
 } reference;
-
-typedef struct _treenode
-{
-	int pos;
-	int max;
-	int height;
-	struct _treenode *left, *right;
-} treenode;
-
 
 typedef struct _gfa { /* table entry: */
     struct _gfa *next; /* next entry in chain */
@@ -31,3 +26,5 @@ void gfa_traverse(gfa** hashtab);
 int free_gfa(gfa** hash_table);
 int read_reference_graph(parameters* params, gfa**);
 void init_reference(reference** ref);
+
+#endif

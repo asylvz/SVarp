@@ -1,7 +1,7 @@
 CC=clang
 CFLAGS = -O0 -funroll-loops -g
 LDFLAGS = -lz -lm -lpthread -llzma -lbz2
-SOURCES = psvpan.c cmdline.c common.c alignment.c reference.c
+SOURCES = psvpan.c cmdline.c common.c alignment.c reference.c interval_tree.c
 OBJECTS = $(SOURCES:.c=.o)
 EXECUTABLE = psvpan
 

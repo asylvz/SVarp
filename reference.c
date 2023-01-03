@@ -1,15 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "common.h"
-#include "reference.h"
 #include <stdbool.h>
+#include "reference.h"
 
-/*treenode insert_treenode(treenode *root)
-{
-	
-}
-*/
 
 int read_reference_graph(parameters* params, gfa* hashtab[])
 {
@@ -127,15 +121,11 @@ gfa *gfa_insert(gfa **hashtab, char *node_name, reference *node)
 		np->node_name = strdup(node_name);
 		np->node = node;
         hashval = hash(node_name); 
-		//printf(" Hash value = %u", hashval);
 		np->next = hashtab[hashval];
         hashtab[hashval] = np;
     } 
 	else
-	{
-		printf("Burası"); 
         free((gfa *) np->node_name);
-	}
     if ((np->node = node) == NULL)
     	return NULL;
    

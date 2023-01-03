@@ -1,3 +1,6 @@
+#ifndef __COMMON
+#define __COMMON
+
 // Track memory usage
 extern long long memUsage;
 
@@ -15,6 +18,8 @@ typedef struct _parameters
 	char* ref_graph;
 } parameters;
 
+#define max(x, y) (((x) > (y)) ? (x) : (y))
+#define min(x, y) (((x) < (y)) ? (x) : (y))
 
 /* String functions */
 void set_str(char **target, char *source); /* Even safer than strncpy */
@@ -30,3 +35,5 @@ void print_error( char* msg);
 
 
 unsigned hash(char *s);
+
+#endif
