@@ -12,9 +12,17 @@ typedef struct _alignment
 	char strand;
 	char* node;
 	char* path;	
-	struct _alignment *next;	
 } alignment;
 
-int read_alignments(parameters*, gfa**);
+
+typedef struct _gaf { /* table entry: */
+	char* contig;
+    alignment *node; /* replacement text */
+    struct _gaf *next; /* next entry in chain */
+} gaf;
+
+
+int read_alignments(parameters *params, gfa* gfa_table[], gaf* gaf_table[]);
+void gaf_traverse(gaf** hashtab);
 
 #endif

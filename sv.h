@@ -1,3 +1,6 @@
+#ifndef __SV
+#define __SV
+
 
 typedef struct _variant
 {
@@ -11,3 +14,13 @@ typedef struct _variant
 	char* node;
 	char node_strand;
 } variant;
+
+typedef struct _sv
+{
+		variant* var;
+		struct _sv *next;
+} sv;
+
+
+
+#endif

@@ -1,7 +1,7 @@
-CC=clang
+CC=gcc
 CFLAGS = -O0 -funroll-loops -g
-LDFLAGS = -lz -lm -lpthread -llzma -lbz2
-SOURCES = psvpan.c cmdline.c common.c alignment.c reference.c interval_tree.c
+LDFLAGS = -g
+SOURCES = psvpan.c cmdline.c common.c alignment.c reference.c interval_tree.c free.c sv.c
 OBJECTS = $(SOURCES:.c=.o)
 EXECUTABLE = psvpan
 
@@ -17,3 +17,4 @@ $(EXECUTABLE): $(OBJECTS)
 clean:
 	rm -f $(EXECUTABLE) *.o *~
 
+#clang

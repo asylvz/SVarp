@@ -4,6 +4,56 @@
 #include <ctype.h>
 #include "alignment.h"
 #include "interval_tree.h"
+#include "sv.h"
+
+void gaf_traverse(gaf** hashtab)
+{
+	gaf *ptr = NULL;
+	for(int i = 0; i < HASHSIZE - 1; i++)
+	{
+		printf("BUCKET %d\n", i);
+		for(ptr = hashtab[i]; ptr != NULL; ptr = ptr->next)
+		{
+			printf("%s - %s (%d - %d)\n", ptr->contig, ptr->node->read_name, ptr->node->start, ptr->node->end);
+		}
+		printf("\n\n");
+	}
+}
+
+gaf *gaf_lookup(gaf **hashtab, char *s)
+{
+    gaf *np;
+	//printf("lookup %s - %u", s, hash(s));
+    for (np = hashtab[hash(s)]; np != NULL; np = np->next)
+	{
+        if (strcmp(s, np->contig) == 0)
+        	return np;
+	}
+	return NULL;
+}
+
+gaf *gaf_insert(gaf **hashtab, char *contig_name, alignment *node)
+{
+    gaf *np;
+    unsigned hashval;
+	
+	if ((np = gaf_lookup(hashtab, contig_name)) == NULL)
+	{
+        np = (gaf*) getMem(sizeof(*np));
+        if (np == NULL)
+        	return NULL;
+		np->contig = strdup(contig_name);
+		np->node = node;
+        hashval = hash(contig_name); 
+		np->next = hashtab[hashval];
+        hashtab[hashval] = np;
+    } 
+    if ((np->node = node) == NULL)
+    	return NULL;
+   
+   	return np;
+}
+
 
 void init_alignment(alignment** aln)
 {
@@ -17,8 +67,7 @@ void init_alignment(alignment** aln)
 	(*aln)->path = NULL;
 }
 
-
-treenode* find_alignment_in_gfa(gfa* hashtab[], treenode* root, char* read_name, char strand, char* path, int path_start, int path_end)
+void find_alignment_in_gfa(gfa* gfatable[], gaf* gaftable[], char* read_name, char strand, char* path, int path_start, int path_end)
 {
 	alignment* aln = NULL;
 	gfa* tmp = NULL;
@@ -27,7 +76,7 @@ treenode* find_alignment_in_gfa(gfa* hashtab[], treenode* root, char* read_name,
 	char *delim = "><";
 	char *mytoken = strtok(copy, delim);
 	int offset = 0;
-	int node_count = 1;
+	int node_count = 0;
 	
 	int total_so_far = 0;
 	int total_node_length = 0;
@@ -40,7 +89,7 @@ treenode* find_alignment_in_gfa(gfa* hashtab[], treenode* root, char* read_name,
 		aln->strand = path[offset];
 		aln->read_name = strdup(read_name);
 		aln->path = strdup(path);
-
+		node_count += 1;
 		offset += strlen(mytoken) + 1;
 		mytoken = strtok(NULL, delim);
 		
@@ -48,16 +97,19 @@ treenode* find_alignment_in_gfa(gfa* hashtab[], treenode* root, char* read_name,
 		{
 			if(aln->strand == '>')
 			{
-				tmp = gfa_lookup(hashtab, aln->node);
+				tmp = gfa_lookup(gfatable, aln->node);
 				aln->start = tmp->node->offset + path_start;
 				aln->end = tmp->node->offset + path_end;
 			}
 			else
 			{
-				tmp = gfa_lookup(hashtab, aln->node);
+				tmp = gfa_lookup(gfatable, aln->node);
 				aln->start = tmp->node->offset + (tmp->node->len - path_end);
 				aln->end = tmp->node->offset + (tmp->node->len - path_start);
-			}
+			}	
+			
+			if(aln->end < aln->start)
+				printf("problem1");
 			total_so_far += (aln->end - aln->start);
 			total_node_length += tmp->node->len;
 		}
@@ -65,16 +117,19 @@ treenode* find_alignment_in_gfa(gfa* hashtab[], treenode* root, char* read_name,
 		{
 			if(aln->strand == '>')
 			{
-				tmp = gfa_lookup(hashtab, aln->node);
+				tmp = gfa_lookup(gfatable, aln->node);
 				aln->start = tmp->node->offset + path_start;
 				aln->end = tmp->node->offset + tmp->node->len;
 			}
 			else
 			{
-				tmp = gfa_lookup(hashtab, aln->node);
+				tmp = gfa_lookup(gfatable, aln->node);
 				aln->start = tmp->node->offset;
 				aln->end = tmp->node->offset + (tmp->node->len - path_start);
 			}
+			
+			if(aln->end < aln->start)
+				printf("\nproblem2 - node= %s, node_len = %d, path_start = %d\n", tmp->node->name, tmp->node->len, path_start);
 			total_so_far += (aln->end - aln->start);
 			total_node_length += tmp->node->len;
 		}
@@ -82,36 +137,44 @@ treenode* find_alignment_in_gfa(gfa* hashtab[], treenode* root, char* read_name,
 		{
 			if(aln->strand == '>')
 			{
-				tmp = gfa_lookup(hashtab, aln->node);
+				tmp = gfa_lookup(gfatable, aln->node);
 				aln->start = tmp->node->offset;
 				aln->end = tmp->node->offset + (total_path_length - total_so_far);
 			}
 			else
 			{
-				tmp = gfa_lookup(hashtab, aln->node);
+				tmp = gfa_lookup(gfatable, aln->node);
 				aln->start = tmp->node->offset + (tmp->node->len - (total_path_length - total_so_far));
 				aln->end = tmp->node->offset + tmp->node->len;
 			}
+
+			if(aln->end < aln->start)
+				printf("problem3");
 		}
 		else //middle node
 		{
-			tmp = gfa_lookup(hashtab, aln->node);
+			tmp = gfa_lookup(gfatable, aln->node);
 			aln->start = tmp->node->offset;
 			aln->end = tmp->node->offset + tmp->node->len;
+			
 			total_so_far += tmp->node->len;
 			total_node_length += tmp->node->len;
+
+			if(aln->end < aln->start)
+				printf("problem4");
 		}
-		root = insert_treenode(root, aln);
+
+		gaf_insert(gaftable, tmp->node->contig, aln);	
+		//root = insert_treenode(root, aln);
 		
 		//printf("mytoken = %s\n", mytoken);
 		//printf("%c%s ", aln->strand, aln->node);
 	}
 	free(copy);
 	
-	return root;
 }
 
-int read_alignments(parameters *params, gfa* gfa_table[])
+int read_alignments(parameters *params, gfa* gfa_table[], gaf* gaf_table[])
 {
 	FILE* fp;
     char* line = NULL;
@@ -119,7 +182,7 @@ int read_alignments(parameters *params, gfa* gfa_table[])
     ssize_t read;
 	char *mytoken = NULL;
 	int node_len, offset, field_cnt = 0, line_cnt = 1;
-	int secondary_filter = 0;
+	int secondary_filter = 0, cigar_cnt, ref_pos = 0;
 	char *cigar = NULL, *read_name = NULL, *path = NULL;
 	char strand;
 	int path_length, path_start, path_end;
@@ -127,12 +190,10 @@ int read_alignments(parameters *params, gfa* gfa_table[])
 	char cigarOp[50000];
 	char *tmp_str = NULL;
 	
-	treenode* t = NULL;
-	
+
 	fp = safe_fopen(params->gaf, "r");
 	while ((read = getline(&line, &len, fp)) != -1) {
         //printf("%s", line);
-		//init_alignment(&aln);	
 		
 		field_cnt = 0;
 		mytoken = strtok(line, "\t" );
@@ -178,7 +239,8 @@ int read_alignments(parameters *params, gfa* gfa_table[])
 						//get the Cigar
 						cigar = substr(mytoken, 5, strlen(mytoken) - 1);
 						//printf("%s\n", cigar);
-						int cigar_offset = 0, str_offset = 0, cigar_cnt = 0;
+						int cigar_offset = 0, str_offset = 0; 
+						cigar_cnt = 0;
 						tmp_str = (char*) getMem(sizeof(char) * 6);
 						memset(cigarLen, 0, 50000);
 						memset(cigarOp, 0, 50000);
@@ -209,19 +271,32 @@ int read_alignments(parameters *params, gfa* gfa_table[])
 			mytoken = strtok(NULL, "\t");
 		}
 		skip_alignment:;
-		if(line_cnt == 100)
+		if(line_cnt == 50000)
 			break;
 		line_cnt++;
-		t = find_alignment_in_gfa(gfa_table, t, read_name, strand, path, path_start, path_end);
+		//printf("Here\n");
+		find_alignment_in_gfa(gfa_table, gaf_table, read_name, strand, path, path_start, path_end);
+		
+		//Find SVs
+		
+		/*for (int c = 0; c < cigar_cnt; c++)
+		{
+			if (cigarOp[c] == 'I' && cigarLen[c] > 50)
+			{
+				sv* var = generate_sv_node(gfa_table, ref_pos, strand, path, path_start, path_end, cigarLen[c]);
+			}
+			if (cigarOp[c] != 'I')
+				ref_pos += cigarLen[c];
+		}*/
+		ref_pos = 0;	
     }
-
     fclose(fp);
     
 	if (line)
         free(line);
     
-	printf("Height is %d\n",find_height(t));
-	inorder(t);	
+	//printf("Height is %d\n",find_height(t));
+	//inorder(t);	
 		
 	return RETURN_SUCCESS;
 }
