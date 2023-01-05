@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <iostream>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
@@ -15,6 +15,21 @@ unsigned hash(char *s)
     for (hashval = 0; *s != '\0'; s++)
       hashval = *s + 31 * hashval;
     return hashval % HASHSIZE;
+}
+
+void* getMem(size_t size)
+{
+	void* ret;
+
+	ret = malloc(size);
+	if(ret == NULL)
+	{
+		printf("Cannot allocate memory.\n");
+		exit(0);
+	}
+
+	memUsage = memUsage + size;
+	return ret;
 }
 
 void init_params(parameters** params)
@@ -43,12 +58,22 @@ void set_str(char** target, char* source)
 	}
 }
 
+/*void copy_string(const string &other)
+{
+
+	int len = strlen(other);
+	other = new char [len + 1];
+	strcpy(m_pString, other.m_pString);
+ 	return *this;
+}*/
+
+/*
 char *substring(char *string, int position, int length)
 {
    char *p;
    int c;
 
-   p = malloc(length+1);
+   p = (char*) malloc(length+1);
 
    if (p == NULL)
    {
@@ -75,32 +100,9 @@ char* substr(const char *src, int start_index, int end_index)
 	strncpy(dest, (src + start_index), len);
 
     return dest;
-    
-	/*for (int i = start_index; i < end_index && (*(src + i) != '\0'); i++)
-    {
-        *dest = *(src + i);
-        dest++;
-    }
-
-    *dest = '\0';
-    return dest - len;*/
 }
 
 
-void* getMem(size_t size)
-{
-	void* ret;
-
-	ret = malloc(size);
-	if(ret == NULL)
-	{
-		printf("Cannot allocate memory. Currently addressed memory = %0.2f MB, requested memory = %0.2f MB.\nCheck the available main memory.\n", getMemUsage(), (float) (size / 1048576.0));
-		exit(0);
-	}
-
-	memUsage = memUsage + size;
-	return ret;
-}
 
 double getMemUsage()
 {
@@ -109,7 +111,6 @@ double getMemUsage()
 
 FILE* safe_fopen( char* path, char* mode)
 {
-	/* Safe file open. Try to open a file; exit if file does not exist */
 	FILE* file;
 	char err[500];
 
@@ -122,7 +123,7 @@ FILE* safe_fopen( char* path, char* mode)
 	return file;
 }
 
-/* gzFile safe_fopen_gz( char* path, char* mode)
+gzFile safe_fopen_gz( char* path, char* mode)
 {
 	//Safe file open. Try to open a file; exit if file does not exist
 	gzFile file;
@@ -135,8 +136,8 @@ FILE* safe_fopen( char* path, char* mode)
 		print_error(err);
 	}
 	return file;
-}*/
-
+}
+*/
 void print_error( char* msg)
 {
 	/* print error message and exit */

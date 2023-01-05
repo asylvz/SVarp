@@ -21,19 +21,20 @@ typedef struct _parameters
 #define max(x, y) (((x) > (y)) ? (x) : (y))
 #define min(x, y) (((x) < (y)) ? (x) : (y))
 
-/* String functions */
-void set_str(char **target, char *source); /* Even safer than strncpy */
+/* String functions
 char* substr(const char *src, int start_index, int end_index);
 
-/* memory */
+
 void* getMem(size_t size);
 double getMemUsage();
 FILE* safe_fopen( char* path, char* mode);		
 //gzFile safe_fopen_gz( char* path, char* mode);
-void init_params(parameters** params);
 void print_error( char* msg);
 
-
+*/
 unsigned hash(char *s);
+void init_params(parameters** params);
+void set_str(char **target, char *source);
+
 
 #endif

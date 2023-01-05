@@ -1,7 +1,7 @@
-CC=gcc
-CFLAGS = -O0 -funroll-loops -g
+CC=g++
+CFLAGS = -O0 -funroll-loops -g -Wall
 LDFLAGS = -g
-SOURCES = psvpan.c cmdline.c common.c alignment.c reference.c interval_tree.c free.c sv.c
+SOURCES = psvpan.cpp common.cpp cmdline.cpp reference.cpp alignment.cpp
 OBJECTS = $(SOURCES:.c=.o)
 EXECUTABLE = psvpan
 

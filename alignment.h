@@ -2,27 +2,39 @@
 #define __ALIGNMENT
 
 #include "common.h"
-#include "reference.h"
 
-typedef struct _alignment
+using namespace std;
+
+#define MINMAPQ 20
+
+class alignment
 {
-	char* read_name;
+private:
+public:
+
+	string read_name;
 	int start;
 	int end;
 	char strand;
-	char* node;
-	char* path;	
-} alignment;
+	string node;
+	string path;	
+		
+	alignment()
+	{
+	}
+	alignment(string _read_name, int _start, int _end, char _strand, string _node, string _path)
+	{
+		read_name = _read_name;
+		start = _start;
+		end = _end;
+		strand = _strand;
+		node = _node;
+		path = _path;
+	}
+	virtual ~alignment() {};
+	void display();
+};
 
-
-typedef struct _gaf { /* table entry: */
-	char* contig;
-    alignment *node; /* replacement text */
-    struct _gaf *next; /* next entry in chain */
-} gaf;
-
-
-int read_alignments(parameters *params, gfa* gfa_table[], gaf* gaf_table[]);
-void gaf_traverse(gaf** hashtab);
+int read_alignments(parameters *params);
 
 #endif
