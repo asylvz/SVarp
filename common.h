@@ -18,8 +18,8 @@ typedef struct _parameters
 	char* ref_graph;
 } parameters;
 
-#define max(x, y) (((x) > (y)) ? (x) : (y))
-#define min(x, y) (((x) < (y)) ? (x) : (y))
+//#define max(x, y) (((x) > (y)) ? (x) : (y))
+//#define min(x, y) (((x) < (y)) ? (x) : (y))
 
 /* String functions
 char* substr(const char *src, int start_index, int end_index);

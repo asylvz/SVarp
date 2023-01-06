@@ -20,7 +20,7 @@ int main(int argc, char** argv)
 
 	std::map<std::string, gfaNode*> ref = read_gfa(params);
 	
-	int a = read_alignments(params);	
+	int a = read_alignments(params, ref);	
 	
 	return 0;
 }

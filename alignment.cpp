@@ -2,95 +2,15 @@
 #include <string>
 #include <cstring>
 #include <fstream>
-#include <vector>
 #include <sstream>
 #include <map>
 #include <iterator>
 #include "alignment.h"
 
-
 void find_cigars(int (&cigarLen)[10000], string (&cigarOp)[10000])
 {
-	cout<<"k";	
-}
 
-
-int read_alignments(parameters *params)
-{
-	int secondary = 0;
-	int primary = 0;
-	
-	std::cout << "Reading the GAF file"<< std::endl;
-	
-	std::string line;	
-	std::vector <std::string> tokens;	
-	std::ifstream fp(params->gaf);
-	std::map<std::string, alignment*> gaf;
-	
-	while(fp)
-	{
-		getline(fp, line);
-			
-		std::string tmp_str;
-		std::stringstream s(line);
-		tokens.clear();
-		
-		while(getline(s, tmp_str, '\t'))
-        	tokens.push_back(tmp_str);
-		
-		if(stoi(tokens[11]) < MINMAPQ)
-			continue;
-
-		alignment *aln = new alignment();
-		aln->read_name = tokens[0];
-		aln->strand = tokens[4][0];
-		aln->path = tokens[5];
-		
-		bool isPrimary = true;	
-		string cigar;
-		for (auto& tok : tokens) {
-			if(strstr(tok.c_str(), "tp:A:"))
-			{
-				if (tok.substr(5, 6) != "P")
-				{
-					isPrimary = false;
-					secondary++;
-					break;
-				}
-				primary++;
-			}
-			else if(strstr(tok.c_str(), "cg:Z:"))
-			{
-				int cigarLen[10000];
-				string cigarOp[10000];
-				cigar = tok.substr(5);
-				find_cigars(cigarLen, cigarOp);
-				//cout<< cigar<<endl;
-			}
-   		}
-		if(!isPrimary)
-			continue;
-
-		//aln->path_length = stoi(tokens[5].substr(5));
-
-		//ref.insert(std::pair<std::string, gfaNode*>(g->name, g));
-	}
-	cout<<"There are "<<primary<<" primary mappings\n"<<endl;
-	/*
-				case 6:
-					path_length = atoi(mytoken);	
-					break;
-				case 7:
-					path_start = atoi(mytoken);
-					break;
-				case 8:
-					path_end = atoi(mytoken);
-					break;
-				default:
-
-					else if (strstr(mytoken, "cg:Z:") == mytoken)
-					{
-						//get the Cigar
+						/*get the Cigar
 						cigar = substr(mytoken, 5, strlen(mytoken) - 1);
 						//printf("%s\n", cigar);
 						int cigar_offset = 0, str_offset = 0; 
@@ -118,21 +38,68 @@ int read_alignments(parameters *params)
 							}
 							cigar_offset++;
 						}
-						break;			
-					}
+						break;	*/		
+}
+
+
+int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref)
+{
+	int secondary = 0;
+	int primary = 0;
+	
+	std::cout << "Reading the GAF file"<< std::endl;
+	
+	std::string line;	
+	std::vector <std::string> tokens;	
+	std::ifstream fp(params->gaf);
+	std::map<std::string, alignment*> gaf;
+	
+	while(fp)
+	{
+		getline(fp, line);
+
+		std::string tmp_str;
+		std::stringstream s(line);
+		tokens.clear();
+		
+		while(getline(s, tmp_str, '\t'))
+        	tokens.push_back(tmp_str);
+		
+		if(stoi(tokens[11]) < MINMAPQ)
+			continue;
+			
+		bool isPrimary = true;	
+		string cigar;
+		for (auto& tok : tokens) {
+			if(strstr(tok.c_str(), "tp:A:"))
+			{
+				if (tok.substr(5, 6) != "P")
+				{
+					isPrimary = false;
+					secondary++;
+					break;
+				}
+				primary++;
 			}
-			field_cnt++;
-			mytoken = strtok(NULL, "\t");
-		}
-		skip_alignment:;
-		if(line_cnt == 50000)
+			else if(strstr(tok.c_str(), "cg:Z:"))
+			{
+				int cigarLen[10000];
+				string cigarOp[10000];
+				cigar = tok.substr(5);
+				//find_cigars(cigarLen, cigarOp);
+				//cout<< cigar<<endl;
+			}
+   		}
+		if(!isPrimary)
+			continue;
+
+		alignment_within_gfa(gaf, ref, tokens);	
+		if(primary > 1000)
 			break;
-		line_cnt++;
-		//printf("Here\n");
-		find_alignment_in_gfa(gfa_table, gaf_table, read_name, strand, path, path_start, path_end);
-		
-		//Find SVs
-		
+	}
+	cout<<"There are "<<primary<<" primary mappings\n"<<endl;
+	
+	/*
 		//for (int c = 0; c < cigar_cnt; c++)
 		//{
 		//	if (cigarOp[c] == 'I' && cigarLen[c] > 50)
@@ -143,124 +110,101 @@ int read_alignments(parameters *params)
 	//			ref_pos += cigarLen[c];
 	//	}/
 		ref_pos = 0;	
-    }
-    fclose(fp);
-    
-	if (line)
-        free(line);
-    
-	//printf("Height is %d\n",find_height(t));
-	//inorder(t);	
-		*/
+	*/
 	return RETURN_SUCCESS;
 }
 
 
-/*
-void find_alignment_in_gfa(gfa* gfatable[], gaf* gaftable[], char* read_name, char strand, char* path, int path_start, int path_end)
+void alignment_within_gfa(map<string, alignment*>& gaf, map<string, gfaNode*> gfa, vector <std::string> tokens)
 {
-	alignment* aln = NULL;
-	gfa* tmp = NULL;
+	char *path_copy = (char *) tokens[5].c_str();
 	
-	char *copy = strdup(path);
-	char *delim = "><";
-	char *mytoken = strtok(copy, delim);
-	int offset = 0;
-	int node_count = 0;
+	char *mytoken = strtok(path_copy,"><");
 	
-	int total_so_far = 0;
-	int total_node_length = 0;
+	int offset = 0, node_count = 0, total_so_far = 0, total_node_length = 0;
+	int path_start = stoi(tokens[7]);
+	int path_end = stoi(tokens[8]);
 	int total_path_length = path_end - path_start;
 
 	while(mytoken) 
 	{
-		init_alignment(&aln);
-		aln->node = strdup(mytoken);
-		aln->strand = path[offset];
-		aln->read_name = strdup(read_name);
-		aln->path = strdup(path);
+		alignment *aln = new alignment();
+			
+		aln->node = mytoken;
+		aln->strand = tokens[4][offset];
+		aln->read_name = tokens[0];
+		aln->path = tokens[5];
 		node_count += 1;
 		offset += strlen(mytoken) + 1;
-		mytoken = strtok(NULL, delim);
+		mytoken = strtok(NULL, "><");
 		
 		if ((node_count == 1) && (mytoken == NULL)) //which means there is only a single node
 		{
 			if(aln->strand == '>')
 			{
-				tmp = gfa_lookup(gfatable, aln->node);
-				aln->start = tmp->node->offset + path_start;
-				aln->end = tmp->node->offset + path_end;
+				aln->start = gfa[aln->node]->offset + path_start;
+				aln->end = gfa[aln->node]->offset + path_end;
 			}
 			else
 			{
-				tmp = gfa_lookup(gfatable, aln->node);
-				aln->start = tmp->node->offset + (tmp->node->len - path_end);
-				aln->end = tmp->node->offset + (tmp->node->len - path_start);
+				aln->start = gfa[aln->node]->offset + (gfa[aln->node]->len - path_end);
+				aln->end = gfa[aln->node]->offset + (gfa[aln->node]->len - path_start);
 			}	
 			
 			if(aln->end < aln->start)
-				printf("problem1");
+				cout<<"problem1";
+			
 			total_so_far += (aln->end - aln->start);
-			total_node_length += tmp->node->len;
+			total_node_length += gfa[aln->node]->len;
 		}
 		else if((node_count == 1) && (mytoken != NULL))
 		{
 			if(aln->strand == '>')
 			{
-				tmp = gfa_lookup(gfatable, aln->node);
-				aln->start = tmp->node->offset + path_start;
-				aln->end = tmp->node->offset + tmp->node->len;
+				aln->start = gfa[aln->node]->offset + path_start;
+				aln->end = gfa[aln->node]->offset + gfa[aln->node]->len;
 			}
 			else
 			{
-				tmp = gfa_lookup(gfatable, aln->node);
-				aln->start = tmp->node->offset;
-				aln->end = tmp->node->offset + (tmp->node->len - path_start);
+				aln->start = gfa[aln->node]->offset;
+				aln->end = gfa[aln->node]->offset + (gfa[aln->node]->len - path_start);
 			}
 			
 			if(aln->end < aln->start)
-				printf("\nproblem2 - node= %s, node_len = %d, path_start = %d\n", tmp->node->name, tmp->node->len, path_start);
+				cout<<"problem2";
+
 			total_so_far += (aln->end - aln->start);
-			total_node_length += tmp->node->len;
+			total_node_length += gfa[aln->node]->len;
 		}
 		else if(mytoken == NULL)
 		{
 			if(aln->strand == '>')
 			{
-				tmp = gfa_lookup(gfatable, aln->node);
-				aln->start = tmp->node->offset;
-				aln->end = tmp->node->offset + (total_path_length - total_so_far);
+				aln->start = gfa[aln->node]->offset;
+				aln->end = gfa[aln->node]->offset + (total_path_length - total_so_far);
 			}
 			else
 			{
-				tmp = gfa_lookup(gfatable, aln->node);
-				aln->start = tmp->node->offset + (tmp->node->len - (total_path_length - total_so_far));
-				aln->end = tmp->node->offset + tmp->node->len;
+				aln->start = gfa[aln->node]->offset + (gfa[aln->node]->len - (total_path_length - total_so_far));
+				aln->end = gfa[aln->node]->offset + gfa[aln->node]->len;
 			}
 
 			if(aln->end < aln->start)
-				printf("problem3");
+				cout<<"problem3"; 
 		}
 		else //middle node
 		{
-			tmp = gfa_lookup(gfatable, aln->node);
-			aln->start = tmp->node->offset;
-			aln->end = tmp->node->offset + tmp->node->len;
+			aln->start = gfa[aln->node]->offset;
+			aln->end = gfa[aln->node]->offset + gfa[aln->node]->len;
 			
-			total_so_far += tmp->node->len;
-			total_node_length += tmp->node->len;
+			total_so_far += gfa[aln->node]->len;
+			total_node_length += gfa[aln->node]->len;
 
 			if(aln->end < aln->start)
-				printf("problem4");
+				cout<< "problem4";
 		}
 
-		gaf_insert(gaftable, tmp->node->contig, aln);	
-		//root = insert_treenode(root, aln);
-		
-		//printf("mytoken = %s\n", mytoken);
-		//printf("%c%s ", aln->strand, aln->node);
+		gaf.insert(std::pair<std::string, alignment*>(gfa[aln->node]->contig, aln));
+		//cout<<"inserted "<<gfa[aln->node]->contig<<endl;
 	}
-	free(copy);
-	
 }
-*/

@@ -1,7 +1,9 @@
 #ifndef __ALIGNMENT
 #define __ALIGNMENT
 
+#include <vector>
 #include "common.h"
+#include "gfa.h" 
 
 using namespace std;
 
@@ -35,6 +37,8 @@ public:
 	void display();
 };
 
-int read_alignments(parameters *params);
+void alignment_within_gfa(map<string, alignment*>& gaf, map<string, gfaNode*> gfa, vector <std::string> tokens);
+int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref);
+
 
 #endif
