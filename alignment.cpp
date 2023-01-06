@@ -7,38 +7,37 @@
 #include <iterator>
 #include "alignment.h"
 
-void find_cigars(int (&cigarLen)[10000], string (&cigarOp)[10000])
+void decompose_cigars(string cigar, int (&cigarLen)[10000], char (&cigarOp)[10000])
 {
-
-						/*get the Cigar
-						cigar = substr(mytoken, 5, strlen(mytoken) - 1);
-						//printf("%s\n", cigar);
-						int cigar_offset = 0, str_offset = 0; 
-						cigar_cnt = 0;
-						tmp_str = (char*) getMem(sizeof(char) * 6);
-						memset(cigarLen, 0, 50000);
-						memset(cigarOp, 0, 50000);
-						
-						while(cigar_offset < strlen(cigar))
-						{
-							if (isdigit(*(cigar + cigar_offset)) == 0)
-							{
-								cigarOp[cigar_cnt] = *(cigar + cigar_offset);
-								cigarLen[cigar_cnt] = atoi(tmp_str);
-								//printf("-->(%d)%d%c\n", cigar_cnt, cigarLen[cigar_cnt], cigarOp[cigar_cnt]);
-								free(tmp_str);
-								tmp_str = (char*) getMem(sizeof(char) * 6);	
-								str_offset = 0;
-								cigar_cnt++;
-							}
-							else 
-							{
-								*(tmp_str + str_offset) = *(cigar + cigar_offset);
-								str_offset++;
-							}
-							cigar_offset++;
-						}
-						break;	*/		
+	/*get the Cigar*/
+	int cigar_offset = 0, str_offset = 0, cigar_cnt = 0;
+	char* cigar_copy = (char*) cigar.c_str();	
+	char *tmp_str = (char*) malloc(sizeof(char) * 6);
+	//cout<< cigar_copy<<"\n\n";
+	while(cigar_offset < cigar.length())
+	{
+		if (isdigit(*(cigar_copy + cigar_offset)) == 0)
+		{
+			cigarOp[cigar_cnt] = *(cigar_copy + cigar_offset);
+			//cout<<cigarOp[cigar_cnt]<<endl;
+			cigarLen[cigar_cnt] = atoi(tmp_str);
+			//printf("-->(%d)%d%c\n", cigar_cnt, cigarLen[cigar_cnt], cigarOp[cigar_cnt]);
+			free(tmp_str);
+			tmp_str = (char*) malloc(sizeof(char) * 6);
+			str_offset = 0;
+			cigar_cnt++;
+		}
+		else 
+		{
+			*(tmp_str + str_offset) = *(cigar_copy + cigar_offset);
+			//cout<<tmp_str<<endl;
+			str_offset++;
+		}
+		//cout<<cigar_offset<<endl; 
+		cigar_offset++;
+	}
+	if(tmp_str != NULL)
+		free(tmp_str);
 }
 
 
@@ -83,10 +82,10 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref)
 			}
 			else if(strstr(tok.c_str(), "cg:Z:"))
 			{
-				int cigarLen[10000];
-				string cigarOp[10000];
+				int cigarLen[10000] = {0};
+				char cigarOp[10000] = {0};
 				cigar = tok.substr(5);
-				//find_cigars(cigarLen, cigarOp);
+				decompose_cigars(cigar, cigarLen, cigarOp);
 				//cout<< cigar<<endl;
 			}
    		}
