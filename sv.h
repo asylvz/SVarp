@@ -1,7 +1,9 @@
 #ifndef __SV
 #define __SV
 
+#include <map>
 #include <vector>
+#include "gfa.h" 
 
 #define DELETION 'D'
 #define INSERTION 'I'
@@ -39,5 +41,6 @@ public:
 	virtual ~variant() {};
 };
 
+variant* generate_sv_node(std::map<std::string, gfaNode*>, string, int, int, int, int, char);
 
 #endif

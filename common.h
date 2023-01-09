@@ -11,6 +11,7 @@ extern long long memUsage;
 #define RETURN_ERROR 0
 
 #define HASHSIZE 1001
+#define MINSVSIZE 50
 
 typedef struct _parameters
 {

@@ -4,12 +4,13 @@
 #include "gfa.h"
 #include "reference.h" 
 #include "alignment.h"
+#include "sv.h"
 
 //ctags *.c
 
 int main(int argc, char** argv)
 {
-	std::cout << "C++ loading" << std::endl;
+	std::vector <variant*> insertions;	
 	
 	parameters* params;
 	init_params(&params);
@@ -20,7 +21,7 @@ int main(int argc, char** argv)
 
 	std::map<std::string, gfaNode*> ref = read_gfa(params);
 	
-	int a = read_alignments(params, ref);	
+	int a = read_alignments(params, ref, insertions);	
 	
 	return 0;
 }

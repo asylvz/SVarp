@@ -4,6 +4,7 @@
 #include <vector>
 #include "common.h"
 #include "gfa.h" 
+#include "sv.h" 
 
 using namespace std;
 
@@ -38,7 +39,7 @@ public:
 };
 
 void alignment_within_gfa(map<string, alignment*>& gaf, map<string, gfaNode*> gfa, vector <std::string> tokens);
-int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref);
 
+int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::vector<variant*>& insertions);
 
 #endif

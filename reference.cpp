@@ -34,7 +34,6 @@ std::map<std::string, gfaNode*> read_gfa(parameters* params)
 			continue;
 		
 		gfaNode *g = new gfaNode();
-		//g->name = tokens[1].c_str();
 		g->name = tokens[1];
 		g->sequence = tokens[2];
 		g->len = stoi(tokens[3].substr(5));

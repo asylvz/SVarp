@@ -7,7 +7,7 @@
 #include <iterator>
 #include "alignment.h"
 
-void decompose_cigars(string cigar, int (&cigarLen)[10000], char (&cigarOp)[10000])
+int decompose_cigars(string cigar, int (&cigarLen)[10000], char (&cigarOp)[10000])
 {
 	/*get the Cigar*/
 	int cigar_offset = 0, str_offset = 0, cigar_cnt = 0;
@@ -38,20 +38,21 @@ void decompose_cigars(string cigar, int (&cigarLen)[10000], char (&cigarOp)[1000
 	}
 	if(tmp_str != NULL)
 		free(tmp_str);
+	
+	return cigar_cnt;
 }
 
 
-int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref)
+int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::vector<variant*>& insertions)
 {
-	int secondary = 0;
-	int primary = 0;
+	int secondary = 0, primary = 0, insertion_count = 0;
 	
 	std::cout << "Reading the GAF file"<< std::endl;
 	
 	std::string line;	
-	std::vector <std::string> tokens;	
+	std::vector <std::string> tokens;
 	std::ifstream fp(params->gaf);
-	std::map<std::string, alignment*> gaf;
+	std::map<std::string, alignment*> gaf;	
 	
 	while(fp)
 	{
@@ -85,8 +86,23 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref)
 				int cigarLen[10000] = {0};
 				char cigarOp[10000] = {0};
 				cigar = tok.substr(5);
-				decompose_cigars(cigar, cigarLen, cigarOp);
-				//cout<< cigar<<endl;
+				int cigar_cnt = decompose_cigars(cigar, cigarLen, cigarOp);
+				int ref_pos = 0;
+				for (int c = 0; c < cigar_cnt; c++)
+				{
+					if (cigarOp[c] == INSERTION && cigarLen[c] > MINSVSIZE)
+					{
+						variant* var = generate_sv_node(ref, tokens[5], stoi(tokens[7]), stoi(tokens[8]), ref_pos, cigarLen[c], INSERTION);
+						if (var)
+						{
+							insertion_count++;
+							insertions.push_back(var);
+						}
+					}
+					//cout<<"Added"<<endl;
+					if (cigarOp[c] != 'I')
+						ref_pos += cigarLen[c];
+				}	
 			}
    		}
 		if(!isPrimary)
@@ -95,21 +111,9 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref)
 		alignment_within_gfa(gaf, ref, tokens);	
 		if(primary > 1000)
 			break;
-	}
-	cout<<"There are "<<primary<<" primary mappings\n"<<endl;
+}
+	cout<<"There are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;
 	
-	/*
-		//for (int c = 0; c < cigar_cnt; c++)
-		//{
-		//	if (cigarOp[c] == 'I' && cigarLen[c] > 50)
-	//		{
-	//			sv* var = generate_sv_node(gfa_table, ref_pos, strand, path, path_start, path_end, cigarLen[c]);
-	//		}
-	//		if (cigarOp[c] != 'I')
-	//			ref_pos += cigarLen[c];
-	//	}/
-		ref_pos = 0;	
-	*/
 	return RETURN_SUCCESS;
 }
 
@@ -130,7 +134,7 @@ void alignment_within_gfa(map<string, alignment*>& gaf, map<string, gfaNode*> gf
 		alignment *aln = new alignment();
 			
 		aln->node = mytoken;
-		aln->strand = tokens[4][offset];
+		aln->strand = tokens[5][offset];
 		aln->read_name = tokens[0];
 		aln->path = tokens[5];
 		node_count += 1;
