@@ -3,8 +3,9 @@
 
 #include <vector>
 #include "common.h"
+#include <map>
 #include "gfa.h" 
-#include "sv.h" 
+#include "sv.h"
 
 using namespace std;
 
@@ -38,8 +39,11 @@ public:
 	void display();
 };
 
-void alignment_within_gfa(map<string, alignment*>& gaf, map<string, gfaNode*> gfa, vector <std::string> tokens);
 
-int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::vector<variant*>& insertions);
+void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<std::string, alignment*> aln, std::set<std::string> contigs, std::multimap<std::string, variant*>& insertions);
 
+void alignment_within_gfa(multimap<string, alignment*>& gaf, map<string, gfaNode*> gfa, vector <std::string> tokens);
+
+
+std::multimap<std::string, alignment*> read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::multimap<std::string, variant*>& insertions);
 #endif

@@ -5,6 +5,7 @@
 #include <vector>
 #include "gfa.h" 
 
+
 #define DELETION 'D'
 #define INSERTION 'I'
 
@@ -42,5 +43,6 @@ public:
 };
 
 variant* generate_sv_node(std::map<std::string, gfaNode*>, string, int, int, int, int, char);
+
 
 #endif

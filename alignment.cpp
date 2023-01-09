@@ -3,9 +3,61 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
-#include <map>
 #include <iterator>
+#include <algorithm>
+#include "interval_tree.h"
 #include "alignment.h"
+
+
+// Compares two intervals according to ending times in descending order.
+bool svSortComparator(variant* i1, variant* i2)
+{
+	if (i1->ref_start != i2->ref_start)
+    	return (i1->ref_start < i2->ref_start);
+	else
+		return (i1->ref_end > i2->ref_end);
+}
+
+
+void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<std::string, alignment*> aln, std::set<std::string> contigs, std::multimap<std::string, variant*>& insertions)
+{
+	
+
+	cout<<"Finding the supporting reads"<<endl;
+    /*for (auto& it : insertions) {
+        cout << it.first << ' ' << it.second->ref_start << ' ' << it.second->ref_end<< endl;
+    }*/
+
+    //sort(insertions.begin(), insertions.end(), svSortComparator);
+    
+    /*for (auto& it : aln) {
+		root = insert_treenode(root, it.second);
+    }*/
+	//inorder(root);
+	for(auto c: contigs)
+	{
+		//Insert the alignments of this contig into the interval tree
+		
+		treenode* root = NULL;
+		auto aln_range = aln.equal_range(c);
+		for (auto i = aln_range.first; i != aln_range.second; ++i)
+			root = insert_treenode(root, i->second);
+		
+		if (find_height(root) >0 )
+			cout<<"Contig:"<<c<<" tree height: "<<find_height(root) <<endl;
+		
+		auto sv_range = insertions.equal_range(c);
+		for (auto i = sv_range.first; i != sv_range.second; ++i)
+		{
+			std::vector <alignment*> overlaps;
+			treenode* t = find_overlaps(root, i->second, overlaps);
+			cout<<"For SV = "<< i->second->ref_start<< " "<< i->second->ref_end<<" - "<< overlaps.size()<<endl;
+			for (auto t:overlaps)
+				cout<<t->start<<endl;
+		}
+	}
+}
+
 
 int decompose_cigars(string cigar, int (&cigarLen)[10000], char (&cigarOp)[10000])
 {
@@ -43,7 +95,7 @@ int decompose_cigars(string cigar, int (&cigarLen)[10000], char (&cigarOp)[10000
 }
 
 
-int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::vector<variant*>& insertions)
+std::multimap<std::string, alignment*> read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::multimap<std::string, variant*>& insertions)
 {
 	int secondary = 0, primary = 0, insertion_count = 0;
 	
@@ -52,7 +104,7 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 	std::string line;	
 	std::vector <std::string> tokens;
 	std::ifstream fp(params->gaf);
-	std::map<std::string, alignment*> gaf;	
+	std::multimap<std::string, alignment*> gaf;	
 	
 	while(fp)
 	{
@@ -96,7 +148,8 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 						if (var)
 						{
 							insertion_count++;
-							insertions.push_back(var);
+							//insertions.push_back(var);
+							insertions.insert(std::pair<std::string, variant*>(var->contig, var));
 						}
 					}
 					//cout<<"Added"<<endl;
@@ -114,11 +167,11 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 }
 	cout<<"There are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;
 	
-	return RETURN_SUCCESS;
+	return gaf;
 }
 
 
-void alignment_within_gfa(map<string, alignment*>& gaf, map<string, gfaNode*> gfa, vector <std::string> tokens)
+void alignment_within_gfa(std::multimap<string, alignment*>& gaf, std::map<string, gfaNode*> gfa, vector <std::string> tokens)
 {
 	char *path_copy = (char *) tokens[5].c_str();
 	

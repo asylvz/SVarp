@@ -2,6 +2,8 @@
 #define __GFA
 
 #include <string>
+#include <set>
+#include "common.h"
 
 using namespace std;
 
@@ -29,5 +31,7 @@ public:
 	}
 	virtual ~gfaNode() {};
 };
+
+std::map<std::string, gfaNode*> read_gfa(parameters* params, std::set<std::string>& contigs);
 
 #endif

@@ -3,6 +3,7 @@
 #include <cstring>
 #include "sv.h"
 
+
 variant* generate_sv_node(std::map<std::string, gfaNode*> gfa, string path, int path_start, int path_end, int ref_pos, int cigar_len, char sv_type)
 {
 	variant *v = new variant();

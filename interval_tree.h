@@ -15,5 +15,6 @@ typedef struct _treenode
 treenode* insert_treenode(treenode *root, alignment *aln);
 int find_height(treenode* root);
 void inorder(treenode *root);
+treenode* find_overlaps(treenode* root, variant* sv, std::vector <alignment*>& overlaps);
 
 #endif

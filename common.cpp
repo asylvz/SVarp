@@ -7,6 +7,7 @@
 // Track memory usage
 long long memUsage = 0;
 
+
 /* The codes for the dictionary is taken from The C Programming language 
  * 2nd edition - Brian Kernighan and Dennis Ritchie */
 unsigned hash(char *s)
