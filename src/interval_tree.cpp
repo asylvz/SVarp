@@ -40,7 +40,7 @@ treenode* insert_treenode(treenode *root, alignment* aln)
     return root;	
 }
 
-treenode* find_overlaps(treenode* root, variant* sv, std::vector <alignment*>& overlaps)
+treenode* find_overlaps(treenode* root, variant* sv, std::set <alignment*>& overlaps)
 {
 	/*This is based on exercise 13.4-3 in Introduction to Algorithms 3rd edition Cormen. Each branch returns an interval (at least), as there are k branches in the tree - O(klgn). It would ideally be a red-black tree or an avl tree
 	Also benefited from:
@@ -48,17 +48,10 @@ treenode* find_overlaps(treenode* root, variant* sv, std::vector <alignment*>& o
 	- http://www.davismol.net/2016/02/07/data-structures-augmented-interval-tree-to-search-for-interval-overlapping/
     - https://github.com/gzc/CLRS/blob/master/C14-Augmenting-Data-Structures/14.3.md
   */
-	if (sv->contig == "chr22")
-	{
-		std::cout<<root->node->start<<" "<< root->node->end<<"---"<<sv->ref_start<<" "<<sv->ref_end<<endl;
-	}
+	
 	if ((root->node->end >= sv->ref_start && sv->ref_start >= root->node->start) || (root->node->end >= sv->ref_end && sv->ref_end >= root->node->start))
-	{
-		overlaps.push_back(root->node);
+		overlaps.insert(root->node);
 		
-		if (sv->contig == "chr22")
-			std::cout<<"pushed"<<endl;
-	}
 	if (root->left != NULL && root->left->max >= sv->ref_start)
 		find_overlaps(root->left, sv, overlaps);
 	

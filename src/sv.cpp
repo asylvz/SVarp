@@ -27,7 +27,7 @@ variant* generate_sv_node(std::map<std::string, gfaNode*> gfa, string path, int 
 			if(strand == '>')
 				v->ref_start = gfa[v->node]->offset + (path_start + ref_pos);
 			else
-				v->ref_start = gfa[v->node]->offset + (gfa[v->node]->len - (path_end + ref_pos));
+				v->ref_start = gfa[v->node]->offset + (gfa[v->node]->len - (path_start + ref_pos));
 			
 			v->contig = gfa[v->node]->contig;
 			v->node_strand = strand;

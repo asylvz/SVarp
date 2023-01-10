@@ -22,62 +22,57 @@ bool svSortComparator(variant* i1, variant* i2)
 void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<std::string, alignment*> aln, std::set<std::string> contigs, std::multimap<std::string, variant*>& insertions)
 {
 	
-
 	cout<<"Finding the supporting reads"<<endl;
-    /*for (auto& it : insertions) {
-        cout << it.first << ' ' << it.second->ref_start << ' ' << it.second->ref_end<< endl;
-    }*/
-
-    //sort(insertions.begin(), insertions.end(), svSortComparator);
-    
-    /*for (auto& it : aln) {
-		root = insert_treenode(root, it.second);
-    }*/
-	//inorder(root);
+	treenode* root;
+	
 	for(auto c: contigs)
 	{
-		//Insert the alignments of this contig into the interval tree
-		
-		treenode* root = NULL;
+		//Insert the alignments of this contig into the interval tree		
+		root = NULL;
 		auto aln_range = aln.equal_range(c);
 		for (auto i = aln_range.first; i != aln_range.second; ++i)
 			root = insert_treenode(root, i->second);
 		
-		if (find_height(root) >0 )
-			cout<<"Contig:"<<c<<" tree height: "<<find_height(root) <<endl;
+		//if (find_height(root) >0 )
+		//	cout<<"Contig:"<<c<<" tree height: "<<find_height(root) <<endl;
 		
 		auto sv_range = insertions.equal_range(c);
 		for (auto i = sv_range.first; i != sv_range.second; ++i)
 		{
-			std::vector <alignment*> overlaps;
+			std::set <alignment*> overlaps;
 			treenode* t = find_overlaps(root, i->second, overlaps);
-			cout<<"For SV = "<< i->second->ref_start<< " "<< i->second->ref_end<<" - "<< overlaps.size()<<endl;
+			//cout<<"For SV = "<< i->second->ref_start<< " "<< i->second->ref_end<<" - "<< overlaps.size()<<endl;
 			for (auto t:overlaps)
-				cout<<t->start<<endl;
+			{
+				cout<<t->read_name<<endl;
+				i->second->reads.push_back(t->read_name);
+				cout<<i->second->reads.size();
+			}
 		}
 	}
 }
 
 
-int decompose_cigars(string cigar, int (&cigarLen)[10000], char (&cigarOp)[10000])
+int decompose_cigars(string cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp)
 {
 	/*get the Cigar*/
-	int cigar_offset = 0, str_offset = 0, cigar_cnt = 0;
+	size_t cigar_offset = 0, str_offset = 0, cigar_cnt = 0;
 	char* cigar_copy = (char*) cigar.c_str();	
-	char *tmp_str = (char*) malloc(sizeof(char) * 6);
+	char *tmp_str = new char[6];
 	//cout<< cigar_copy<<"\n\n";
 	while(cigar_offset < cigar.length())
 	{
 		if (isdigit(*(cigar_copy + cigar_offset)) == 0)
 		{
-			cigarOp[cigar_cnt] = *(cigar_copy + cigar_offset);
+			cigarOp.push_back (*(cigar_copy + cigar_offset));
 			//cout<<cigarOp[cigar_cnt]<<endl;
-			cigarLen[cigar_cnt] = atoi(tmp_str);
-			//printf("-->(%d)%d%c\n", cigar_cnt, cigarLen[cigar_cnt], cigarOp[cigar_cnt]);
-			free(tmp_str);
-			tmp_str = (char*) malloc(sizeof(char) * 6);
+			cigarLen.push_back (atoi(tmp_str));
+			//printf("-->(%d)%d%c\n", cigar_cnt, cigarLen[cigar_cnt], cigarOp[cigar_cnt])
+			delete[] tmp_str; 	
+			tmp_str = new char[6];
 			str_offset = 0;
 			cigar_cnt++;
+			
 		}
 		else 
 		{
@@ -88,8 +83,7 @@ int decompose_cigars(string cigar, int (&cigarLen)[10000], char (&cigarOp)[10000
 		//cout<<cigar_offset<<endl; 
 		cigar_offset++;
 	}
-	if(tmp_str != NULL)
-		free(tmp_str);
+	delete[] tmp_str;
 	
 	return cigar_cnt;
 }
@@ -103,6 +97,9 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 	
 	std::string line;	
 	std::vector <std::string> tokens;
+	std::vector<int> cigarLen;
+	std::vector<char> cigarOp;
+
 	std::ifstream fp(params->gaf);
 	std::multimap<std::string, alignment*> gaf;	
 	
@@ -135,8 +132,9 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 			}
 			else if(strstr(tok.c_str(), "cg:Z:"))
 			{
-				int cigarLen[10000] = {0};
-				char cigarOp[10000] = {0};
+				cigarLen.clear();
+				cigarOp.clear();
+
 				cigar = tok.substr(5);
 				int cigar_cnt = decompose_cigars(cigar, cigarLen, cigarOp);
 				int ref_pos = 0;
@@ -147,15 +145,20 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 						variant* var = generate_sv_node(ref, tokens[5], stoi(tokens[7]), stoi(tokens[8]), ref_pos, cigarLen[c], INSERTION);
 						if (var)
 						{
+
+							//if (var->contig == "chr22")
+							//{
+							//	std::cout<<line<<endl;
+							//	std::cout<<cigarLen[c]<<cigarOp[c]<<endl;
+							//}
 							insertion_count++;
-							//insertions.push_back(var);
 							insertions.insert(std::pair<std::string, variant*>(var->contig, var));
 						}
 					}
 					//cout<<"Added"<<endl;
 					if (cigarOp[c] != 'I')
 						ref_pos += cigarLen[c];
-				}	
+				}
 			}
    		}
 		if(!isPrimary)

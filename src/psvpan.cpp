@@ -14,6 +14,7 @@ int main(int argc, char** argv)
 	parameters* params;
 	init_params(&params);
 	
+		
 	int return_value = parse_command_line(argc, argv, params);			
 	printf("\nThe input files are: \n\t%s\n\t%s\n", params->gaf, params->ref_graph);
 	

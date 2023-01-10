@@ -1,20 +1,22 @@
-CC=g++
-CFLAGS = -O0 -funroll-loops -g -Wall
-LDFLAGS = -g
-SOURCES = psvpan.cpp common.cpp cmdline.cpp reference.cpp alignment.cpp sv.cpp interval_tree.cpp
-OBJECTS = $(SOURCES:.c=.o)
-EXECUTABLE = psvpan
+CXX=g++
+CXXFLAGS = -g -O0 -Wall -DDEBUG
+TARGET_EXEC := psvpan
+BUILD_DIR := ./build
+SRC_DIRS := ./src
 
-all: $(SOURCES) $(EXECUTABLE)
-	rm -rf *.o
+SRCS := $(shell find $(SRC_DIRS) -name '*.cpp')
+OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
 
-$(EXECUTABLE): $(OBJECTS)
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
+# The final build step.
+$(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
+	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
 
-.c.o:
-	$(CC) -c $(CFLAGS) $< -o $@
 
+# Build step for C++ source
+$(BUILD_DIR)/%.cpp.o: %.cpp
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+.PHONY: clean
 clean:
-	rm -f $(EXECUTABLE) *.o *~
-
-#clang
+	rm -r $(BUILD_DIR)
