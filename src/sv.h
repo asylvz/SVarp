@@ -20,7 +20,7 @@ public:
 	int ref_start; 
 	int ref_end;
 	std::string contig;
-	std::vector <std::string> reads;
+	std::set <std::string> reads;
 	std::string node;
 	char node_strand;
 	

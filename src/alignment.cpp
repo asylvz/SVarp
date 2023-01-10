@@ -44,9 +44,9 @@ void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<st
 			//cout<<"For SV = "<< i->second->ref_start<< " "<< i->second->ref_end<<" - "<< overlaps.size()<<endl;
 			for (auto t:overlaps)
 			{
-				cout<<t->read_name<<endl;
-				i->second->reads.push_back(t->read_name);
-				cout<<i->second->reads.size();
+				//cout<<t->read_name<<endl;
+				i->second->reads.insert(t->read_name);
+				//cout<<i->second->reads.size();
 			}
 		}
 	}
