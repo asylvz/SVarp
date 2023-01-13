@@ -34,6 +34,8 @@ void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<st
 			root = insert_treenode(root, i->second);
 		
 		//if (find_height(root) >0 )
+		
+		//if (c == "CHM13#0#chr1")
 		//	cout<<"Contig:"<<c<<" tree height: "<<find_height(root) <<endl;
 		
 		auto sv_range = insertions.equal_range(c);
@@ -41,7 +43,11 @@ void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<st
 		{
 			std::set <alignment*> overlaps;
 			treenode* t = find_overlaps(root, i->second, overlaps);
-			//cout<<"For SV = "<< i->second->ref_start<< " "<< i->second->ref_end<<" - "<< overlaps.size()<<endl;
+			
+			/*if (i->second->contig == "CHM13#0#chr1")
+			{
+				cout<<"For SV = "<< i->second->ref_start<< " "<< i->second->ref_end<<" - "<< overlaps.size()<<endl;
+			}*/
 			for (auto t:overlaps)
 			{
 				//cout<<t->read_name<<endl;
@@ -143,19 +149,21 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 					if (cigarOp[c] == INSERTION && cigarLen[c] > MINSVSIZE)
 					{
 						variant* var = generate_sv_node(ref, tokens[5], stoi(tokens[7]), stoi(tokens[8]), ref_pos, cigarLen[c], INSERTION);
+						
 						if (var)
 						{
-
-							//if (var->contig == "chr22")
-							//{
-							//	std::cout<<line<<endl;
-							//	std::cout<<cigarLen[c]<<cigarOp[c]<<endl;
-							//}
+							if (var->ref_start == 100643044)
+							{
+								cout<<"Path:"<<tokens[5]<<" "<< var->contig <<endl;
+								cout<<"node:"<<var->node_strand<< var->node<<"\tstart:"<<var->ref_start<<"\tend:"<< var->ref_end<< "("<<tokens[0] <<endl;
+							}
 							insertion_count++;
+							//cout<<insertion_count<<endl;
 							insertions.insert(std::pair<std::string, variant*>(var->contig, var));
 						}
+						else
+							cout<<"RETURNED NULL"<<endl;
 					}
-					//cout<<"Added"<<endl;
 					if (cigarOp[c] != 'I')
 						ref_pos += cigarLen[c];
 				}
@@ -165,7 +173,8 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 			continue;
 
 		alignment_within_gfa(gaf, ref, tokens);	
-		if(primary > 1000)
+		//cout<<"primary = "<<primary<<endl;
+		if(primary > 10000)
 			break;
 }
 	cout<<"There are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;
@@ -185,6 +194,7 @@ void alignment_within_gfa(std::multimap<string, alignment*>& gaf, std::map<strin
 	int path_end = stoi(tokens[8]);
 	int total_path_length = path_end - path_start;
 
+	
 	while(mytoken) 
 	{
 		alignment *aln = new alignment();
@@ -262,7 +272,11 @@ void alignment_within_gfa(std::multimap<string, alignment*>& gaf, std::map<strin
 			if(aln->end < aln->start)
 				cout<< "problem4";
 		}
-
+		
+		if (gfa[aln->node]->contig == "CHM13#0#chr1")
+		{
+			cout<<"aln - \tstart: "<<aln->start<<"\tend: "<<aln->end<<endl;
+		}
 		gaf.insert(std::pair<std::string, alignment*>(gfa[aln->node]->contig, aln));
 		//cout<<"inserted "<<gfa[aln->node]->contig<<endl;
 	}

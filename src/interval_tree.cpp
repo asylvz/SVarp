@@ -49,6 +49,11 @@ treenode* find_overlaps(treenode* root, variant* sv, std::set <alignment*>& over
     - https://github.com/gzc/CLRS/blob/master/C14-Augmenting-Data-Structures/14.3.md
   */
 	
+	/*if (sv->contig == "CHM13#0#chr1")
+	{
+		cout<<"\t"<< root->node->start<< " "<< root->node->end<<endl;
+	}
+*/
 	if ((root->node->end >= sv->ref_start && sv->ref_start >= root->node->start) || (root->node->end >= sv->ref_end && sv->ref_end >= root->node->start))
 		overlaps.insert(root->node);
 		

@@ -21,6 +21,16 @@ int main(int argc, char** argv)
 	std::map<std::string, gfaNode*> ref = read_gfa(params, contigs);
 	std::multimap<std::string, alignment*> alignments = read_alignments(params, ref, insertions);	
 	find_supporting_reads(ref, alignments, contigs, insertions);
-		
+	
+
+
+	multimap<std::string, variant*>::iterator itr;
+	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
+	{
+		cout << itr->first << '\t'<< itr->second->ref_start << '\t'<< itr->second->ref_end << " ("<<itr->second->reads.size()<<" read support)\n";
+		for (auto &a: itr->second->reads)			
+			cout << '\t' << a << '\n';
+	}	
+
 	return 0;
 }
