@@ -5,23 +5,23 @@
 #include <set>
 #include "common.h"
 
-using namespace std;
+//using namespace std;
 
 class gfaNode
 {
 private:
 public:
 
-	string name;
-	string sequence;
+	std::string name;
+	std::string sequence;
 	int len;
 	int offset;
-	string contig;	
+	std::string contig;	
 	
 	gfaNode()
 	{
 	}
-	gfaNode(string _name, string _sequence, int _len, string _contig, int _offset)
+	gfaNode(std::string _name, std::string _sequence, int _len, std::string _contig, int _offset)
 	{
 		name = _name;
 		sequence = _sequence;

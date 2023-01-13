@@ -4,6 +4,7 @@
 #include "cmdline.h"
 #include "gfa.h"
 #include "alignment.h"
+#include "assembly.h"
 
 //ctags *.c
 
@@ -11,26 +12,21 @@ int main(int argc, char** argv)
 {
 	std::multimap <std::string, variant*> insertions;	
 	std::set<std::string> contigs;	
-	parameters* params;
-	init_params(&params);
+	std::map<std::string, gfaNode*> ref;
+	std::multimap<std::string, alignment*> alignments;
+
+	parameters* params = new parameters;	
+	if (parse_command_line(argc, argv, params) != RETURN_SUCCESS)
+		return RETURN_ERROR;
+
+	std::cout<<"\nThe input files are:\n\t"<<params->gaf<<"\n\t"<< params->ref_graph<<"\n\t"<<params->fastq<<std::endl;
 	
-		
-	int return_value = parse_command_line(argc, argv, params);			
-	printf("\nThe input files are: \n\t%s\n\t%s\n", params->gaf, params->ref_graph);
-	
-	std::map<std::string, gfaNode*> ref = read_gfa(params, contigs);
-	std::multimap<std::string, alignment*> alignments = read_alignments(params, ref, insertions);	
+	ref = read_gfa(params, contigs);
+	alignments = read_alignments(params, ref, insertions);	
+
 	find_supporting_reads(ref, alignments, contigs, insertions);
 	
+	//run_assembly(params, insertions);	
 
-
-	multimap<std::string, variant*>::iterator itr;
-	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
-	{
-		cout << itr->first << '\t'<< itr->second->ref_start << '\t'<< itr->second->ref_end << " ("<<itr->second->reads.size()<<" read support)\n";
-		for (auto &a: itr->second->reads)			
-			cout << '\t' << a << '\n';
-	}	
-
-	return 0;
+	return RETURN_SUCCESS;
 }

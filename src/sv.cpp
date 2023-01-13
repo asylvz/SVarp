@@ -4,7 +4,7 @@
 #include "sv.h"
 
 
-variant* generate_sv_node(std::map<std::string, gfaNode*> gfa, string path, int path_start, int path_end, int ref_pos, int cigar_len, char sv_type)
+variant* generate_sv_node(std::map<std::string, gfaNode*> gfa, std::string path, int path_start, int path_end, int ref_pos, int cigar_len, char sv_type)
 {
 	variant *v = new variant();
 	char *path_copy = (char *) path.c_str();
@@ -16,8 +16,8 @@ variant* generate_sv_node(std::map<std::string, gfaNode*> gfa, string path, int 
 	
 	while(mytoken) 
 	{
-		if (strcmp (mytoken,"s18891") == 0)
-			cout<<"node count "<< node_count<<" - mytoken: "<<mytoken <<endl;
+		//if (strcmp (mytoken,"s18891") == 0)
+		//	cout<<"node count "<< node_count<<" - mytoken: "<<mytoken <<endl;
 		
 		v->node = mytoken;
 		char strand = path[offset];
@@ -49,14 +49,10 @@ variant* generate_sv_node(std::map<std::string, gfaNode*> gfa, string path, int 
 		}
 		else if((node_count == 1) && (mytoken)) //First node
 		{
-			int node_map_size;
-			//if(strand == '>')
-				node_map_size = gfa[v->node]->len - path_start;
-			//else
-			//	node_map_size = path_start;
+			int	node_map_size = gfa[v->node]->len - path_start;
 			
-			if (v->node == "s18892")
-				cout<<"First node* node_map_size "<< node_map_size <<" ref_pos="<<ref_pos<<endl;
+			//if (v->node == "s18892")
+			//	cout<<"First node* node_map_size "<< node_map_size <<" ref_pos="<<ref_pos<<endl;
 			
 			if (node_map_size >= ref_pos)
 			{
@@ -84,8 +80,8 @@ variant* generate_sv_node(std::map<std::string, gfaNode*> gfa, string path, int 
 		}
 		else if(!mytoken) //Last node
 		{
-			if (v->node == "s18891")
-				cout<<"Last node* total_so_far "<< total_so_far <<" ref_pos="<<ref_pos<<endl;
+			//if (v->node == "s18891")
+			//	cout<<"Last node* total_so_far "<< total_so_far <<" ref_pos="<<ref_pos<<endl;
 			
 			if (ref_pos >= total_so_far)
 			{
@@ -104,14 +100,14 @@ variant* generate_sv_node(std::map<std::string, gfaNode*> gfa, string path, int 
 				return v;	
 			}
 			else
-				cout<<"Size problem in adding SV"<<endl;
+				std::cout<<"Size problem in adding SV"<<std::endl;
 		}
 		else //middle node
 		{
 			int node_map_size = total_so_far + gfa[v->node]->len;
 			
-			if (v->node == "s18891")
-				cout<<"Middle node* node_map_size "<< node_map_size <<" ref_pos="<<ref_pos<<"mytoken= "<<mytoken <<endl;
+			//if (v->node == "s18891")
+			//	cout<<"Middle node* node_map_size "<< node_map_size <<" ref_pos="<<ref_pos<<"mytoken= "<<mytoken <<endl;
 			
 			if (node_map_size >= ref_pos)
 			{
@@ -138,6 +134,6 @@ variant* generate_sv_node(std::map<std::string, gfaNode*> gfa, string path, int 
 			}
 		}
 	}
-	cout<<"ERRROORRRRRR -"<< total_so_far<< " "<<ref_pos<<endl;
+	std::cout<<"ERRROORRRRRR -"<< total_so_far<< " "<<ref_pos<<std::endl;
 	return NULL;
 }

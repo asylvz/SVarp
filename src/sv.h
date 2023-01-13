@@ -42,7 +42,7 @@ public:
 	virtual ~variant() {};
 };
 
-variant* generate_sv_node(std::map<std::string, gfaNode*>, string, int, int, int, int, char);
+variant* generate_sv_node(std::map<std::string, gfaNode*>, std::string, int, int, int, int, char);
 
 
 #endif

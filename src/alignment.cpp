@@ -152,11 +152,11 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 						
 						if (var)
 						{
-							if (var->ref_start == 100643044)
+							/*if (var->ref_start == 100643044)
 							{
 								cout<<"Path:"<<tokens[5]<<" "<< var->contig <<endl;
 								cout<<"node:"<<var->node_strand<< var->node<<"\tstart:"<<var->ref_start<<"\tend:"<< var->ref_end<< "("<<tokens[0] <<endl;
-							}
+							}*/
 							insertion_count++;
 							//cout<<insertion_count<<endl;
 							insertions.insert(std::pair<std::string, variant*>(var->contig, var));
@@ -273,10 +273,10 @@ void alignment_within_gfa(std::multimap<string, alignment*>& gaf, std::map<strin
 				cout<< "problem4";
 		}
 		
-		if (gfa[aln->node]->contig == "CHM13#0#chr1")
+		/*if (gfa[aln->node]->contig == "CHM13#0#chr1")
 		{
 			cout<<"aln - \tstart: "<<aln->start<<"\tend: "<<aln->end<<endl;
-		}
+		}*/
 		gaf.insert(std::pair<std::string, alignment*>(gfa[aln->node]->contig, aln));
 		//cout<<"inserted "<<gfa[aln->node]->contig<<endl;
 	}

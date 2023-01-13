@@ -2,21 +2,25 @@
 #define __COMMON
 
 // Track memory usage
-extern long long memUsage;
+//extern long long memUsage;
 
 #define EXIT_SUCCESS 0
 #define EXIT_COMMON 1
 
-#define RETURN_SUCCESS 1
-#define RETURN_ERROR 0
+#define RETURN_SUCCESS 0
+#define RETURN_ERROR -1
 
 #define HASHSIZE 1001
 #define MINSVSIZE 50
 
 typedef struct _parameters
 {
-	char* gaf;
-	char* ref_graph;
+	std::string gaf;
+	std::string ref_graph;
+	std::string fastq;
+	
+	_parameters() {
+    }
 } parameters;
 
 //#define max(x, y) (((x) > (y)) ? (x) : (y))

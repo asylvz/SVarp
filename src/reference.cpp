@@ -17,7 +17,7 @@ std::map<std::string, gfaNode*> read_gfa(parameters* params, std::set<std::strin
 	std::string line;	
 	std::vector <std::string> tokens;	
 	std::ifstream fp(params->ref_graph);
-	map<string, gfaNode*> ref;
+	std::map<std::string, gfaNode*> ref;
 	
 	while(fp)
 	{

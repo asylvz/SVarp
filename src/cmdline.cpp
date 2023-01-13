@@ -9,36 +9,40 @@ int parse_command_line(int argc, char** argv, parameters* params)
 	
 	static struct option long_options[] = 
 	{
-		{"gaf" , required_argument, NULL, 'i'},
+		{"gaf" , required_argument, NULL, 'a'},
 		{"graph" , required_argument, NULL, 'g'},
+		{"fastq" , required_argument, NULL, 'f'},
 		{NULL, 0, NULL, 0}
 	};
 	
-	while((o = getopt_long( argc, argv, "i:g:", long_options, &index)) != -1)
+	while((o = getopt_long( argc, argv, "a:g:f:", long_options, &index)) != -1)
 	{
 		switch(o)
 		{
-			case 'i':
-				set_str(&(params->gaf), optarg);
+			case 'a':
+				params->gaf = optarg;
 				break;	
 			case 'g':
-				set_str(&(params->ref_graph), optarg);
+				params->ref_graph = optarg;
+				break;
+			case 'f':
+				params->fastq = optarg;
 				break;
 		}
 	}	
 	/* check if --ref   is invoked */
-	if( params->ref_graph == NULL)
+	if((params->ref_graph).empty())
 	{
-		fprintf( stderr, "[PSVPAN CMDLINE ERROR] Please enter reference graph genome file (GFA) using the --graph option.\n");
-		return -1;
+		fprintf( stderr, "[PSVPAN CMDLINE ERROR] Please enter reference graph genome file (GFA) using the --graph (-g) option.\n");
+		return RETURN_ERROR;
 	}
 
-	if( params->gaf == NULL)
+	if((params->gaf).empty())
 	{
-		fprintf( stderr, "[PSVPAN CMDLINE ERROR] Please enter alignment file (GAF) using the --gaf option.\n");
-		return -1;
+		fprintf( stderr, "[PSVPAN CMDLINE ERROR] Please enter alignment file (GAF) using the --gaf (-a) option.\n");
+		return RETURN_ERROR;
 	}	
 
-	return 1;
+	return RETURN_SUCCESS;
 }
 
