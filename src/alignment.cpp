@@ -173,7 +173,6 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 			continue;
 
 		alignment_within_gfa(gaf, ref, tokens);	
-		//cout<<"primary = "<<primary<<endl;
 		if(primary > 10000)
 			break;
 }

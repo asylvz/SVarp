@@ -11,22 +11,25 @@
 int main(int argc, char** argv)
 {
 	std::multimap <std::string, variant*> insertions;	
+	std::multimap<std::string, alignment*> alignments;
 	std::set<std::string> contigs;	
 	std::map<std::string, gfaNode*> ref;
-	std::multimap<std::string, alignment*> alignments;
 
 	parameters* params = new parameters;	
 	if (parse_command_line(argc, argv, params) != RETURN_SUCCESS)
 		return RETURN_ERROR;
 
-	std::cout<<"\nThe input files are:\n\t"<<params->gaf<<"\n\t"<< params->ref_graph<<"\n\t"<<params->fastq<<std::endl;
+	
+	std::cout<<"\nThe input files are:\n\t"<<params->gaf<<"\n\t"<< params->ref_graph<<"\n\t"<<params->fasta<<std::endl;
 	
 	ref = read_gfa(params, contigs);
 	alignments = read_alignments(params, ref, insertions);	
 
 	find_supporting_reads(ref, alignments, contigs, insertions);
 	
-	//run_assembly(params, insertions);	
+	run_assembly(params, insertions);	
 
 	return RETURN_SUCCESS;
 }
+
+

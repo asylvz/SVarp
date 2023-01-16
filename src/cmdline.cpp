@@ -11,7 +11,7 @@ int parse_command_line(int argc, char** argv, parameters* params)
 	{
 		{"gaf" , required_argument, NULL, 'a'},
 		{"graph" , required_argument, NULL, 'g'},
-		{"fastq" , required_argument, NULL, 'f'},
+		{"fasta" , required_argument, NULL, 'f'},
 		{NULL, 0, NULL, 0}
 	};
 	
@@ -26,7 +26,7 @@ int parse_command_line(int argc, char** argv, parameters* params)
 				params->ref_graph = optarg;
 				break;
 			case 'f':
-				params->fastq = optarg;
+				params->fasta = optarg;
 				break;
 		}
 	}	

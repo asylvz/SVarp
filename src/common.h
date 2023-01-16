@@ -17,7 +17,7 @@ typedef struct _parameters
 {
 	std::string gaf;
 	std::string ref_graph;
-	std::string fastq;
+	std::string fasta;
 	
 	_parameters() {
     }
