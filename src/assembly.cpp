@@ -130,7 +130,7 @@ void run_assembly(parameters* params, std::multimap<std::string, variant*>& inse
 				exit(-1);
   			}
 
-			int var_size = itr->second->sv_size / 1000;
+			int var_size = (itr->second->sv_size * 2) / 1000;
 			if(var_size == 0)
 				var_size = 1;
 
