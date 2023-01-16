@@ -139,8 +139,8 @@ void run_assembly(parameters* params, std::multimap<std::string, variant*>& inse
 			std::string wtdbg2_cmd2 = "wtpoa-cns -t 16 -i " + output_path + ".ctg.lay.gz -fo " + output_path + filename + ".fa";
 			
 			//std::cout<< wtdbg2_cmd1<<"\n"<<wtdbg2_cmd2<<"\nSV size=" << itr->second->sv_size<< std::endl;
-		system(wtdbg2_cmd1.c_str());
-		system(wtdbg2_cmd2.c_str());
+			system(wtdbg2_cmd1.c_str());
+			system(wtdbg2_cmd2.c_str());
 		}
 	}
 
