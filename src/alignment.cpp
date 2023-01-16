@@ -157,6 +157,7 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 								cout<<"Path:"<<tokens[5]<<" "<< var->contig <<endl;
 								cout<<"node:"<<var->node_strand<< var->node<<"\tstart:"<<var->ref_start<<"\tend:"<< var->ref_end<< "("<<tokens[0] <<endl;
 							}*/
+							var->sv_size = cigarLen[c];
 							insertion_count++;
 							//cout<<insertion_count<<endl;
 							insertions.insert(std::pair<std::string, variant*>(var->contig, var));
@@ -173,7 +174,7 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 			continue;
 
 		alignment_within_gfa(gaf, ref, tokens);	
-		if(primary > 10000)
+		if(primary > TEST_SAMPLE_SIZE)
 			break;
 }
 	cout<<"There are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;

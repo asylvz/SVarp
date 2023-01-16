@@ -1,6 +1,7 @@
 #include <iostream>
 #include <set>
 #include <map>
+#include <filesystem>
 #include "cmdline.h"
 #include "gfa.h"
 #include "alignment.h"
@@ -19,7 +20,6 @@ int main(int argc, char** argv)
 	if (parse_command_line(argc, argv, params) != RETURN_SUCCESS)
 		return RETURN_ERROR;
 
-	
 	std::cout<<"\nThe input files are:\n\t"<<params->gaf<<"\n\t"<< params->ref_graph<<"\n\t"<<params->fasta<<std::endl;
 	
 	ref = read_gfa(params, contigs);

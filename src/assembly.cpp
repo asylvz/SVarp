@@ -84,17 +84,35 @@ void run_assembly(parameters* params, std::multimap<std::string, variant*>& inse
 {
 	std::map<std::string, unsigned long> fasta_index;
 	std::multimap<std::string, variant*>::iterator itr;
-	
-	std::string path = "log/";
-	std::cout<<"Assembly using wtdbg2..."<<std::endl;
-	
+
+	std::string cwd = std::filesystem::current_path().string();
+		
+	std::string log_path = cwd + "/log/";
+	if(std::filesystem::exists(log_path))
+		std::filesystem::remove_all(log_path);
+
+  	if (!std::filesystem::create_directory(log_path))
+	{
+		std::cerr << "Error creating log folder" << std::endl;
+		exit(-1);
+  	}
+  	if (!std::filesystem::create_directory(log_path + "assembly_input/"))
+	{
+		std::cerr << "Error creating log/assembly_input/" << std::endl;
+		exit(-1);
+  	}
+  	if (!std::filesystem::create_directory(log_path + "assembly_output/"))
+	{
+		std::cerr << "Error creating log/assembly_output/" << std::endl;
+		exit(-1);
+  	}
+
+	std::cout<<"Assembly using wtdbg2..."<<std::endl;		
+
 	index_fasta(params, fasta_index);	
 
 	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
 	{
-		//std::cout << itr->first << '\t'<< itr->second->ref_start << '\t'<< itr->second->ref_end << " ("<<itr->second->reads.size()<<" read support)\n";
-		//for (auto &a: itr->second->reads)			
-			//std::cout << '\t' << a << '\n';
 		if (itr->second->reads.size() == 0)
 			std::cout<< "ALARM - there is no read supporting the SV ("<<itr->second->ref_start<<" - "<<itr->second->ref_end<<") in "<< itr->second->contig <<std::endl;
 		
@@ -103,23 +121,26 @@ void run_assembly(parameters* params, std::multimap<std::string, variant*>& inse
 		{
 			std::string filename = itr->second->contig + "_" + std::to_string(itr->second->ref_start) + "_" + std::to_string(itr->second->ref_end);
 				
-			std::string file_path = path + "assembly_input/" + filename + ".fasta";
+			std::string file_path = log_path + "assembly_input/" + filename + ".fasta";
 			generate_fastq_file(params, fasta_index, itr->second->reads, file_path);	
-			std::string output_path = path + "assembly_output/" + filename;
-			std::cout<<itr->second->ref_end - itr->second->ref_start<<std::endl;
-			
-			auto created_new_directory = std::filesystem::create_directory(output_path);
-  			if (not created_new_directory) {
-    			// Either creation failed or the directory was already present.
-        		std::cerr << "Error creating the folder" << std::endl;
+			std::string output_path = log_path + "assembly_output/" + filename + "/";
+
+  			if (! std::filesystem::create_directory(output_path)) {
+        		std::cerr << "Error creating the folder "<<output_path << std::endl;
 				exit(-1);
   			}
 
-			int var_size = (itr->second->ref_end - itr->second->ref_start) / 1000000;
-			std::string wtdbg2_cmd1 = "wtdbg2 -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path;			
-			
-			std::string wtdbg2_cmd2 = "wtpoa-cns -t 16 -i " + output_path + ".ctg.lay.gz -fo " + output_path +".fa";			
+			int var_size = itr->second->sv_size / 1000;
+			if(var_size == 0)
+				var_size = 1;
 
+			std::string wtdbg2_cmd1 = "wtdbg2 -t 16 -x ont -g " + std::to_string(var_size) + "k -o " + output_path;			
+			
+			std::string wtdbg2_cmd2 = "wtpoa-cns -t 16 -i " + output_path + ".ctg.lay.gz -fo " + output_path + filename + ".fa";
+			
+			//std::cout<< wtdbg2_cmd1<<"\n"<<wtdbg2_cmd2<<"\nSV size=" << itr->second->sv_size<< std::endl;
+		system(wtdbg2_cmd1.c_str());
+		system(wtdbg2_cmd2.c_str());
 		}
 	}
 

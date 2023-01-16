@@ -13,6 +13,8 @@
 #define HASHSIZE 1001
 #define MINSVSIZE 50
 
+#define TEST_SAMPLE_SIZE 2000
+
 typedef struct _parameters
 {
 	std::string gaf;
