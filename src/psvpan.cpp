@@ -20,7 +20,9 @@ int main(int argc, char** argv)
 	if (parse_command_line(argc, argv, params) != RETURN_SUCCESS)
 		return RETURN_ERROR;
 
-	std::cout<<"\nThe input files are:\n\t"<<params->gaf<<"\n\t"<< params->ref_graph<<"\n\t"<<params->fasta<<std::endl;
+	std::cout<<"Working directory: "<<std::filesystem::current_path().string()<<std::endl;
+	
+	std::cout<<"\nInput files are:\n\t"<<params->gaf<<"\n\t"<< params->ref_graph<<"\n\t"<<params->fasta<<std::endl;
 	
 	ref = read_gfa(params, contigs);
 	alignments = read_alignments(params, ref, insertions);	

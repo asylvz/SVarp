@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS = -g -O0 -Wall -DDEBUG
+CXXFLAGS = -g -O0 -Wall -DDEBUG -lstdc++fs -std=c++17
 TARGET_EXEC := psvpan
 BUILD_DIR := ./build
 SRC_DIRS := ./src
