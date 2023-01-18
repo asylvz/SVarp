@@ -45,5 +45,5 @@ void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<st
 void alignment_within_gfa(multimap<string, alignment*>& gaf, map<string, gfaNode*> gfa, vector <std::string> tokens);
 
 
-std::multimap<std::string, alignment*> read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::multimap<std::string, variant*>& insertions);
+std::multimap<std::string, alignment*> read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::map<std::string, variant*>& insertions);
 #endif

@@ -94,7 +94,7 @@ int decompose_cigars(string cigar, std::vector<int>& cigarLen, std::vector<char>
 }
 
 
-std::multimap<std::string, alignment*> read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::multimap<std::string, variant*>& insertions)
+std::multimap<std::string, alignment*> read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::map<std::string, variant*>& insertions)
 {
 	int secondary = 0, primary = 0, insertion_count = 0;
 	
@@ -160,8 +160,17 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 							var->sv_size = cigarLen[c];
 							insertion_count++;
 							//cout<<insertion_count<<endl;
-							//check if this SV is found before
-							insertions.insert(std::pair<std::string, variant*>(var->contig, var));
+							//check if this SV has already been found
+							//insertions.insert(std::pair<std::string, variant*>(var->contig, var));
+							string var_name = var->contig + "_" + std::to_string(var->ref_start) + "_" + std::to_string(var->ref_end);
+							std::map<string, variant*>::iterator it = insertions.find(var_name);
+							if (it != insertions.end())
+								it->second->reads.insert(tokens[0]);	
+							else
+							{
+								var->reads.insert(tokens[0]);
+								insertions.insert(std::pair<std::string, variant*>(var_name, var));
+							}
 						}
 						else
 							cout<<"RETURNED NULL"<<endl;
