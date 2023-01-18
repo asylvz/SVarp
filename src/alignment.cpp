@@ -42,7 +42,7 @@ void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<st
 		for (auto i = sv_range.first; i != sv_range.second; ++i)
 		{
 			std::set <alignment*> overlaps;
-			treenode* t = find_overlaps(root, i->second, overlaps);
+			find_overlaps(root, i->second, overlaps);
 			
 			/*if (i->second->contig == "CHM13#0#chr1")
 			{
@@ -77,8 +77,7 @@ int decompose_cigars(string cigar, std::vector<int>& cigarLen, std::vector<char>
 			delete[] tmp_str; 	
 			tmp_str = new char[6];
 			str_offset = 0;
-			cigar_cnt++;
-			
+			cigar_cnt++;			
 		}
 		else 
 		{
@@ -152,14 +151,16 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 						
 						if (var)
 						{
-							/*if (var->ref_start == 100643044)
+							/*if (var->ref_start == 46392638)
 							{
+								cout<<line<<endl;
 								cout<<"Path:"<<tokens[5]<<" "<< var->contig <<endl;
 								cout<<"node:"<<var->node_strand<< var->node<<"\tstart:"<<var->ref_start<<"\tend:"<< var->ref_end<< "("<<tokens[0] <<endl;
 							}*/
 							var->sv_size = cigarLen[c];
 							insertion_count++;
 							//cout<<insertion_count<<endl;
+							//check if this SV is found before
 							insertions.insert(std::pair<std::string, variant*>(var->contig, var));
 						}
 						else

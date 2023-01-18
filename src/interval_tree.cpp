@@ -40,7 +40,7 @@ treenode* insert_treenode(treenode *root, alignment* aln)
     return root;	
 }
 
-treenode* find_overlaps(treenode* root, variant* sv, std::set <alignment*>& overlaps)
+void find_overlaps(treenode* root, variant* sv, std::set <alignment*>& overlaps)
 {
 	/*This is based on exercise 13.4-3 in Introduction to Algorithms 3rd edition Cormen. Each branch returns an interval (at least), as there are k branches in the tree - O(klgn). It would ideally be a red-black tree or an avl tree
 	Also benefited from:
@@ -63,7 +63,7 @@ treenode* find_overlaps(treenode* root, variant* sv, std::set <alignment*>& over
 	if (root->right != NULL && root->right->max >= sv->ref_start)
 		find_overlaps(root->right, sv, overlaps);
 	
-	return root;
+	//return root;
 }
 
 void inorder(treenode *root) {
