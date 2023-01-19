@@ -96,7 +96,7 @@ void run_assembly(parameters* params, std::map<std::string, variant*>& insertion
 	std::cout<<"Assembly using wtdbg2..."<<std::endl;		
 
 	index_fasta(params, fasta_index);	
-	//int cnt = 0;
+	int cnt = 0;
 	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
 	{
 		
@@ -137,7 +137,7 @@ void run_assembly(parameters* params, std::map<std::string, variant*>& insertion
 			//system(wtdbg2_cmd2.c_str());
 		}
 	}
-
+	std::cout<<"There are "<<cnt++<<"SVs that have >"<<MIN_READ_SUPPORT<<std::endl;
 
 
     /*for (const auto & entry : std::filesystem::directory_iterator(path + "assembly_input/"))

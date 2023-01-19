@@ -97,9 +97,9 @@ int decompose_cigars(string cigar, std::vector<int>& cigarLen, std::vector<char>
 
 int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::map<std::string, variant*>& insertions)
 {
-	int secondary = 0, primary = 0, insertion_count = 0, line_count = 0;
+	int secondary = 0, primary = 0, insertion_count = 0, line_count = 0, perc = 0;
 	
-	std::cout << "Reading the GAF file"<< std::endl;
+	std::cout<<"Reading the GAF file"<<std::endl;
 	
 	std::string line;	
 	std::vector <std::string> tokens;
@@ -109,7 +109,7 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 	std::ifstream fp(params->gaf);
 	//std::multimap<std::string, alignment*> gaf;	
 	
-    /*int total_line_count = 0;
+    int total_line_count = 0;
     char endline_char = '\n';
     while (fp.ignore(numeric_limits<streamsize>::max(), fp.widen(endline_char)))
 	{ 
@@ -122,7 +122,7 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 	
 	if (total_line_count > TEST_SAMPLE_SIZE)
 		total_line_count = TEST_SAMPLE_SIZE;
-	*/
+
 	while(fp)
 	{
 		getline(fp, line);
@@ -192,14 +192,21 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 			continue;
 
 		line_count++;
-		//int perc = (line_count / total_line_count) * 100;
-		//if(perc % 10 == 0)
-		//	std::cout<<".";
+		int perc_tmp = ((double) line_count / total_line_count) * 100;
+		
+		//std::cout<<line_count<< " / "<<total_line_count<<" = "<< perc_tmp<< " " <<perc<< std::endl;
+		//std::cout<<perc_tmp<<" "<<perc<<std::endl;
+		if (perc_tmp > perc)
+		{
+			perc = perc_tmp;
+			fprintf(stderr, "%d%%\r",perc);
+			fflush(stderr);
+		}
 
-		//alignment_within_gfa(gaf, ref, tokens);	
+		//alignment_within_gfa(gaf, ref, tokens);
 		if(line_count > TEST_SAMPLE_SIZE)
 			break;
-	}	
+	}
 	cout<<"\nThere are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;
 	
 	return RETURN_SUCCESS;
