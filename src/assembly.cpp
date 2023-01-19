@@ -101,7 +101,7 @@ void run_assembly(parameters* params, std::map<std::string, variant*>& insertion
 	{
 		
 		//Generate fastq files
-		if (itr->second->reads.size() > 1)
+		if (itr->second->reads.size() > MIN_READ_SUPPORT)
 		{
 			std::string filename = itr->second->contig + "_" + std::to_string(itr->second->ref_start) + "_" + std::to_string(itr->second->ref_end);
 				

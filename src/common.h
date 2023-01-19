@@ -13,7 +13,8 @@
 #define HASHSIZE 1001
 #define MINSVSIZE 50
 
-#define TEST_SAMPLE_SIZE 100000
+#define TEST_SAMPLE_SIZE 10000
+#define MIN_READ_SUPPORT 5
 
 typedef struct _parameters
 {

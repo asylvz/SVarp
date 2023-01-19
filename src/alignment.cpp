@@ -5,6 +5,7 @@
 #include <sstream>
 #include <iterator>
 #include <algorithm>
+#include <limits>
 #include "interval_tree.h"
 #include "alignment.h"
 
@@ -96,7 +97,7 @@ int decompose_cigars(string cigar, std::vector<int>& cigarLen, std::vector<char>
 
 int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::map<std::string, variant*>& insertions)
 {
-	int secondary = 0, primary = 0, insertion_count = 0;
+	int secondary = 0, primary = 0, insertion_count = 0, line_count = 0;
 	
 	std::cout << "Reading the GAF file"<< std::endl;
 	
@@ -108,6 +109,20 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 	std::ifstream fp(params->gaf);
 	//std::multimap<std::string, alignment*> gaf;	
 	
+    /*int total_line_count = 0;
+    char endline_char = '\n';
+    while (fp.ignore(numeric_limits<streamsize>::max(), fp.widen(endline_char)))
+	{ 
+		++total_line_count;
+	}
+	//std::cout<< line_count<<std::endl;
+	
+	fp.clear() ; // clear the failed state of the stream
+	fp.seekg(0) ; // seek to the first character in the file
+	
+	if (total_line_count > TEST_SAMPLE_SIZE)
+		total_line_count = TEST_SAMPLE_SIZE;
+	*/
 	while(fp)
 	{
 		getline(fp, line);
@@ -176,11 +191,16 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 		if(!isPrimary)
 			continue;
 
+		line_count++;
+		//int perc = (line_count / total_line_count) * 100;
+		//if(perc % 10 == 0)
+		//	std::cout<<".";
+
 		//alignment_within_gfa(gaf, ref, tokens);	
-		if(primary > TEST_SAMPLE_SIZE)
+		if(line_count > TEST_SAMPLE_SIZE)
 			break;
 	}	
-	cout<<"There are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;
+	cout<<"\nThere are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;
 	
 	return RETURN_SUCCESS;
 }
