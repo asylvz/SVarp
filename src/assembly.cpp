@@ -99,15 +99,16 @@ void run_assembly(parameters* params, std::map<std::string, variant*>& insertion
 	//int cnt = 0;
 	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
 	{
-		if (itr->second->reads.size() == 0)
-			std::cout<< "ALARM - there is no read supporting the SV ("<<itr->second->ref_start<<" - "<<itr->second->ref_end<<") in "<< itr->second->contig <<std::endl;
 		
-		std::cout<<itr->second->reads.size()<<" "<<itr->second->ref_start<<" - "<<itr->second->ref_end<<" --- "<< itr->second->contig <<std::endl;
 		//Generate fastq files
 		if (itr->second->reads.size() > 1)
 		{
 			std::string filename = itr->second->contig + "_" + std::to_string(itr->second->ref_start) + "_" + std::to_string(itr->second->ref_end);
-			
+				
+			std::cout<<itr->second->reads.size()<<" "<<itr->first <<std::endl;
+			for (auto &a: itr->second->reads)
+				std::cout<<a<<std::endl;
+
 			std::string file_path = log_path + "assembly_input/" + filename + ".fasta";	
 			std::string output_path = log_path + "assembly_output/" + filename + "/";
 			//The same SV may be covered by multiple reads

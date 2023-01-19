@@ -12,6 +12,7 @@
 
 int main(int argc, char** argv)
 {
+
 	std::map <std::string, variant*> insertions;	
 	std::multimap<std::string, alignment*> alignments;
 	std::set<std::string> contigs;	
@@ -31,7 +32,8 @@ int main(int argc, char** argv)
 	std::cout<<"\nInput files are:\n\t"<<params->gaf<<"\n\t"<< params->ref_graph<<"\n\t"<<params->fasta<<std::endl;
 	
 	ref = read_gfa(params, contigs);
-	alignments = read_alignments(params, ref, insertions);	
+	if (read_alignments(params, ref, insertions) != RETURN_SUCCESS)
+		std::cout<<"Alignments could not be read\n";
 
 	//find_supporting_reads(ref, alignments, contigs, insertions);
 	

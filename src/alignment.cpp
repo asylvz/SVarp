@@ -94,7 +94,7 @@ int decompose_cigars(string cigar, std::vector<int>& cigarLen, std::vector<char>
 }
 
 
-std::multimap<std::string, alignment*> read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::map<std::string, variant*>& insertions)
+int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::map<std::string, variant*>& insertions)
 {
 	int secondary = 0, primary = 0, insertion_count = 0;
 	
@@ -106,7 +106,7 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 	std::vector<char> cigarOp;
 
 	std::ifstream fp(params->gaf);
-	std::multimap<std::string, alignment*> gaf;	
+	//std::multimap<std::string, alignment*> gaf;	
 	
 	while(fp)
 	{
@@ -151,19 +151,12 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 						
 						if (var)
 						{
-							/*if (var->ref_start == 46392638)
-							{
-								cout<<line<<endl;
-								cout<<"Path:"<<tokens[5]<<" "<< var->contig <<endl;
-								cout<<"node:"<<var->node_strand<< var->node<<"\tstart:"<<var->ref_start<<"\tend:"<< var->ref_end<< "("<<tokens[0] <<endl;
-							}*/
 							var->sv_size = cigarLen[c];
 							insertion_count++;
-							//cout<<insertion_count<<endl;
-							//check if this SV has already been found
-							//insertions.insert(std::pair<std::string, variant*>(var->contig, var));
+							
 							string var_name = var->contig + "_" + std::to_string(var->ref_start) + "_" + std::to_string(var->ref_end);
 							std::map<string, variant*>::iterator it = insertions.find(var_name);
+							
 							if (it != insertions.end())
 								it->second->reads.insert(tokens[0]);	
 							else
@@ -183,17 +176,17 @@ std::multimap<std::string, alignment*> read_alignments(parameters *params, std::
 		if(!isPrimary)
 			continue;
 
-		alignment_within_gfa(gaf, ref, tokens);	
+		//alignment_within_gfa(gaf, ref, tokens);	
 		if(primary > TEST_SAMPLE_SIZE)
 			break;
-}
+	}	
 	cout<<"There are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;
 	
-	return gaf;
+	return RETURN_SUCCESS;
 }
 
 
-void alignment_within_gfa(std::multimap<string, alignment*>& gaf, std::map<string, gfaNode*> gfa, vector <std::string> tokens)
+/*void alignment_within_gfa(std::multimap<string, alignment*>& gaf, std::map<string, gfaNode*> gfa, vector <std::string> tokens)
 {
 	char *path_copy = (char *) tokens[5].c_str();
 	
@@ -283,11 +276,11 @@ void alignment_within_gfa(std::multimap<string, alignment*>& gaf, std::map<strin
 				cout<< "problem4";
 		}
 		
-		/*if (gfa[aln->node]->contig == "CHM13#0#chr1")
-		{
-			cout<<"aln - \tstart: "<<aln->start<<"\tend: "<<aln->end<<endl;
-		}*/
+		//if (gfa[aln->node]->contig == "CHM13#0#chr1")
+		//{
+		//	cout<<"aln - \tstart: "<<aln->start<<"\tend: "<<aln->end<<endl;
+		//}
 		gaf.insert(std::pair<std::string, alignment*>(gfa[aln->node]->contig, aln));
 		//cout<<"inserted "<<gfa[aln->node]->contig<<endl;
 	}
-}
+}*/
