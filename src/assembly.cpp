@@ -96,63 +96,65 @@ void run_assembly(parameters* params, std::map<std::string, variant*>& insertion
 	std::cout<<"Assembly using wtdbg2..."<<std::endl;		
 
 	index_fasta(params, fasta_index);	
-	int cnt = 0;
+
+
+	int h1 = 0, h2 = 0;
 	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
-	{
-		
+	{	
 		//Generate fastq files
-		if (itr->second->reads.size() > MIN_READ_SUPPORT)
+		if (itr->second->reads_h1.size() > MIN_READ_SUPPORT)
 		{
-			std::string filename = itr->second->contig + "_" + std::to_string(itr->second->ref_start) + "_" + std::to_string(itr->second->ref_end);
+			std::string filename = itr->second->contig + "_" + std::to_string(itr->second->ref_start) + "_" + std::to_string(itr->second->ref_end) + "_H1";
 				
-			std::cout<<itr->second->reads.size()<<" "<<itr->first <<std::endl;
-			for (auto &a: itr->second->reads)
-				std::cout<<a<<std::endl;
+			std::cout<<"H1 "<<itr->second->reads_h1.size()<<" "<<itr->first <<std::endl;
+			for (auto &a: itr->second->reads_h1)
+				std::cout<<"\t"<<a<<std::endl;
 
 			std::string file_path = log_path + "assembly_input/" + filename + ".fasta";	
 			std::string output_path = log_path + "assembly_output/" + filename + "/";
-			//The same SV may be covered by multiple reads
-			//if (std::filesystem::exists(output_path))
-			//	continue;		
 			
-			generate_fastq_file(params, fasta_index, itr->second->reads, file_path);	
+			generate_fastq_file(params, fasta_index, itr->second->reads_h1, file_path);	
 			
-			//std::cout<< itr->second->ref_start<<" - "<<itr->second->ref_end<<" in "<< itr->second->contig <<" "<< cnt++ <<std::endl;
-			//std::cout<<output_path<<std::endl;
-  			if (! std::filesystem::create_directory(output_path)) {
+  			if (! std::filesystem::create_directory(output_path))
         		std::cerr << "Error creating the folder "<<output_path << std::endl;
-				//exit(-1);
-  			}
 
 			int var_size = (itr->second->sv_size * 2) / 1000;
 			if(var_size == 0)
 				var_size = 1;
-
-			std::string wtdbg2_cmd1 = "wtdbg2 -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path;	
 			
-			std::string wtdbg2_cmd2 = "wtpoa-cns -t 16 -i " + output_path + ".ctg.lay.gz -fo " + output_path + filename + ".fa";
+			h1++;
+			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path;	
 			
 			//std::cout<< wtdbg2_cmd1<<"\n"<<wtdbg2_cmd2<<"\nSV size=" << itr->second->sv_size<< std::endl;
-			//system(wtdbg2_cmd1.c_str());
-			//system(wtdbg2_cmd2.c_str());
+			//system(wtdbg2_cmd.c_str());
+		}
+		if (itr->second->reads_h2.size() > MIN_READ_SUPPORT)
+		{
+			std::string filename = itr->second->contig + "_" + std::to_string(itr->second->ref_start) + "_" + std::to_string(itr->second->ref_end) + "_H2";
+				
+			std::cout<<"H2"<<itr->second->reads_h1.size()<<" "<<itr->first <<std::endl;
+			for (auto &a: itr->second->reads_h1)
+				std::cout<<"\t"<<a<<std::endl;
+
+			std::string file_path = log_path + "assembly_input/" + filename + ".fasta";	
+			std::string output_path = log_path + "assembly_output/" + filename + "/";
+			
+			generate_fastq_file(params, fasta_index, itr->second->reads_h2, file_path);	
+			
+  			if (! std::filesystem::create_directory(output_path))
+        		std::cerr << "Error creating the folder "<<output_path << std::endl;
+
+			int var_size = (itr->second->sv_size * 2) / 1000;
+			if(var_size == 0)
+				var_size = 1;
+			
+			h2++;
+			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path;	
+			
+			//std::cout<< wtdbg2_cmd1<<"\n"<<wtdbg2_cmd2<<"\nSV size=" << itr->second->sv_size<< std::endl;
+			//system(wtdbg2_cmd.c_str());
 		}
 	}
-	std::cout<<"There are "<<cnt++<<"SVs that have >"<<MIN_READ_SUPPORT<<std::endl;
-
-
-    /*for (const auto & entry : std::filesystem::directory_iterator(path + "assembly_input/"))
-	{
-		if (entry.path().extension() != ".fasta")
-			continue;
-		
-		std::string rawname = entry.path().string().substr(entry.path().string().find_last_of("/\\") + 1);	
-		std::string output_path = path + "assembly_out/" + rawname.substr(0, rawname.find_last_of(".")); 
-
-		std::string flye_cmd = "flye --nano-raw " + entry.path().string() + " --out-dir " + output_path;
-		std::cout<<"Running flye with " <<flye_cmd<<std::endl;
-		system(flye_cmd.c_str());
-
-	}*/
-
+	std::cout<<"There are "<<h1+h2<<" SVs that have >"<<MIN_READ_SUPPORT<<" minimum read support ("<<h1<<" H1 - "<<h2<<" H2)" <<std::endl;
 }
 

@@ -20,7 +20,9 @@ public:
 	int ref_start; 
 	int ref_end;
 	std::string contig;
-	std::set <std::string> reads;
+	std::set <std::string> reads_h1;	
+	std::set <std::string> reads_h2;
+	bool phased;
 	std::string node;
 	char node_strand;
 	

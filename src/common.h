@@ -13,7 +13,7 @@
 #define HASHSIZE 1001
 #define MINSVSIZE 50
 
-#define TEST_SAMPLE_SIZE 10000
+#define TEST_SAMPLE_SIZE 500000
 #define MIN_READ_SUPPORT 5
 
 typedef struct _parameters
@@ -21,7 +21,8 @@ typedef struct _parameters
 	std::string gaf;
 	std::string ref_graph;
 	std::string fasta;
-	
+	std::string phase_tags;
+
 	_parameters() {
     }
 } parameters;

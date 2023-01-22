@@ -52,7 +52,7 @@ void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<st
 			for (auto t:overlaps)
 			{
 				//cout<<t->read_name<<endl;
-				i->second->reads.insert(t->read_name);
+				i->second->reads_h1.insert(t->read_name);
 				//cout<<i->second->reads.size();
 			}
 		}
@@ -166,17 +166,16 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 						
 						if (var)
 						{
-							var->sv_size = cigarLen[c];
+							var->sv_size = cigarLen[c];	
 							insertion_count++;
 							
 							string var_name = var->contig + "_" + std::to_string(var->ref_start) + "_" + std::to_string(var->ref_end);
 							std::map<string, variant*>::iterator it = insertions.find(var_name);
-							
 							if (it != insertions.end())
-								it->second->reads.insert(tokens[0]);	
+								it->second->reads_h1.insert(tokens[0]);	
 							else
 							{
-								var->reads.insert(tokens[0]);
+								var->reads_h1.insert(tokens[0]);
 								insertions.insert(std::pair<std::string, variant*>(var_name, var));
 							}
 						}

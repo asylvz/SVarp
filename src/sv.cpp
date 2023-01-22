@@ -20,6 +20,7 @@ variant* generate_sv_node(std::map<std::string, gfaNode*> gfa, std::string path,
 		//	cout<<"node count "<< node_count<<" - mytoken: "<<mytoken <<endl;
 		
 		v->node = mytoken;
+		v->phased = false;
 		char strand = path[offset];
 		node_count += 1;
 		offset += strlen(mytoken) + 1;
