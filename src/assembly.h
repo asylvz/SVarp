@@ -6,5 +6,6 @@
 #include "sv.h"
 
 void run_assembly(parameters* params, std::map<std::string, variant*>& insertions);
+int index_fasta(parameters* params, std::map<std::string, unsigned long>& fasta_index);
 
 #endif

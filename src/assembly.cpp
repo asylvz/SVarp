@@ -149,7 +149,7 @@ void run_assembly(parameters* params, std::map<std::string, variant*>& insertion
 				var_size = 1;
 			
 			h2++;
-			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path;	
+			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + "&> /dev/null";	
 			
 			//std::cout<< wtdbg2_cmd1<<"\n"<<wtdbg2_cmd2<<"\nSV size=" << itr->second->sv_size<< std::endl;
 			//system(wtdbg2_cmd.c_str());
