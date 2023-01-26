@@ -16,7 +16,7 @@ typedef struct _phase
     }
 } phase;
 
-void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string, variant*>& insertions);
+void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string, std::vector<svtig*>>& insertions);
 int read_phase_file(parameters *params, std::map<std::string, phase*>& phased_reads);
 
 #endif

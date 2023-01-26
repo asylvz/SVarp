@@ -9,6 +9,25 @@
 #define DELETION 'D'
 #define INSERTION 'I'
 
+
+class svtig
+{
+private:
+public:
+
+	char sv_type; 
+	std::string contig;
+	std::set <std::string> reads_h1;	
+	std::set <std::string> reads_h2;
+	int sv_size;
+	bool phased;
+	
+	svtig()
+	{
+	}
+	virtual ~svtig() {};
+};
+
 class variant
 {
 private:
@@ -46,5 +65,6 @@ public:
 
 variant* generate_sv_node(std::map<std::string, gfaNode*>, std::string, int, int, int, int, char);
 
+std::map<std::string, std::vector<svtig*>> refine_svs(std::map<std::string, variant*> initial_insertions);
 
 #endif

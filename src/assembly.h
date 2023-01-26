@@ -5,7 +5,7 @@
 #include "common.h"
 #include "sv.h"
 
-void run_assembly(parameters* params, std::map<std::string, variant*>& insertions);
+void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>& insertions);
 int index_fasta(parameters* params, std::map<std::string, unsigned long>& fasta_index);
 
 #endif

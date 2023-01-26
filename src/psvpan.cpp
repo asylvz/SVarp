@@ -71,11 +71,12 @@ void check_size(parameters* params, std::map <std::string, phase*> phased_reads)
 
 int main(int argc, char** argv)
 {
-	std::map <std::string, variant*> insertions;	
-	//std::multimap<std::string, alignment*> alignments;
+	std::map <std::string, variant*> insertions_tmp;	
+	//std::multimap<std::string, variant*> insertions;
 	std::set<std::string> contigs;	
 	std::map<std::string, gfaNode*> ref;
 	std::map <std::string, phase*> phased_reads;
+	std::map<std::string, std::vector<svtig*>> insertions;
 
 	parameters* params = new parameters;	
 	if (parse_command_line(argc, argv, params) != RETURN_SUCCESS)
@@ -91,8 +92,10 @@ int main(int argc, char** argv)
 	std::cout<<"\nInput files are:\n\t"<<params->gaf<<"\n\t"<< params->ref_graph<<"\n\t"<<params->fasta<<std::endl;
 	
 	ref = read_gfa(params, contigs);
-	if (read_alignments(params, ref, insertions) != RETURN_SUCCESS)
+	if (read_alignments(params, ref, insertions_tmp) != RETURN_SUCCESS)
 		std::cout<<"Alignments could not be read\n";
+			
+	insertions = refine_svs(insertions_tmp);
 
 	//Read the TSV file and phase the reads
 	if (read_phase_file(params, phased_reads) == RETURN_SUCCESS)

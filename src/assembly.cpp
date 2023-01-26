@@ -68,10 +68,10 @@ int index_fasta(parameters* params, std::map<std::string, unsigned long>& fasta_
 }
 
 
-void run_assembly(parameters* params, std::map<std::string, variant*>& insertions)
+void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>& insertions)
 {
 	std::map<std::string, unsigned long> fasta_index;
-	std::map<std::string, variant*>::iterator itr;
+	std::map<std::string, std::vector<svtig*>>::iterator itr;
 
 	std::string cwd = std::filesystem::current_path().string();
 		
@@ -97,61 +97,70 @@ void run_assembly(parameters* params, std::map<std::string, variant*>& insertion
 
 	index_fasta(params, fasta_index);	
 
-
+	int svtig_cnt = 0;
 	int h1 = 0, h2 = 0;
 	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
 	{	
 		//Generate fastq files
-		if (itr->second->reads_h1.size() > MIN_READ_SUPPORT)
+		
+		for (auto &sv : itr->second) 
 		{
-			std::string filename = itr->second->contig + "_" + std::to_string(itr->second->ref_start) + "_" + std::to_string(itr->second->ref_end) + "_H1";
+			if ((sv->reads_h1).size() < MIN_READ_SUPPORT)
+				continue;
+
+			std::string filename = sv->contig + "_svtig" + std::to_string(svtig_cnt++) + "_H1";
 				
-			std::cout<<"H1 "<<itr->second->reads_h1.size()<<" "<<itr->first <<std::endl;
-			for (auto &a: itr->second->reads_h1)
+			std::cout<<"H1 "<<sv->reads_h1.size()<<" "<<itr->first <<std::endl;
+			for (auto &a: sv->reads_h1)
 				std::cout<<"\t"<<a<<std::endl;
 
 			std::string file_path = log_path + "assembly_input/" + filename + ".fasta";	
-			std::string output_path = log_path + "assembly_output/" + filename + "/";
+			std::string output_path = log_path + "assembly_output/" + filename;
 			
-			generate_fastq_file(params, fasta_index, itr->second->reads_h1, file_path);	
+			generate_fastq_file(params, fasta_index, sv->reads_h1, file_path);	
 			
   			if (! std::filesystem::create_directory(output_path))
         		std::cerr << "Error creating the folder "<<output_path << std::endl;
 
-			int var_size = (itr->second->sv_size * 2) / 1000;
+			int var_size = (sv->sv_size * 2) / 1000;
 			if(var_size == 0)
 				var_size = 1;
 			
 			h1++;
-			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path;	
+			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " &>"+ output_path+".log";
 			
-			//std::cout<< wtdbg2_cmd1<<"\n"<<wtdbg2_cmd2<<"\nSV size=" << itr->second->sv_size<< std::endl;
+			//std::cout<<"\n"<<wtdbg2_cmd<<"\nSV size=" << sv->sv_size<< std::endl;
 			//system(wtdbg2_cmd.c_str());
 		}
-		if (itr->second->reads_h2.size() > MIN_READ_SUPPORT)
+
+		for (auto &sv : itr->second) 
 		{
-			std::string filename = itr->second->contig + "_" + std::to_string(itr->second->ref_start) + "_" + std::to_string(itr->second->ref_end) + "_H2";
+
+			if ((sv->reads_h2).size() < MIN_READ_SUPPORT)
+				continue;
+			
+			std::string filename = sv->contig + "_svtig" + std::to_string(svtig_cnt++) + "_H2";
 				
-			std::cout<<"H2"<<itr->second->reads_h1.size()<<" "<<itr->first <<std::endl;
-			for (auto &a: itr->second->reads_h1)
+			std::cout<<"H2"<<sv->reads_h1.size()<<" "<<itr->first <<std::endl;
+			for (auto &a: sv->reads_h1)
 				std::cout<<"\t"<<a<<std::endl;
 
 			std::string file_path = log_path + "assembly_input/" + filename + ".fasta";	
-			std::string output_path = log_path + "assembly_output/" + filename + "/";
+			std::string output_path = log_path + "assembly_output/" + filename;
 			
-			generate_fastq_file(params, fasta_index, itr->second->reads_h2, file_path);	
+			generate_fastq_file(params, fasta_index, sv->reads_h2, file_path);	
 			
   			if (! std::filesystem::create_directory(output_path))
         		std::cerr << "Error creating the folder "<<output_path << std::endl;
 
-			int var_size = (itr->second->sv_size * 2) / 1000;
+			int var_size = (sv->sv_size * 2) / 1000;
 			if(var_size == 0)
 				var_size = 1;
 			
 			h2++;
-			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + "&> /dev/null";	
+			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " &>"+ output_path+".log";	
 			
-			//std::cout<< wtdbg2_cmd1<<"\n"<<wtdbg2_cmd2<<"\nSV size=" << itr->second->sv_size<< std::endl;
+			//std::cout<<"\n"<<wtdbg2_cmd<<"\nSV size=" << sv->sv_size<< std::endl;
 			//system(wtdbg2_cmd.c_str());
 		}
 	}

@@ -10,15 +10,6 @@
 #include "alignment.h"
 
 
-// Compares two intervals according to ending times in descending order.
-bool svSortComparator(variant* i1, variant* i2)
-{
-	if (i1->ref_start != i2->ref_start)
-    	return (i1->ref_start < i2->ref_start);
-	else
-		return (i1->ref_end > i2->ref_end);
-}
-
 
 void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<std::string, alignment*> aln, std::set<std::string> contigs, std::multimap<std::string, variant*>& insertions)
 {
@@ -105,6 +96,7 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 	std::vector <std::string> tokens;
 	std::vector<int> cigarLen;
 	std::vector<char> cigarOp;
+	
 
 	std::ifstream fp(params->gaf);
 	//std::multimap<std::string, alignment*> gaf;	
@@ -169,7 +161,8 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 							var->sv_size = cigarLen[c];	
 							insertion_count++;
 							
-							string var_name = var->contig + "_" + std::to_string(var->ref_start) + "_" + std::to_string(var->ref_end);
+							
+							string var_name = var->contig + ":" + std::to_string(var->ref_start) + "_" + std::to_string(var->ref_end);
 							std::map<string, variant*>::iterator it = insertions.find(var_name);
 							if (it != insertions.end())
 								it->second->reads_h1.insert(tokens[0]);	
