@@ -9,16 +9,21 @@
 #include "reference.h"
 #include "common.h"
 
-std::map<std::string, gfaNode*> read_gfa(parameters* params, std::map <std::string, Contig*>& ref)
+int read_gfa(parameters* params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa)
 {	
 	// Read the S lines in the GFA file
-	std::cout << "Reading the GFA file"<< std::endl;
+	std::cout << "\nReading the GFA file"<< std::endl;
 	
 	std::string line;	
 	std::vector <std::string> tokens;	
-	std::ifstream fp(params->ref_graph);
-	std::map<std::string, gfaNode*> gfa;
 	
+	std::ifstream fp(params->ref_graph);
+	if(!fp.good())
+	{
+        std::cerr << "Error opening '"<<params->ref_graph<< std::endl;
+        return RETURN_ERROR;
+    }
+
 	//For overall coverage
 	Contig *c = new Contig();
 	ref.insert(std::pair<std::string, Contig*>("overall", c));
@@ -73,6 +78,6 @@ std::map<std::string, gfaNode*> read_gfa(parameters* params, std::map <std::stri
         cout << '\t' << itr->first << '\t' << itr->second->offset<< '\n';
     }*/
 	
-	return gfa;
+	return RETURN_SUCCESS;
 }
 

@@ -67,6 +67,8 @@ public:
 
 
 variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, std::string path, int path_start, int path_end, int ref_pos, int cigar_len, char sv_type);
-std::map<std::string, std::vector<svtig*>> refine_svs(std::map<std::string, variant*> initial_insertions);
+
+int refine_svs(std::map<std::string, variant*> initial_insertions, std::map<std::string, std::vector<svtig*>>& insertions);
+
 
 #endif

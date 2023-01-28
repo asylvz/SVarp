@@ -6,14 +6,11 @@
 
 void generate_fastq_file(parameters* params, std::map<std::string, unsigned long>& fasta_index, std::set <std::string>& reads, std::string file_path)
 {
-	//std::cout<<"Generating fastq file"<<std::endl;
-	
 	std::ifstream fp_read(params->fasta);
 	std::ofstream fp_write(file_path);
 	
 	unsigned long char_pos;	
 	std::string line;	
-
 	
 	for (auto &read: reads)
 	{
@@ -41,7 +38,7 @@ void generate_fastq_file(parameters* params, std::map<std::string, unsigned long
 
 int index_fasta(parameters* params, std::map<std::string, unsigned long>& fasta_index)
 {
-	std::cout<<"Indexing the fasta file"<<std::endl;
+	std::cout<<"--->Indexing the fasta file"<<std::endl;
 	std::ifstream fp_read(params->fasta);
 	std::string line, read_name;
 	unsigned long char_count = 0;
@@ -77,24 +74,8 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 		
 	std::string log_path = cwd + "/log/";
 
-  	if (!std::filesystem::create_directory(log_path))
-	{
-		std::cerr << "Error creating log folder" << std::endl;
-		exit(-1);
-  	}
-  	if (!std::filesystem::create_directory(log_path + "assembly_input/"))
-	{
-		std::cerr << "Error creating log/assembly_input/" << std::endl;
-		exit(-1);
-  	}
-  	if (!std::filesystem::create_directory(log_path + "assembly_output/"))
-	{
-		std::cerr << "Error creating log/assembly_output/" << std::endl;
-		exit(-1);
-  	}
-
-	std::cout<<"Assembly using wtdbg2..."<<std::endl;		
-
+	std::cout<<"\nAssembly using wtdbg2..."<<std::endl;		
+	
 	index_fasta(params, fasta_index);	
 
 	int svtig_cnt = 0;
@@ -109,12 +90,12 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 
 			std::string filename = sv->contig + "_svtig" + std::to_string(svtig_cnt++) + "_H1";
 				
-			std::cout<<"H1 "<<sv->reads_h1.size()<<" "<<itr->first <<std::endl;
+			logFile<<"H1 "<<sv->reads_h1.size()<<" "<<itr->first <<std::endl;
 			for (auto &a: sv->reads_h1)
-				std::cout<<"\t"<<a<<std::endl;
+			logFile<<"\t"<<a<<std::endl;
 
-			std::string file_path = log_path + "assembly_input/" + filename + ".fasta";	
-			std::string output_path = log_path + "assembly_output/" + filename;
+			std::string file_path = log_path + "in/" + filename + ".fasta";	
+			std::string output_path = log_path + "out/" + filename;
 			
 			generate_fastq_file(params, fasta_index, sv->reads_h1, file_path);	
 			
@@ -140,12 +121,12 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 			
 			std::string filename = sv->contig + "_svtig" + std::to_string(svtig_cnt++) + "_H2";
 				
-			std::cout<<"H2"<<sv->reads_h1.size()<<" "<<itr->first <<std::endl;
+			logFile<<"H2"<<sv->reads_h1.size()<<" "<<itr->first <<std::endl;
 			for (auto &a: sv->reads_h1)
-				std::cout<<"\t"<<a<<std::endl;
+				logFile<<"\t"<<a<<std::endl;
 
-			std::string file_path = log_path + "assembly_input/" + filename + ".fasta";	
-			std::string output_path = log_path + "assembly_output/" + filename;
+			std::string file_path = log_path + "in/" + filename + ".fasta";	
+			std::string output_path = log_path + "out/" + filename;
 			
 			generate_fastq_file(params, fasta_index, sv->reads_h2, file_path);	
 			
@@ -163,6 +144,6 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 			//system(wtdbg2_cmd.c_str());
 		}
 	}
-	std::cout<<"There are "<<h1+h2<<" SVs that have >"<<MIN_READ_SUPPORT<<" minimum read support ("<<h1<<" H1 - "<<h2<<" H2)" <<std::endl;
+	std::cout<<"\nThere are "<<h1+h2<<" SVs that have >"<<MIN_READ_SUPPORT<<" minimum read support ("<<h1<<" H1 - "<<h2<<" H2)" <<std::endl;
 }
 

@@ -47,6 +47,6 @@ public:
 	virtual ~gfaNode() {};
 };
 
-std::map<std::string, gfaNode*> read_gfa(parameters* params, std::map <std::string, Contig*>& ref);
 
+int read_gfa(parameters* params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa);
 #endif

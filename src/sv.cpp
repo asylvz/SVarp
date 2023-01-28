@@ -52,13 +52,12 @@ std::map<std::string, std::vector<variant*>> arrange_variants(std::map<std::stri
 //We don't do this while iterating the gaf file in alignment.cpp because we want to 
 //find the sv later in O(1) using "contig_name:start_end" in order to add reads to the
 //read set of the variant
-std::map<std::string, std::vector<svtig*>> refine_svs(std::map<std::string, variant*> initial_insertions)
+int refine_svs(std::map<std::string, variant*> initial_insertions, std::map<std::string, std::vector<svtig*>>& var)
 {
 	
 	std::map<std::string, std::vector<variant*>>::iterator it;
-	std::map<std::string, std::vector<variant*>> insertions;
+	std::map<std::string, std::vector<variant*>> insertions;	
 	
-	std::map<std::string, std::vector<svtig*>> var;
 	std::vector<svtig*> var_vector;
 	
 	insertions = arrange_variants(initial_insertions);
@@ -88,10 +87,9 @@ std::map<std::string, std::vector<svtig*>> refine_svs(std::map<std::string, vari
 			}
 			else
 			{
-				//if((!first) && (svtig_tmp->reads_h1.size() > MIN_READ_SUPPORT))
-	
-				if(!first)
+				if((!first) && (svtig_tmp->reads_h1.size() > MIN_READ_SUPPORT))	
 					var_vector.push_back(svtig_tmp);
+					
 				//std::cout<<"\tIN2"<<std::endl;
 				svtig_tmp = new svtig();
 				svtig_tmp->sv_type = INSERTION;
@@ -105,14 +103,14 @@ std::map<std::string, std::vector<svtig*>> refine_svs(std::map<std::string, vari
 			}
 		}
 		//Add the last one as well
-		if (!first)
+		if((!first) && (svtig_tmp->reads_h1.size() > MIN_READ_SUPPORT))	
 			var_vector.push_back(svtig_tmp);
 		
 		//if (var_vector.size() >	MIN_READ_SUPPORT)
 		var.insert(std::pair<std::string, std::vector<svtig*>>(it->first, var_vector));
 	}
 	
-	std::cout<<"\tMerged "<<merged_sv_count<<" SVs\n\n";
+	std::cout<<"--->Merged "<<merged_sv_count<<" SVs\n\n";
 	std::vector<int> read_size;
 /*
 	//std::cout<<"-------SVTIGS------\n";
@@ -131,7 +129,7 @@ std::map<std::string, std::vector<svtig*>> refine_svs(std::map<std::string, vari
 	}
 	std::cout<<"Merged "<<merged_sv_count<<" SVs\n\n";
 */	
-	return var;
+	return RETURN_SUCCESS;
 }
 
 

@@ -11,7 +11,7 @@ int read_phase_file(parameters *params, std::map<std::string, phase*>& phased_re
 	if (params->phase_tags.empty())
 		return RETURN_ERROR;
 	
-	std::cout<<"Reading .tsv file"<<std::endl;	
+	std::cout<<"--->Reading .tsv file"<<std::endl;	
 	std::ifstream fp(params->phase_tags);
 	std::vector <std::string> tokens; 
 	std::string line;	
@@ -48,7 +48,8 @@ void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string,
 	std::map<std::string, phase*>::iterator itr2;
 
 	int phased = 0, not_phased = 0;
-	std::cout<<"Phasing"<<std::endl;	
+	
+	std::cout<<"--->Checking SVs"<<std::endl;	
 	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
 	{	
 		for (auto &sv: itr->second) 
@@ -109,7 +110,7 @@ void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string,
 			//std::cout<<"h1: "<<sv->reads_h1.size()<< "\th2: "<<sv->reads_h2.size()<<std::endl;
 		}
 	}
-	std::cout<<"\t"<<phased<<"SVs can be phased and "<<not_phased<< " cannot...\n";
+	std::cout<<"--->"<<phased<<" SVs could be phased, but "<<not_phased<< " could not...\n";
 }
 
 

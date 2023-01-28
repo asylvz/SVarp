@@ -21,9 +21,8 @@ int decompose_cigars(string cigar, std::vector<int>& cigarLen, std::vector<char>
 		if (isdigit(*(cigar_copy + cigar_offset)) == 0)
 		{
 			cigarOp.push_back (*(cigar_copy + cigar_offset));
-			//cout<<cigarOp[cigar_cnt]<<endl;
 			cigarLen.push_back (atoi(tmp_str));
-			//printf("-->(%d)%d%c\n", cigar_cnt, cigarLen[cigar_cnt], cigarOp[cigar_cnt])
+			
 			delete[] tmp_str; 	
 			tmp_str = new char[6];
 			str_offset = 0;
@@ -86,8 +85,7 @@ void contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string,
 			ref["overall"]->mapped_bases += gfa[mytoken]->len;		
 
 			total_so_far += gfa[mytoken]->len;
-		}
-			
+		}	
 		mytoken = strtok(NULL, "><");
 	}
 }
@@ -105,7 +103,12 @@ int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, st
 	std::vector<char> cigarOp;
 	
 	std::ifstream fp(params->gaf);
-	
+	if(!fp.good())
+	{
+        std::cerr << "Error opening '"<<params->gaf<< std::endl;
+        return RETURN_ERROR;
+    }
+
     int total_line_count = 0;
     char endline_char = '\n';
     while (fp.ignore(numeric_limits<streamsize>::max(), fp.widen(endline_char)))
@@ -201,14 +204,11 @@ int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, st
 		if(line_count > TEST_SAMPLE_SIZE)
 			break;
 	}
-	cout<<"\nThere are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;
+	cout<<"\n--->There are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;
 
 	std::map<std::string, Contig*>::iterator it;
 	for (it=ref.begin(); it != ref.end(); ++it)
-	{	
-		//std::cout<< it->first<<" LEN= "<<it->second->contig_length <<std::endl;
-		it->second->coverage = (double) it->second->mapped_bases / it->second->contig_length;
-	}	
+		it->second->coverage = (double) it->second->mapped_bases / it->second->contig_length;	
 		
 	return RETURN_SUCCESS;
 }
