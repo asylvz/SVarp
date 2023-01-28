@@ -23,7 +23,7 @@ std::map<std::string, std::vector<variant*>> arrange_variants(std::map<std::stri
 	
 	std::map<std::string, std::vector<variant*>>::iterator it;
 	std::map<std::string, std::vector<variant*>> ins;
-	
+		
 	for (itr=initial_insertions.begin(); itr != initial_insertions.end(); ++itr)
 	{
 		int pos = (itr->first).find(':');
@@ -63,6 +63,7 @@ std::map<std::string, std::vector<svtig*>> refine_svs(std::map<std::string, vari
 	
 	insertions = arrange_variants(initial_insertions);
 	
+	std::cout<<"Merging nearby SVs"<<std::endl;	
 	int merged_sv_count = 0;
 	for (it=insertions.begin(); it != insertions.end(); ++it)
 	{
@@ -111,7 +112,7 @@ std::map<std::string, std::vector<svtig*>> refine_svs(std::map<std::string, vari
 		var.insert(std::pair<std::string, std::vector<svtig*>>(it->first, var_vector));
 	}
 	
-	std::cout<<"Merged "<<merged_sv_count<<" SVs\n\n";
+	std::cout<<"\tMerged "<<merged_sv_count<<" SVs\n\n";
 	std::vector<int> read_size;
 /*
 	//std::cout<<"-------SVTIGS------\n";
@@ -134,7 +135,7 @@ std::map<std::string, std::vector<svtig*>> refine_svs(std::map<std::string, vari
 }
 
 
-variant* generate_sv_node(std::map<std::string, gfaNode*> gfa, std::string path, int path_start, int path_end, int ref_pos, int cigar_len, char sv_type)
+variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, std::string path, int path_start, int path_end, int ref_pos, int cigar_len, char sv_type)
 {
 	variant *v = new variant();
 	char *path_copy = (char *) path.c_str();

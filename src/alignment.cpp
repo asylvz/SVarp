@@ -10,54 +10,12 @@
 #include "alignment.h"
 
 
-
-void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<std::string, alignment*> aln, std::set<std::string> contigs, std::multimap<std::string, variant*>& insertions)
-{
-	
-	cout<<"Finding the supporting reads"<<endl;
-	treenode* root;
-	
-	for(auto c: contigs)
-	{
-		//Insert the alignments of this contig into the interval tree		
-		root = NULL;
-		auto aln_range = aln.equal_range(c);
-		for (auto i = aln_range.first; i != aln_range.second; ++i)
-			root = insert_treenode(root, i->second);
-		
-		//if (find_height(root) >0 )
-		
-		//if (c == "CHM13#0#chr1")
-		//	cout<<"Contig:"<<c<<" tree height: "<<find_height(root) <<endl;
-		
-		auto sv_range = insertions.equal_range(c);
-		for (auto i = sv_range.first; i != sv_range.second; ++i)
-		{
-			std::set <alignment*> overlaps;
-			find_overlaps(root, i->second, overlaps);
-			
-			/*if (i->second->contig == "CHM13#0#chr1")
-			{
-				cout<<"For SV = "<< i->second->ref_start<< " "<< i->second->ref_end<<" - "<< overlaps.size()<<endl;
-			}*/
-			for (auto t:overlaps)
-			{
-				//cout<<t->read_name<<endl;
-				i->second->reads_h1.insert(t->read_name);
-				//cout<<i->second->reads.size();
-			}
-		}
-	}
-}
-
-
 int decompose_cigars(string cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp)
 {
 	/*get the Cigar*/
 	size_t cigar_offset = 0, str_offset = 0, cigar_cnt = 0;
 	char* cigar_copy = (char*) cigar.c_str();	
 	char *tmp_str = new char[6];
-	//cout<< cigar_copy<<"\n\n";
 	while(cigar_offset < cigar.length())
 	{
 		if (isdigit(*(cigar_copy + cigar_offset)) == 0)
@@ -74,10 +32,8 @@ int decompose_cigars(string cigar, std::vector<int>& cigarLen, std::vector<char>
 		else 
 		{
 			*(tmp_str + str_offset) = *(cigar_copy + cigar_offset);
-			//cout<<tmp_str<<endl;
 			str_offset++;
 		}
-		//cout<<cigar_offset<<endl; 
 		cigar_offset++;
 	}
 	delete[] tmp_str;
@@ -86,7 +42,58 @@ int decompose_cigars(string cigar, std::vector<int>& cigarLen, std::vector<char>
 }
 
 
-int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::map<std::string, variant*>& insertions)
+
+void contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, vector <std::string>& tokens)
+{
+	char *path_copy = (char *) tokens[5].c_str();
+	
+	char *mytoken = strtok(path_copy,"><");
+	
+	int offset = 0, node_count = 0, total_so_far = 0;
+	int path_start = stoi(tokens[7]);
+	int path_end = stoi(tokens[8]);
+	int total_path_length = path_end - path_start;
+		
+	while(mytoken) 
+	{
+		node_count += 1;
+		offset += strlen(mytoken) + 1;
+		
+		if ((node_count == 1) && (mytoken == NULL)) //the single node
+		{
+			std::string contig = gfa[mytoken]->contig; 
+			ref[contig]->mapped_bases += path_end - path_start;	
+			ref["overall"]->mapped_bases += path_end - path_start;
+		}
+		else if((node_count == 1) && (mytoken != NULL)) //first node
+		{
+			std::string contig = gfa[mytoken]->contig; 
+			ref[contig]->mapped_bases += gfa[mytoken]->len - path_start;		
+			ref["overall"]->mapped_bases += gfa[mytoken]->len - path_start;
+
+			total_so_far += ref[contig]->mapped_bases;
+		}
+		else if(mytoken == NULL) //Last node
+		{
+			std::string contig = gfa[mytoken]->contig; 
+			ref[contig]->mapped_bases += total_path_length - total_so_far;
+			ref["overall"]->mapped_bases += total_path_length - total_so_far;
+		}
+		else //middle node
+		{
+			std::string contig = gfa[mytoken]->contig; 
+			ref[contig]->mapped_bases += gfa[mytoken]->len;		
+			ref["overall"]->mapped_bases += gfa[mytoken]->len;		
+
+			total_so_far += gfa[mytoken]->len;
+		}
+			
+		mytoken = strtok(NULL, "><");
+	}
+}
+
+
+int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*> gfa, std::map<std::string, variant*>& insertions)
 {
 	int secondary = 0, primary = 0, insertion_count = 0, line_count = 0, perc = 0;
 	
@@ -97,17 +104,12 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 	std::vector<int> cigarLen;
 	std::vector<char> cigarOp;
 	
-
 	std::ifstream fp(params->gaf);
-	//std::multimap<std::string, alignment*> gaf;	
 	
     int total_line_count = 0;
     char endline_char = '\n';
     while (fp.ignore(numeric_limits<streamsize>::max(), fp.widen(endline_char)))
-	{ 
 		++total_line_count;
-	}
-	//std::cout<< line_count<<std::endl;
 	
 	fp.clear() ; // clear the failed state of the stream
 	fp.seekg(0) ; // seek to the first character in the file
@@ -131,7 +133,8 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 			
 		bool isPrimary = true;	
 		string cigar;
-		for (auto& tok : tokens) {
+		for (auto& tok : tokens) 
+		{
 			if(strstr(tok.c_str(), "tp:A:"))
 			{
 				if (tok.substr(5, 6) != "P")
@@ -154,14 +157,13 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 				{
 					if (cigarOp[c] == INSERTION && cigarLen[c] > MINSVSIZE)
 					{
-						variant* var = generate_sv_node(ref, tokens[5], stoi(tokens[7]), stoi(tokens[8]), ref_pos, cigarLen[c], INSERTION);
+						variant* var = generate_sv_node(gfa, tokens[5], stoi(tokens[7]), stoi(tokens[8]), ref_pos, cigarLen[c], INSERTION);
 						
 						if (var)
 						{
 							var->sv_size = cigarLen[c];	
 							insertion_count++;
-							
-							
+								
 							string var_name = var->contig + ":" + std::to_string(var->ref_start) + "_" + std::to_string(var->ref_end);
 							std::map<string, variant*>::iterator it = insertions.find(var_name);
 							if (it != insertions.end())
@@ -180,14 +182,14 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 				}
 			}
    		}
+		//Check the read depth/coverage here
+		contig_coverage(ref, gfa, tokens);	
+
 		if(!isPrimary)
 			continue;
 
 		line_count++;
 		int perc_tmp = ((double) line_count / total_line_count) * 100;
-		
-		//std::cout<<line_count<< " / "<<total_line_count<<" = "<< perc_tmp<< " " <<perc<< std::endl;
-		//std::cout<<perc_tmp<<" "<<perc<<std::endl;
 		if (perc_tmp > perc)
 		{
 			perc = perc_tmp;
@@ -200,7 +202,14 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 			break;
 	}
 	cout<<"\nThere are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;
-	
+
+	std::map<std::string, Contig*>::iterator it;
+	for (it=ref.begin(); it != ref.end(); ++it)
+	{	
+		//std::cout<< it->first<<" LEN= "<<it->second->contig_length <<std::endl;
+		it->second->coverage = (double) it->second->mapped_bases / it->second->contig_length;
+	}	
+		
 	return RETURN_SUCCESS;
 }
 
@@ -303,3 +312,46 @@ int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std
 		//cout<<"inserted "<<gfa[aln->node]->contig<<endl;
 	}
 }*/
+
+
+
+/*void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<std::string, alignment*> aln, std::set<std::string> contigs, std::multimap<std::string, variant*>& insertions)
+{
+	
+	cout<<"Finding the supporting reads"<<endl;
+	treenode* root;
+	
+	for(auto c: contigs)
+	{
+		//Insert the alignments of this contig into the interval tree		
+		root = NULL;
+		auto aln_range = aln.equal_range(c);
+		for (auto i = aln_range.first; i != aln_range.second; ++i)
+			root = insert_treenode(root, i->second);
+		
+		//if (find_height(root) >0 )
+		
+		//if (c == "CHM13#0#chr1")
+		//	cout<<"Contig:"<<c<<" tree height: "<<find_height(root) <<endl;
+		
+		auto sv_range = insertions.equal_range(c);
+		for (auto i = sv_range.first; i != sv_range.second; ++i)
+		{
+			std::set <alignment*> overlaps;
+			find_overlaps(root, i->second, overlaps);
+			
+			//if (i->second->contig == "CHM13#0#chr1")
+			//{
+			//	cout<<"For SV = "<< i->second->ref_start<< " "<< i->second->ref_end<<" - "<< overlaps.size()<<endl;
+			//}
+			for (auto t:overlaps)
+			{
+				//cout<<t->read_name<<endl;
+				i->second->reads_h1.insert(t->read_name);
+				//cout<<i->second->reads.size();
+			}
+		}
+	}
+}
+
+*/

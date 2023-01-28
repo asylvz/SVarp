@@ -47,24 +47,36 @@ void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string,
 	std::map<std::string, std::vector<svtig*>>::iterator itr;
 	std::map<std::string, phase*>::iterator itr2;
 
+	int phased = 0, not_phased = 0;
 	std::cout<<"Phasing"<<std::endl;	
 	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
 	{	
-		for (auto &sv : itr->second) 
+		for (auto &sv: itr->second) 
 		{
 			//first check if it can be phased
 			std::string tmp_phase;
 			int tmp_cnt = 0;
-			sv->phased = true;
-		
+			sv->phased = false;
+				
+			//std::cout<<"First pass "<<sv->reads_h1.size()<<"\n";
 			for (auto &read: sv->reads_h1)
-			{
+			{	
+				std::map<std::string, phase*>::iterator it = phased_reads.find(read);
+				if (it == phased_reads.end())
+					continue;
+
 				//std::cout<<phased_reads[read]->haplotype<<" "<< phased_reads[read]->phase_set <<std::endl;
 				if(phased_reads[read]->haplotype == "none" || phased_reads[read]->phase_set == "none")
-			   		continue;
+				{
+			   		sv->phased = false;
+					break;
+				}
 
 				if (tmp_cnt == 0)
+				{
 					tmp_phase = phased_reads[read]->phase_set;
+					sv->phased = true;
+				}
 				else
 					if(tmp_phase != phased_reads[read]->phase_set)
 					{
@@ -89,10 +101,15 @@ void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string,
 				//Erase reads added to the second set, from the first set
 				for (auto &read: sv->reads_h2)
 					sv->reads_h1.erase(read);
+
+				phased++;
 			}
+			else
+				not_phased++;
 			//std::cout<<"h1: "<<sv->reads_h1.size()<< "\th2: "<<sv->reads_h2.size()<<std::endl;
 		}
 	}
+	std::cout<<"\t"<<phased<<"SVs can be phased and "<<not_phased<< " cannot...\n";
 }
 
 

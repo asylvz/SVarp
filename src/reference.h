@@ -1,11 +1,26 @@
-#ifndef __GFA
-#define __GFA
+#ifndef __REFERENCE
+#define __REFERENCE
 
 #include <string>
 #include <set>
 #include "common.h"
 
-//using namespace std;
+
+typedef struct _contig
+{
+	//std::string contig_name;
+	//long read_count;
+	long mapped_bases;
+	long contig_length;
+	double coverage;
+
+	_contig() {
+		mapped_bases = 0;
+		contig_length = 0;
+		coverage = 0;
+    }
+} Contig;
+
 
 class gfaNode
 {
@@ -32,6 +47,6 @@ public:
 	virtual ~gfaNode() {};
 };
 
-std::map<std::string, gfaNode*> read_gfa(parameters* params, std::set<std::string>& contigs);
+std::map<std::string, gfaNode*> read_gfa(parameters* params, std::map <std::string, Contig*>& ref);
 
 #endif

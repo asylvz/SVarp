@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <filesystem>
 #include "cmdline.h"
-#include "gfa.h"
+#include "reference.h"
 #include "alignment.h"
 #include "assembly.h"
 #include "phasing.h"
@@ -13,7 +13,57 @@
 //ctags *.c
 
 
-void check_size(parameters* params, std::map <std::string, phase*> phased_reads)
+int main(int argc, char** argv)
+{
+	std::map <std::string, variant*> insertions_tmp;	
+	std::map <std::string, gfaNode*> gfa;
+	std::map <std::string, phase*> phased_reads;
+	std::map <std::string, std::vector<svtig*>> insertions;
+	std::map <std::string, Contig*> ref;
+
+	parameters* params = new parameters;	
+	if (parse_command_line(argc, argv, params) != RETURN_SUCCESS)
+		return RETURN_ERROR;
+
+
+	std::string cwd = std::filesystem::current_path().string();
+	std::string log_path = cwd + "/log/";	
+	std::cout<<"\nLogs will be written to: "<<log_path<<std::endl;
+	if(std::filesystem::exists(log_path))
+		std::filesystem::remove_all(log_path);
+
+	std::cout<<"\nInput files are:\n\t"<<params->gaf<<"\n\t"<< params->ref_graph<<"\n\t"<<params->fasta<<std::endl;
+	
+	gfa = read_gfa(params, ref);
+	if (read_alignments(params, ref, gfa, insertions_tmp) != RETURN_SUCCESS)
+		std::cout<<"Alignments could not be read\n";
+			
+	std::map<std::string, Contig*>::iterator it;
+	for (it=ref.begin(); it != ref.end(); ++it)
+		std::cout<< it->first<<"---> LEN= "<<it->second->contig_length<<" - Mapped bases= "<< it->second->mapped_bases<<" - Cov= "<<it->second->coverage <<std::endl;	
+
+	insertions = refine_svs(insertions_tmp);
+
+	//Read the TSV file and phase the reads
+	if (read_phase_file(params, phased_reads) == RETURN_SUCCESS)
+		phase_svs(phased_reads, insertions);
+	
+	//check_size(params, phased_reads);
+	run_assembly(params, insertions);	
+
+	char *username= new char[50];
+	getlogin_r( username, 50);
+	
+	std::cout<<"\nThank you for using pSVpan "<<username<< "... Hope to see you again.\n" <<std::endl;
+	
+	delete[] username;
+	
+	return RETURN_SUCCESS;
+}
+
+
+
+/*void check_size(parameters* params, std::map <std::string, phase*> phased_reads)
 {
 	std::cout<<"Check read size\n";
 	std::map<std::string, unsigned long> fasta_index;
@@ -66,53 +116,4 @@ void check_size(parameters* params, std::map <std::string, phase*> phased_reads)
 		//cout<<none_line<<" - "<<total_line<<std::endl;
 	}
 	std::cout<<"None = "<<(double) none_total / none_line <<"\nPhased = "<<total/total_line<<std::endl;
-}
-
-
-int main(int argc, char** argv)
-{
-	std::map <std::string, variant*> insertions_tmp;	
-	//std::multimap<std::string, variant*> insertions;
-	std::set<std::string> contigs;	
-	std::map<std::string, gfaNode*> ref;
-	std::map <std::string, phase*> phased_reads;
-	std::map<std::string, std::vector<svtig*>> insertions;
-
-	parameters* params = new parameters;	
-	if (parse_command_line(argc, argv, params) != RETURN_SUCCESS)
-		return RETURN_ERROR;
-
-
-	std::string cwd = std::filesystem::current_path().string();
-	std::string log_path = cwd + "/log/";	
-	std::cout<<"\nLogs will be written to: "<<log_path<<std::endl;
-	if(std::filesystem::exists(log_path))
-		std::filesystem::remove_all(log_path);
-
-	std::cout<<"\nInput files are:\n\t"<<params->gaf<<"\n\t"<< params->ref_graph<<"\n\t"<<params->fasta<<std::endl;
-	
-	ref = read_gfa(params, contigs);
-	if (read_alignments(params, ref, insertions_tmp) != RETURN_SUCCESS)
-		std::cout<<"Alignments could not be read\n";
-			
-	insertions = refine_svs(insertions_tmp);
-
-	//Read the TSV file and phase the reads
-	if (read_phase_file(params, phased_reads) == RETURN_SUCCESS)
-		phase_svs(phased_reads, insertions);
-	
-	//check_size(params, phased_reads);
-	run_assembly(params, insertions);	
-
-	char *username= new char[50];
-	getlogin_r( username, 50);
-	
-	std::cout<<"\nThank you for using pSVpan "<<username<< "... Hope to see you again.\n" <<std::endl;
-	
-	delete[] username;
-	
-	return RETURN_SUCCESS;
-}
-
-
-
+}*/

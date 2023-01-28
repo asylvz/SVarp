@@ -4,7 +4,7 @@
 #include <vector>
 #include "common.h"
 #include <map>
-#include "gfa.h" 
+#include "reference.h" 
 #include "sv.h"
 
 using namespace std;
@@ -44,6 +44,5 @@ void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<st
 
 void alignment_within_gfa(multimap<string, alignment*>& gaf, map<string, gfaNode*> gfa, vector <std::string> tokens);
 
-
-int read_alignments(parameters *params, std::map<std::string, gfaNode*> ref, std::map<std::string, variant*>& insertions);
+int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*> gfa, std::map<std::string, variant*>& insertions);
 #endif

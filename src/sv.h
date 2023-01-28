@@ -3,7 +3,7 @@
 
 #include <map>
 #include <vector>
-#include "gfa.h" 
+#include "reference.h" 
 
 
 #define DELETION 'D'
@@ -19,6 +19,7 @@ public:
 	std::string contig;
 	std::set <std::string> reads_h1;	
 	std::set <std::string> reads_h2;
+	std::vector <int> breakpoints; 		//The SV breakpoints that contribute to this svtig
 	int sv_size;
 	bool phased;
 	
@@ -27,6 +28,7 @@ public:
 	}
 	virtual ~svtig() {};
 };
+
 
 class variant
 {
@@ -63,8 +65,8 @@ public:
 	virtual ~variant() {};
 };
 
-variant* generate_sv_node(std::map<std::string, gfaNode*>, std::string, int, int, int, int, char);
 
+variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, std::string path, int path_start, int path_end, int ref_pos, int cigar_len, char sv_type);
 std::map<std::string, std::vector<svtig*>> refine_svs(std::map<std::string, variant*> initial_insertions);
 
 #endif

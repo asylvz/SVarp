@@ -4,7 +4,7 @@
 #include "assembly.h"
 
 
-void generate_fastq_file(parameters* params, std::map<std::string, unsigned long> fasta_index, std::set <std::string> reads, std::string file_path)
+void generate_fastq_file(parameters* params, std::map<std::string, unsigned long>& fasta_index, std::set <std::string>& reads, std::string file_path)
 {
 	//std::cout<<"Generating fastq file"<<std::endl;
 	
@@ -102,7 +102,6 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
 	{	
 		//Generate fastq files
-		
 		for (auto &sv : itr->second) 
 		{
 			if ((sv->reads_h1).size() < MIN_READ_SUPPORT)

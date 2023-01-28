@@ -1,8 +1,6 @@
 #ifndef __COMMON
 #define __COMMON
 
-// Track memory usage
-//extern long long memUsage;
 
 #define EXIT_SUCCESS 0
 #define EXIT_COMMON 1
@@ -13,8 +11,8 @@
 #define HASHSIZE 1001
 #define MINSVSIZE 50
 
-#define TEST_SAMPLE_SIZE 10000
-#define MIN_READ_SUPPORT 3
+#define TEST_SAMPLE_SIZE 10000000
+#define MIN_READ_SUPPORT 5
 #define MIN_SV_DISTANCE 500
 
 typedef struct _parameters
