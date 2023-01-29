@@ -110,7 +110,7 @@ int refine_svs(std::map<std::string, variant*> initial_insertions, std::map<std:
 		var.insert(std::pair<std::string, std::vector<svtig*>>(it->first, var_vector));
 	}
 	
-	std::cout<<"--->Merged "<<merged_sv_count<<" SVs\n\n";
+	std::cout<<"--->merged "<<merged_sv_count<<" SVs (with "<<MIN_SV_DISTANCE<<" as the SV distance threshold)\n\n";
 	std::vector<int> read_size;
 /*
 	//std::cout<<"-------SVTIGS------\n";
@@ -158,7 +158,6 @@ variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, std::string path
 
 		if ((node_count == 1) && (!mytoken)) //means there is only a single node
 		{
-
 			//if(path_start == 20405)
 			//	cout<<"Single node* mytoken "<< mytoken<<endl;
 
@@ -257,11 +256,9 @@ variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, std::string path
 				}
 				return v;	
 			}
-		 	else
-			{
-				
+		 	else		
 				total_so_far = node_map_size;
-			}
+
 		}
 	}
 	std::cout<<"ERRROORRRRRR -"<< total_so_far<< " "<<ref_pos<<std::endl;

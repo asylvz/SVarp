@@ -25,10 +25,12 @@ int main(int argc, char** argv)
 
 	init_logs(params);	
 	
-	read_gfa(params, ref, gfa);
+	if (read_gfa(params, ref, gfa) != RETURN_SUCCESS)
+		return RETURN_ERROR;
+
 	if (read_alignments(params, ref, gfa, insertions_tmp) != RETURN_SUCCESS)
-		std::cout<<"Alignments could not be read\n";
-				
+		return RETURN_ERROR;
+
 	refine_svs(insertions_tmp, insertions);
 
 	//Read the TSV file and phase the reads
@@ -42,7 +44,7 @@ int main(int argc, char** argv)
 	char *username= new char[50];
 	getlogin_r(username, 50);
 	
-	std::cout<<"\nThank you for using svapan "<<username<< "... Hope to see you again.\n" <<std::endl;
+	std::cout<<"\nThank you for using svapan "<<username<< "... Tschüs, güle güle, adios, bye...\n" <<std::endl;
 	
 	logFile.close();
 	//delete[] username;

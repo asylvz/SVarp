@@ -69,7 +69,7 @@ void init_logs(parameters* params)
 {	
 	std::string cwd = std::filesystem::current_path().string();
 	std::string log_path = cwd + "/log/";	
-	std::cout<<"\n...Hello, svapan is running...\n";
+	std::cout<<"\n...hallo, merhaba, ola, salaam, hello!!! svapan is running...\n";
 	if(std::filesystem::exists(log_path))
 		std::filesystem::remove_all(log_path);
 	

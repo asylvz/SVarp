@@ -62,22 +62,6 @@ int read_gfa(parameters* params, std::map <std::string, Contig*>& ref, std::map<
 
 		gfa.insert(std::pair<std::string, gfaNode*>(g->name, g));
 	}
-
-	//std::cout<< ref.size()<<std::endl;
-	/*std::map<std::string, Contig*>::iterator it;
-	for (it=ref.begin(); it != ref.end(); ++it)
-	{	
-		//std::cout<< it->first<<" LEN= "<<it->second->contig_length <<std::endl;
-		//it->second->coverage = (double) it->second->
-	}*/	
-	//cout <<ref["s10"]->contig<<endl;
-	/*map<std::string, gfaNode*>::iterator itr;
-    cout << "\nThe map is :"<<cnt<< "\n";
-    cout << "\tKEY\tELEMENT\n";
-    for (itr = ref.begin(); itr != ref.end(); ++itr) {
-        cout << '\t' << itr->first << '\t' << itr->second->offset<< '\n';
-    }*/
-	
 	return RETURN_SUCCESS;
 }
 

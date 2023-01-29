@@ -6,7 +6,6 @@
 #include <iterator>
 #include <algorithm>
 #include <limits>
-#include "interval_tree.h"
 #include "alignment.h"
 
 
@@ -48,45 +47,62 @@ void contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string,
 	
 	char *mytoken = strtok(path_copy,"><");
 	
-	int offset = 0, node_count = 0, total_so_far = 0;
+	int node_count = 0, total_so_far = 0;
 	int path_start = stoi(tokens[7]);
 	int path_end = stoi(tokens[8]);
 	int total_path_length = path_end - path_start;
-		
 	while(mytoken) 
 	{
+		//std::cout<<mytoken<<std::endl;
 		node_count += 1;
-		offset += strlen(mytoken) + 1;
+		std::string node = mytoken;
+
+		mytoken = strtok(NULL, "><");
+		//std::cout<<mytoken<<std::endl;
 		
-		if ((node_count == 1) && (mytoken == NULL)) //the single node
+		if ((node_count == 1) && (!mytoken)) //the single node
 		{
-			std::string contig = gfa[mytoken]->contig; 
+			std::string contig = gfa[node]->contig; 
 			ref[contig]->mapped_bases += path_end - path_start;	
+			ref[contig]->mapped_reads++;	
+
+			ref["overall"]->mapped_reads++;	
 			ref["overall"]->mapped_bases += path_end - path_start;
 		}
-		else if((node_count == 1) && (mytoken != NULL)) //first node
+		else if((node_count == 1) && (mytoken)) //first node
 		{
-			std::string contig = gfa[mytoken]->contig; 
-			ref[contig]->mapped_bases += gfa[mytoken]->len - path_start;		
-			ref["overall"]->mapped_bases += gfa[mytoken]->len - path_start;
+			std::string contig = gfa[node]->contig; 
+			ref[contig]->mapped_bases += gfa[node]->len - path_start;	
+			ref[contig]->mapped_reads++;	
 
-			total_so_far += ref[contig]->mapped_bases;
+			ref["overall"]->mapped_reads++;	
+			ref["overall"]->mapped_bases += gfa[node]->len - path_start;
+			
+			total_so_far += gfa[node]->len - path_start;
 		}
-		else if(mytoken == NULL) //Last node
+		else if(!mytoken) //Last node
 		{
-			std::string contig = gfa[mytoken]->contig; 
+			std::string contig = gfa[node]->contig; 
 			ref[contig]->mapped_bases += total_path_length - total_so_far;
+			ref[contig]->mapped_reads++;	
+
+			ref["overall"]->mapped_reads++;	
 			ref["overall"]->mapped_bases += total_path_length - total_so_far;
+
+			//if(total_path_length - total_so_far < 0)
+			//	std::cout<< "middles: "<<middles <<" " <<total_path_length<<" "<<total_so_far<<std::endl;
 		}
 		else //middle node
 		{
-			std::string contig = gfa[mytoken]->contig; 
-			ref[contig]->mapped_bases += gfa[mytoken]->len;		
-			ref["overall"]->mapped_bases += gfa[mytoken]->len;		
+			std::string contig = gfa[node]->contig; 
+			ref[contig]->mapped_bases += gfa[node]->len;		
+			ref[contig]->mapped_reads++;	
 
-			total_so_far += gfa[mytoken]->len;
-		}	
-		mytoken = strtok(NULL, "><");
+			ref["overall"]->mapped_reads++;	
+			ref["overall"]->mapped_bases += gfa[node]->len;		
+
+			total_so_far += gfa[node]->len;
+		}
 	}
 }
 
@@ -123,6 +139,7 @@ int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, st
 	while(fp)
 	{
 		getline(fp, line);
+		line_count++;
 
 		std::string tmp_str;
 		std::stringstream s(line);
@@ -191,12 +208,11 @@ int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, st
 		if(!isPrimary)
 			continue;
 
-		line_count++;
 		int perc_tmp = ((double) line_count / total_line_count) * 100;
 		if (perc_tmp > perc)
 		{
 			perc = perc_tmp;
-			fprintf(stderr, "%d%%\r",perc);
+			fprintf(stderr, "--->%d%%\r",perc);
 			fflush(stderr);
 		}
 
@@ -204,14 +220,13 @@ int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, st
 		if(line_count > TEST_SAMPLE_SIZE)
 			break;
 	}
-	cout<<"\n--->There are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;
+	cout<<"\n--->there are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;
 
 	std::map<std::string, Contig*>::iterator it;
 	for (it=ref.begin(); it != ref.end(); ++it)
 	{
 		it->second->coverage = (double) it->second->mapped_bases / it->second->contig_length;	
-		logFile<< it->first<<"---> LEN= "<<it->second->contig_length<<" - Mapped bases= "<< it->second->mapped_bases<<" - Cov= "<<it->second->coverage <<std::endl;	
-	
+		logFile<< it->first<<"---> LEN= "<<it->second->contig_length<<" - Mapped bases= "<< it->second->mapped_bases<<" - Mapped reads= "<<it->second->mapped_reads << " - Cov= "<<it->second->coverage <<std::endl;		
 	}			
 	
 	return RETURN_SUCCESS;

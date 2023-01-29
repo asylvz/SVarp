@@ -38,7 +38,7 @@ void generate_fastq_file(parameters* params, std::map<std::string, unsigned long
 
 int index_fasta(parameters* params, std::map<std::string, unsigned long>& fasta_index)
 {
-	std::cout<<"--->Indexing the fasta file"<<std::endl;
+	std::cout<<"--->indexing the fasta file"<<std::endl;
 	std::ifstream fp_read(params->fasta);
 	std::string line, read_name;
 	unsigned long char_count = 0;
@@ -74,10 +74,11 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 		
 	std::string log_path = cwd + "/log/";
 
-	std::cout<<"\nAssembly using wtdbg2..."<<std::endl;		
+	std::cout<<"\nAssembly..."<<std::endl;		
 	
 	index_fasta(params, fasta_index);	
 
+	std::cout<<"--->assembling the reads using wtdbg2"<<std::endl;
 	int svtig_cnt = 0;
 	int h1 = 0, h2 = 0;
 	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
@@ -90,9 +91,9 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 
 			std::string filename = sv->contig + "_svtig" + std::to_string(svtig_cnt++) + "_H1";
 				
-			logFile<<"H1 "<<sv->reads_h1.size()<<" "<<itr->first <<std::endl;
-			for (auto &a: sv->reads_h1)
-			logFile<<"\t"<<a<<std::endl;
+			//logFile<<"H1 "<<sv->reads_h1.size()<<" "<<itr->first <<std::endl;
+			//for (auto &a: sv->reads_h1)
+			//	logFile<<"\t"<<a<<std::endl;
 
 			std::string file_path = log_path + "in/" + filename + ".fasta";	
 			std::string output_path = log_path + "out/" + filename;
@@ -121,9 +122,9 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 			
 			std::string filename = sv->contig + "_svtig" + std::to_string(svtig_cnt++) + "_H2";
 				
-			logFile<<"H2"<<sv->reads_h1.size()<<" "<<itr->first <<std::endl;
-			for (auto &a: sv->reads_h1)
-				logFile<<"\t"<<a<<std::endl;
+			//logFile<<"H2"<<sv->reads_h1.size()<<" "<<itr->first <<std::endl;
+			//for (auto &a: sv->reads_h1)
+			//	logFile<<"\t"<<a<<std::endl;
 
 			std::string file_path = log_path + "in/" + filename + ".fasta";	
 			std::string output_path = log_path + "out/" + filename;
