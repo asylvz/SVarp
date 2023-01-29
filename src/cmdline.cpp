@@ -41,13 +41,13 @@ int parse_command_line(int argc, char** argv, parameters* params)
 	/* check if --ref   is invoked */
 	if((params->ref_graph).empty())
 	{
-		std::cerr<<"[PSVPAN CMDLINE ERROR] Please enter reference graph genome file (GFA) using the --graph (-g) option.\n";
+		std::cerr<<"[SVAPAN CMDLINE ERROR] Please enter reference graph genome file (GFA) using the --graph (-g) option.\n";
 		return RETURN_ERROR;
 	}
 
 	if((params->gaf).empty())
 	{
-		std::cerr<<"[PSVPAN CMDLINE ERROR] Please enter alignment file (GAF) using the --gaf (-a) option.\n";
+		std::cerr<<"[SVAPAN CMDLINE ERROR] Please enter alignment file (GAF) using the --gaf (-a) option.\n";
 		return RETURN_ERROR;
 	}	
 	
@@ -64,7 +64,7 @@ int parse_command_line(int argc, char** argv, parameters* params)
 void print_help() 
 {
 	std::cerr << std::endl;
-	std::cout << "pSVpan: phased Structural Variation discovery in pangenomes" << std::endl;
+	std::cout << "svapan: Phased structural variation discovery in pangenomes" << std::endl;
 	
 	std::cerr << std::endl;
 	std::cerr << "Required arguments"<<std::endl;

@@ -1,6 +1,6 @@
 CXX=g++
 CXXFLAGS = -g -O0 -Wall -DDEBUG -std=c++17
-TARGET_EXEC := psvpan
+TARGET_EXEC := svapan
 BUILD_DIR := ./build
 SRC_DIRS := ./src
 
