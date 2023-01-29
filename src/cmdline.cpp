@@ -1,7 +1,11 @@
 #include <iostream>
+#include <filesystem>
+#include <fstream>
 #include <getopt.h>
 #include "cmdline.h"
 
+
+std::ofstream logFile;
 
 int parse_command_line(int argc, char** argv, parameters* params)
 {
@@ -58,6 +62,37 @@ int parse_command_line(int argc, char** argv, parameters* params)
 	}	
 
 	return RETURN_SUCCESS;
+}
+
+
+void init_logs(parameters* params)
+{	
+	std::string cwd = std::filesystem::current_path().string();
+	std::string log_path = cwd + "/log/";	
+	std::cout<<"\n...Hello, svapan is running...\n";
+	if(std::filesystem::exists(log_path))
+		std::filesystem::remove_all(log_path);
+	
+  	if (!std::filesystem::create_directory(log_path))
+	{
+		std::cerr << "Error creating log folder" << std::endl;
+		exit(-1);
+  	}
+  	if (!std::filesystem::create_directory(log_path + "in/"))
+	{
+		std::cerr << "Error creating log/in/" << std::endl;
+		exit(-1);
+  	}
+  	if (!std::filesystem::create_directory(log_path + "out/"))
+	{
+		std::cerr << "Error creating log/out/" << std::endl;
+		exit(-1);
+  	}
+
+	logFile.open(log_path + "svapan.log");
+	
+	std::cout<<"\nInput files:\n\t"<<params->gaf<<"\n\t"<< params->ref_graph<<"\n\t"<<params->fasta<<std::endl;
+	std::cout<<"\nLog folder:\n\t"<<log_path<<std::endl;
 }
 
 

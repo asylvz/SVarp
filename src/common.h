@@ -1,6 +1,7 @@
 #ifndef __COMMON
 #define __COMMON
 
+#include <fstream>
 
 #define EXIT_SUCCESS 0
 #define EXIT_COMMON 1

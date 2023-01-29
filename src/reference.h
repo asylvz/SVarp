@@ -11,11 +11,13 @@ typedef struct _contig
 	//std::string contig_name;
 	//long read_count;
 	long mapped_bases;
+	long mapped_reads;
 	long contig_length;
 	double coverage;
 
 	_contig() {
 		mapped_bases = 0;
+		mapped_reads = 0;
 		contig_length = 0;
 		coverage = 0;
     }

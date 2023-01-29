@@ -208,8 +208,12 @@ int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, st
 
 	std::map<std::string, Contig*>::iterator it;
 	for (it=ref.begin(); it != ref.end(); ++it)
+	{
 		it->second->coverage = (double) it->second->mapped_bases / it->second->contig_length;	
-		
+		logFile<< it->first<<"---> LEN= "<<it->second->contig_length<<" - Mapped bases= "<< it->second->mapped_bases<<" - Cov= "<<it->second->coverage <<std::endl;	
+	
+	}			
+	
 	return RETURN_SUCCESS;
 }
 

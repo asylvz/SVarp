@@ -2,17 +2,14 @@
 #include <set>
 #include <map>
 #include <unistd.h>
-#include <filesystem>
 #include "cmdline.h"
 #include "reference.h"
 #include "alignment.h"
 #include "assembly.h"
 #include "phasing.h"
 
-#include <fstream>
 //ctags *.c
 
-std::ofstream logFile;
 
 int main(int argc, char** argv)
 {
@@ -26,44 +23,16 @@ int main(int argc, char** argv)
 	if (parse_command_line(argc, argv, params) != RETURN_SUCCESS)
 		return RETURN_ERROR;
 
-	std::string cwd = std::filesystem::current_path().string();
-	std::string log_path = cwd + "/log/";	
-	std::cout<<"\nLogs will be written to: "<<log_path<<std::endl;
-	if(std::filesystem::exists(log_path))
-		std::filesystem::remove_all(log_path);
-	
-  	if (!std::filesystem::create_directory(log_path))
-	{
-		std::cerr << "Error creating log folder" << std::endl;
-		exit(-1);
-  	}
-  	if (!std::filesystem::create_directory(log_path + "in/"))
-	{
-		std::cerr << "Error creating log/in/" << std::endl;
-		exit(-1);
-  	}
-  	if (!std::filesystem::create_directory(log_path + "out/"))
-	{
-		std::cerr << "Error creating log/out/" << std::endl;
-		exit(-1);
-  	}
-
-	logFile.open(log_path + "psvpan.log");
-	
-	std::cout<<"\nInput files are:\n\t"<<params->gaf<<"\n\t"<< params->ref_graph<<"\n\t"<<params->fasta<<std::endl;
+	init_logs(params);	
 	
 	read_gfa(params, ref, gfa);
 	if (read_alignments(params, ref, gfa, insertions_tmp) != RETURN_SUCCESS)
 		std::cout<<"Alignments could not be read\n";
-			
-	std::map<std::string, Contig*>::iterator it;
-	for (it=ref.begin(); it != ref.end(); ++it)
-		logFile<< it->first<<"---> LEN= "<<it->second->contig_length<<" - Mapped bases= "<< it->second->mapped_bases<<" - Cov= "<<it->second->coverage <<std::endl;	
-	
+				
 	refine_svs(insertions_tmp, insertions);
 
-	std::cout<<"Phasing"<<std::endl;	
 	//Read the TSV file and phase the reads
+	std::cout<<"Phasing"<<std::endl;	
 	if (read_phase_file(params, phased_reads) == RETURN_SUCCESS)
 		phase_svs(phased_reads, insertions);
 	
@@ -71,9 +40,9 @@ int main(int argc, char** argv)
 	run_assembly(params, insertions);	
 
 	char *username= new char[50];
-	getlogin_r( username, 50);
+	getlogin_r(username, 50);
 	
-	std::cout<<"\nThank you for using pSVpan "<<username<< "... Hope to see you again.\n" <<std::endl;
+	std::cout<<"\nThank you for using svapan "<<username<< "... Hope to see you again.\n" <<std::endl;
 	
 	logFile.close();
 	//delete[] username;
