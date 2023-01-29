@@ -8,4 +8,5 @@
 void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>& insertions);
 int index_fasta(parameters* params, std::map<std::string, unsigned long>& fasta_index);
 
+int merge_assemblies();
 #endif

@@ -4,6 +4,51 @@
 #include "assembly.h"
 
 
+int merge_assemblies()
+{	
+	std::cout<<"\nMerging assembly outputs..."<<std::endl;		
+	
+	std::string cwd = std::filesystem::current_path().string();
+	std::string assembly_path = cwd + "/log/out";
+	//std::string assembly_path = cwd + "/out_tmp";
+
+	std::string line;
+
+	std::string out_file = cwd + "/log/merged_cns.fa";
+	std::ofstream fp_write(out_file);
+	
+	//Find the files ending with ".cns.fa"
+	for (const auto& entry : std::filesystem::directory_iterator(assembly_path)) 
+	{
+		//std::string file_name = entry.path().filename().string();	
+		if (entry.path().extension() == ".fa" && entry.path().stem().extension() == ".cns")
+		{
+			//std::cout<<entry.path()<<"\n";
+			std::string file_name = entry.path().stem().stem();
+			std::ifstream fp_read(entry.path());	
+			if (!fp_read)
+			{
+        		std::cerr << "Error opening "<<entry.path().filename()<< std::endl;
+				return RETURN_ERROR;
+			}
+
+			while(getline(fp_read, line))
+			{
+				if (line[0] == '>')	
+					fp_write<< ">"<<file_name<< std::endl;
+				else
+					fp_write<< line << std::endl;
+				
+				line.clear();
+			}
+		}
+	}	
+
+	return RETURN_SUCCESS;
+}
+
+
+
 void generate_fastq_file(parameters* params, std::map<std::string, unsigned long>& fasta_index, std::set <std::string>& reads, std::string file_path)
 {
 	std::ifstream fp_read(params->fasta);
@@ -71,7 +116,6 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 	std::map<std::string, std::vector<svtig*>>::iterator itr;
 
 	std::string cwd = std::filesystem::current_path().string();
-		
 	std::string log_path = cwd + "/log/";
 
 	std::cout<<"\nAssembly..."<<std::endl;		
@@ -116,7 +160,6 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 
 		for (auto &sv : itr->second) 
 		{
-
 			if ((sv->reads_h2).size() < MIN_READ_SUPPORT)
 				continue;
 			

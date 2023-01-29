@@ -22,9 +22,9 @@ int main(int argc, char** argv)
 	parameters* params = new parameters;	
 	if (parse_command_line(argc, argv, params) != RETURN_SUCCESS)
 		return RETURN_ERROR;
-
-	init_logs(params);	
 	
+	init_logs(params);	
+
 	if (read_gfa(params, ref, gfa) != RETURN_SUCCESS)
 		return RETURN_ERROR;
 
@@ -40,6 +40,9 @@ int main(int argc, char** argv)
 	
 	//check_size(params, phased_reads);
 	run_assembly(params, insertions);	
+
+	//merge assembly output in a single fasta file
+	merge_assemblies();		
 
 	char *username= new char[50];
 	getlogin_r(username, 50);
