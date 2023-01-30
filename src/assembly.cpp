@@ -4,17 +4,35 @@
 #include "assembly.h"
 
 
+int remap_assemblies(parameters* params)
+{
+
+	std::cout<<"\nRemapping assemblies using minigraph..."<<std::endl;		
+	std::string cwd = std::filesystem::current_path().string();
+	std::string fasta_file_path = cwd + "/log/" + FASTA_OUTPUT;
+	std::string remap_output_path = cwd + "/log/" + REMAP_OUTPUT;
+
+	std::string minigraph_cmd = "minigraph -cx lr " + params->ref_graph + " " + fasta_file_path + " -t 16 > " + remap_output_path;
+	
+	system(minigraph_cmd.c_str());
+	
+	std::cout<<"--->output written to "<<remap_output_path <<std::endl;		
+
+	return RETURN_SUCCESS;
+}
+
+
 int merge_assemblies()
 {	
 	std::cout<<"\nMerging assembly outputs..."<<std::endl;		
 	
 	std::string cwd = std::filesystem::current_path().string();
-	std::string assembly_path = cwd + "/log/out";
-	//std::string assembly_path = cwd + "/out_tmp";
+	//std::string assembly_path = cwd + "/log/out";
+	std::string assembly_path = cwd + "/out_tmp";
 
 	std::string line;
 
-	std::string out_file = cwd + "/log/merged_cns.fa";
+	std::string out_file = cwd + "/log/" + FASTA_OUTPUT;
 	std::ofstream fp_write(out_file);
 	
 	//Find the files ending with ".cns.fa"
@@ -155,7 +173,7 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " &>"+ output_path+".log";
 			
 			//std::cout<<"\n"<<wtdbg2_cmd<<"\nSV size=" << sv->sv_size<< std::endl;
-			//system(wtdbg2_cmd.c_str());
+			system(wtdbg2_cmd.c_str());
 		}
 
 		for (auto &sv : itr->second) 
@@ -185,7 +203,7 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " &>"+ output_path+".log";	
 			
 			//std::cout<<"\n"<<wtdbg2_cmd<<"\nSV size=" << sv->sv_size<< std::endl;
-			//system(wtdbg2_cmd.c_str());
+			system(wtdbg2_cmd.c_str());
 		}
 	}
 	std::cout<<"\nThere are "<<h1+h2<<" SVs that have >"<<MIN_READ_SUPPORT<<" minimum read support ("<<h1<<" H1 - "<<h2<<" H2)" <<std::endl;

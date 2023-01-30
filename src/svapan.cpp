@@ -43,6 +43,9 @@ int main(int argc, char** argv)
 
 	//merge assembly output in a single fasta file
 	merge_assemblies();		
+	
+	//Run minigraph for remapping insertion assemblies
+	remap_assemblies(params);	
 
 	char *username= new char[50];
 	getlogin_r(username, 50);
