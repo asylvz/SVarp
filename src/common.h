@@ -2,6 +2,7 @@
 #define __COMMON
 
 #include <fstream>
+#include <vector>
 
 #define EXIT_SUCCESS 0
 #define EXIT_COMMON 1
@@ -12,9 +13,16 @@
 #define HASHSIZE 1001
 #define MINSVSIZE 50
 
+#define MINMAPQ 20
 #define TEST_SAMPLE_SIZE 10000000
 #define MIN_READ_SUPPORT 5
 #define MIN_SV_DISTANCE 500
+
+#define DELETION 'D'
+#define INSERTION 'I'
+
+const std::string REMAP_OUTPUT = "remap_output.gaf";
+const std::string FASTA_OUTPUT = "merged_cns.fa";
 
 typedef struct _parameters
 {
@@ -46,6 +54,6 @@ void print_error( char* msg);
 unsigned hash(char *s);
 void init_params(parameters** params);
 void set_str(char **target, char *source);
-
+int decompose_cigars(std::string cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp);
 
 #endif

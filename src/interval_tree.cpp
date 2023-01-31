@@ -31,7 +31,7 @@ treenode* insert_treenode(treenode *root, alignment* aln)
 	else
 		root->right = insert_treenode(root->right, aln);
 	
-   	root->height = 1 + max(find_height(root->left), find_height(root->right));	
+   	root->height = 1 + std::max(find_height(root->left), find_height(root->right));	
     
 	// Update the max value of this ancestor if needed
     if (root->max < aln->end)

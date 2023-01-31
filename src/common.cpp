@@ -63,3 +63,34 @@ void print_error( char* msg)
 	printf("Invoke parameter -h for help.\n");
 	exit(EXIT_COMMON);
 }
+
+
+int decompose_cigars(std::string cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp)
+{
+	/*get the Cigar*/
+	size_t cigar_offset = 0, str_offset = 0, cigar_cnt = 0;
+	char* cigar_copy = (char*) cigar.c_str();	
+	char *tmp_str = new char[6];
+	while(cigar_offset < cigar.length())
+	{
+		if (isdigit(*(cigar_copy + cigar_offset)) == 0)
+		{
+			cigarOp.push_back (*(cigar_copy + cigar_offset));
+			cigarLen.push_back (atoi(tmp_str));
+			
+			delete[] tmp_str; 	
+			tmp_str = new char[6];
+			str_offset = 0;
+			cigar_cnt++;			
+		}
+		else 
+		{
+			*(tmp_str + str_offset) = *(cigar_copy + cigar_offset);
+			str_offset++;
+		}
+		cigar_offset++;
+	}
+	delete[] tmp_str;
+	
+	return cigar_cnt;
+}

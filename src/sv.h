@@ -6,10 +6,6 @@
 #include "reference.h" 
 
 
-#define DELETION 'D'
-#define INSERTION 'I'
-
-
 class svtig
 {
 private:

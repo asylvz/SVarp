@@ -54,7 +54,7 @@ std::map<std::string, std::vector<variant*>> arrange_variants(std::map<std::stri
 //read set of the variant
 int refine_svs(std::map<std::string, variant*> initial_insertions, std::map<std::string, std::vector<svtig*>>& var)
 {
-	
+
 	std::map<std::string, std::vector<variant*>>::iterator it;
 	std::map<std::string, std::vector<variant*>> insertions;	
 	
@@ -110,7 +110,7 @@ int refine_svs(std::map<std::string, variant*> initial_insertions, std::map<std:
 		var.insert(std::pair<std::string, std::vector<svtig*>>(it->first, var_vector));
 	}
 	
-	std::cout<<"--->merged "<<merged_sv_count<<" SVs (with "<<MIN_SV_DISTANCE<<" as the SV distance threshold)\n\n";
+	std::cout<<"--->merged "<<merged_sv_count<<" SVs (with "<<MIN_SV_DISTANCE<<" as the SV distance threshold)\n--->there are "<<var_vector.size()<<"svtigs\n\n";
 	std::vector<int> read_size;
 /*
 	//std::cout<<"-------SVTIGS------\n";

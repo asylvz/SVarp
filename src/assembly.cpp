@@ -4,23 +4,6 @@
 #include "assembly.h"
 
 
-int remap_assemblies(parameters* params)
-{
-
-	std::cout<<"\nRemapping assemblies using minigraph..."<<std::endl;		
-	std::string cwd = std::filesystem::current_path().string();
-	std::string fasta_file_path = cwd + "/log/" + FASTA_OUTPUT;
-	std::string remap_output_path = cwd + "/log/" + REMAP_OUTPUT;
-
-	std::string minigraph_cmd = "minigraph -cx lr " + params->ref_graph + " " + fasta_file_path + " -t 16 > " + remap_output_path;
-	
-	system(minigraph_cmd.c_str());
-	
-	std::cout<<"--->output written to "<<remap_output_path <<std::endl;		
-
-	return RETURN_SUCCESS;
-}
-
 
 int merge_assemblies()
 {	
@@ -143,8 +126,9 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 	std::cout<<"--->assembling the reads using wtdbg2"<<std::endl;
 	int svtig_cnt = 0;
 	int h1 = 0, h2 = 0;
+	int cnt = 0, perc = 0;
 	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
-	{	
+	{
 		//Generate fastq files
 		for (auto &sv : itr->second) 
 		{
@@ -204,6 +188,14 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 			
 			//std::cout<<"\n"<<wtdbg2_cmd<<"\nSV size=" << sv->sv_size<< std::endl;
 			system(wtdbg2_cmd.c_str());
+		}
+
+		int perc_tmp = ((double) cnt++ / insertions.size()) * 100;
+		if (perc_tmp > perc)
+		{
+			perc = perc_tmp;
+			fprintf(stderr, "--->%d%%\r",perc);
+			fflush(stderr);
 		}
 	}
 	std::cout<<"\nThere are "<<h1+h2<<" SVs that have >"<<MIN_READ_SUPPORT<<" minimum read support ("<<h1<<" H1 - "<<h2<<" H2)" <<std::endl;

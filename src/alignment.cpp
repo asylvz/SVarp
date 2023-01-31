@@ -9,39 +9,7 @@
 #include "alignment.h"
 
 
-int decompose_cigars(string cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp)
-{
-	/*get the Cigar*/
-	size_t cigar_offset = 0, str_offset = 0, cigar_cnt = 0;
-	char* cigar_copy = (char*) cigar.c_str();	
-	char *tmp_str = new char[6];
-	while(cigar_offset < cigar.length())
-	{
-		if (isdigit(*(cigar_copy + cigar_offset)) == 0)
-		{
-			cigarOp.push_back (*(cigar_copy + cigar_offset));
-			cigarLen.push_back (atoi(tmp_str));
-			
-			delete[] tmp_str; 	
-			tmp_str = new char[6];
-			str_offset = 0;
-			cigar_cnt++;			
-		}
-		else 
-		{
-			*(tmp_str + str_offset) = *(cigar_copy + cigar_offset);
-			str_offset++;
-		}
-		cigar_offset++;
-	}
-	delete[] tmp_str;
-	
-	return cigar_cnt;
-}
-
-
-
-void contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, vector <std::string>& tokens)
+void contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::vector <std::string>& tokens)
 {
 	char *path_copy = (char *) tokens[5].c_str();
 	
@@ -127,7 +95,7 @@ int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, st
 
     int total_line_count = 0;
     char endline_char = '\n';
-    while (fp.ignore(numeric_limits<streamsize>::max(), fp.widen(endline_char)))
+    while (fp.ignore(std::numeric_limits<std::streamsize>::max(), fp.widen(endline_char)))
 		++total_line_count;
 	
 	fp.clear() ; // clear the failed state of the stream
@@ -152,7 +120,7 @@ int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, st
 			continue;
 			
 		bool isPrimary = true;	
-		string cigar;
+		std::string cigar;
 		for (auto& tok : tokens) 
 		{
 			if(strstr(tok.c_str(), "tp:A:"))
@@ -184,8 +152,8 @@ int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, st
 							var->sv_size = cigarLen[c];	
 							insertion_count++;
 								
-							string var_name = var->contig + ":" + std::to_string(var->ref_start) + "_" + std::to_string(var->ref_end);
-							std::map<string, variant*>::iterator it = insertions.find(var_name);
+							std::string var_name = var->contig + ":" + std::to_string(var->ref_start) + "_" + std::to_string(var->ref_end);
+							std::map<std::string, variant*>::iterator it = insertions.find(var_name);
 							if (it != insertions.end())
 								it->second->reads_h1.insert(tokens[0]);	
 							else
@@ -195,7 +163,7 @@ int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, st
 							}
 						}
 						else
-							cout<<"RETURNED NULL"<<endl;
+							std::cout<<"RETURNED NULL\n";
 					}
 					if (cigarOp[c] != 'I')
 						ref_pos += cigarLen[c];
@@ -220,7 +188,7 @@ int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, st
 		if(line_count > TEST_SAMPLE_SIZE)
 			break;
 	}
-	cout<<"\n--->there are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n"<<endl;
+	std::cout<<"\n--->there are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n\n";
 
 	std::map<std::string, Contig*>::iterator it;
 	for (it=ref.begin(); it != ref.end(); ++it)
