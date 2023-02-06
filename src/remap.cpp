@@ -57,6 +57,7 @@ int read_remappings(std::map<std::string, gfaNode*> gfa)
 				{
 					isPrimary = false;
 					secondary++;
+					std::cout<<tokens[0]<<"\n";
 					break;
 				}
 				primary++;
@@ -73,7 +74,7 @@ int read_remappings(std::map<std::string, gfaNode*> gfa)
 				{
 					if (cigarOp[c] == INSERTION && cigarLen[c] > MINSVSIZE)
 					{
-						std::cout<<tokens[0]<<" "<<cigarLen[c]<<"\n";
+						std::cout<<tokens[0]<<" "<<cigarLen[c]<<" "<<tokens[7] <<"\n";
 						total_sv_length += cigarLen[c];
 						sv_count++;
 						distinct_read.insert(tokens[0]);
@@ -87,7 +88,7 @@ int read_remappings(std::map<std::string, gfaNode*> gfa)
 		if(!isPrimary)
 			continue;
 	}
-	std::cout<<"\n--->there are "<<primary<<" primary and "<<line_count-primary<<" secondary mappings\n";
+	std::cout<<"\n--->there are "<<primary<<" primary and "<<secondary<<" secondary mappings\n";
 	std::cout<<"--->there are "<<sv_count<< " final SVs with average "<<(total_sv_length/sv_count)<<"\n\n"<<distinct_read.size();
 
 	return RETURN_SUCCESS;
@@ -102,7 +103,7 @@ int remap_assemblies(parameters* params)
 	std::string fasta_file_path = cwd + "/log/" + FASTA_OUTPUT;
 	std::string remap_output_path = cwd + "/log/" + REMAP_OUTPUT;
 
-	std::string minigraph_cmd = "minigraph -cx lr " + params->ref_graph + " " + fasta_file_path + " -t 16 --vc > " + remap_output_path;
+	std::string minigraph_cmd = "minigraph -cx lr " + params->ref_graph + " " + fasta_file_path + " -t 16 --vc --secondary=yes --show-unmap=yes > " + remap_output_path;
 	
 	system(minigraph_cmd.c_str());
 	

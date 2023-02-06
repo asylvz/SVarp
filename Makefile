@@ -1,6 +1,11 @@
+SVARP_VERSION := "0.1"
+SVARP_UPDATE := "February 1, 2023"
+SVARP_DEBUG := 0
+BUILD_DATE := "$(shell date)"
+
 CXX=g++
-CXXFLAGS = -g -O0 -Wall -DDEBUG -std=c++17
-TARGET_EXEC := svapan
+CXXFLAGS = -g -O0 -Wall -DDEBUG -std=c++17 -DSVARP_VERSION=\"$(SVARP_VERSION)\" -DBUILD_DATE=\"$(BUILD_DATE)\" -DSVARP_UPDATE=\"$(SVARP_UPDATE)\" -DSVAPR_DEBUG=$(SVARP_DEBUG)
+TARGET_EXEC := svarp
 BUILD_DIR := ./build
 SRC_DIRS := ./src
 

@@ -45,13 +45,13 @@ int parse_command_line(int argc, char** argv, parameters* params)
 	/* check if --ref   is invoked */
 	if((params->ref_graph).empty())
 	{
-		std::cerr<<"[SVAPAN CMDLINE ERROR] Please enter reference graph genome file (GFA) using the --graph (-g) option.\n";
+		std::cerr<<"[SVARP CMDLINE ERROR] Please enter reference graph genome file (GFA) using the --graph (-g) option.\n";
 		return RETURN_ERROR;
 	}
 
 	if((params->gaf).empty())
 	{
-		std::cerr<<"[SVAPAN CMDLINE ERROR] Please enter alignment file (GAF) using the --gaf (-a) option.\n";
+		std::cerr<<"[SVARP CMDLINE ERROR] Please enter alignment file (GAF) using the --gaf (-a) option.\n";
 		return RETURN_ERROR;
 	}	
 	
@@ -69,7 +69,7 @@ void init_logs(parameters* params)
 {	
 	std::string cwd = std::filesystem::current_path().string();
 	std::string log_path = cwd + "/log/";	
-	std::cout<<"\n...hallo, merhaba, ola, salaam, hello!!! svapan is running...\n";
+	std::cout<<"\n...hallo, merhaba, ola, salaam, hello!!! SVarp is running...\n";
 	if(std::filesystem::exists(log_path))
 		std::filesystem::remove_all(log_path);
 	
@@ -89,7 +89,7 @@ void init_logs(parameters* params)
 		exit(-1);
   	}
 
-	logFile.open(log_path + "svapan.log");
+	logFile.open(log_path + "svarp.log");
 	
 	std::cout<<"\nInput files:\n\t"<<params->gaf<<"\n\t"<< params->ref_graph<<"\n\t"<<params->fasta<<std::endl;
 	std::cout<<"\nLog folder:\n\t"<<log_path<<std::endl;
@@ -99,8 +99,8 @@ void init_logs(parameters* params)
 void print_help() 
 {
 	std::cerr << std::endl;
-	std::cout << "svapan: Phased structural variation discovery in pangenomes" << std::endl;
-	
+	std::cout << "SVarp: Structural variation discovery using pangenomes" << std::endl;
+	std::cout<< "\tVersion "<<SVARP_VERSION<<", Last update: "<<SVARP_UPDATE<<"\n\n";
 	std::cerr << std::endl;
 	std::cerr << "Required arguments"<<std::endl;
 	std::cerr << "\t--gaf (-a)          : GAF alignment file"<<std::endl;

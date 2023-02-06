@@ -45,10 +45,11 @@ int read_phase_file(parameters *params, std::map<std::string, phase*>& phased_re
 void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string, std::vector<svtig*>>& insertions)
 {
 	std::map<std::string, std::vector<svtig*>>::iterator itr;
-	std::map<std::string, phase*>::iterator itr2;
+	std::set <std::string> none_reads;
 
-	int phased = 0, not_phased = 0;
-	
+	int phased = 0, not_phased = 0, skipped_reads = 0, read_not_found = 0;
+	int phased_read_count;
+
 	std::cout<<"--->reading SVs to phase"<<std::endl;	
 	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
 	{	
@@ -56,7 +57,7 @@ void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string,
 		{
 			//first check if it can be phased
 			std::string tmp_phase;
-			int tmp_cnt = 0;
+			phased_read_count = 0;
 			sv->phased = false;
 				
 			//std::cout<<"First pass "<<sv->reads_h1.size()<<"\n";
@@ -64,16 +65,19 @@ void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string,
 			{	
 				std::map<std::string, phase*>::iterator it = phased_reads.find(read);
 				if (it == phased_reads.end())
+				{
+					read_not_found++;
 					continue;
+				}
 
 				//std::cout<<phased_reads[read]->haplotype<<" "<< phased_reads[read]->phase_set <<std::endl;
 				if(phased_reads[read]->haplotype == "none" || phased_reads[read]->phase_set == "none")
 				{
-			   		sv->phased = false;
-					break;
+					skipped_reads++;
+					continue;
 				}
 
-				if (tmp_cnt == 0)
+				if (phased_read_count == 0)
 				{
 					tmp_phase = phased_reads[read]->phase_set;
 					sv->phased = true;
@@ -84,33 +88,43 @@ void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string,
 						sv->phased = false;
 						break;
 					}	
-				tmp_cnt++;
+				phased_read_count++;
 			}
 		
-			//phasing
+			//phasing	
+			//std::cout<<"Second pass\n";
 			if (sv->phased == true)
 			{
-				//std::cout<<"Second pass\n";
 				for (auto &read: sv->reads_h1)
 				{
 					//std::cout<<phased_reads[read]->haplotype<<" "<< phased_reads[read]->phase_set <<std::endl;
 					if(phased_reads[read]->haplotype == "none" || phased_reads[read]->phase_set == "none")
-			   		continue;
+					{
+						none_reads.insert(read);
+						continue;
+					}
 					if (phased_reads[read]->haplotype == "H2")
 						sv->reads_h2.insert(read);
 				}
 				//Erase reads added to the second set, from the first set
 				for (auto &read: sv->reads_h2)
 					sv->reads_h1.erase(read);
+				
+				//Erase none reads from the first set
+				for (auto &read: none_reads)
+					sv->reads_h1.erase(read);
+				
+				none_reads.clear();
 
 				phased++;
+				//std::cout<<"h1: "<<sv->reads_h1.size()<< "\th2: "<<sv->reads_h2.size()<<std::endl;
 			}
 			else
 				not_phased++;
-			//std::cout<<"h1: "<<sv->reads_h1.size()<< "\th2: "<<sv->reads_h2.size()<<std::endl;
+			
 		}
 	}
-	std::cout<<"--->"<<phased<<" SVs could be phased, but "<<not_phased<< " could not...\n";
+	std::cout<<"--->"<<phased<<" SVs phased - "<<not_phased<< " not...\n";
 }
 
 
