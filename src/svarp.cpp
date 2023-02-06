@@ -40,13 +40,13 @@ int main(int argc, char** argv)
 		phase_svs(phased_reads, insertions);
 	
 	//calculate_n50(params, phased_reads);
-	//run_assembly(params, insertions);	
+	run_assembly(params, insertions);	
 
 	//merge assembly output in a single fasta file
-	//merge_assemblies();		
+	merge_assemblies();		
 	
 	//Run minigraph for remapping insertion assemblies
-	//remap_assemblies(params);	
+	remap_assemblies(params);	
 	
 	//Read remapped svtigs
 	read_remappings(gfa);

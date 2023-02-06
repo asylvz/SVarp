@@ -74,7 +74,7 @@ int read_remappings(std::map<std::string, gfaNode*> gfa)
 				{
 					if (cigarOp[c] == INSERTION && cigarLen[c] > MINSVSIZE)
 					{
-						std::cout<<tokens[0]<<" "<<cigarLen[c]<<" "<<tokens[7] <<"\n";
+						//std::cout<<tokens[0]<<" "<<cigarLen[c]<<" "<<tokens[7] <<"\n";
 						total_sv_length += cigarLen[c];
 						sv_count++;
 						distinct_read.insert(tokens[0]);
