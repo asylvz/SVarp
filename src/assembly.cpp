@@ -190,13 +190,13 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 			system(wtdbg2_cmd.c_str());
 		}
 
-		int perc_tmp = ((double) cnt++ / insertions.size()) * 100;
+		/*int perc_tmp = ((double) cnt++ / insertions.size()) * 100;
 		if (perc_tmp > perc)
 		{
 			perc = perc_tmp;
 			fprintf(stderr, "--->%d%%\r",perc);
 			fflush(stderr);
-		}
+		}*/
 	}
 	std::cout<<"\nThere are "<<h1+h2<<" SVs that have >"<<MIN_READ_SUPPORT<<" minimum read support ("<<h1<<" H1 - "<<h2<<" H2)" <<std::endl;
 }

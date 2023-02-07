@@ -35,7 +35,7 @@ typedef struct _parameters
     }
 } parameters;
 
-extern std::ofstream logFile; //Defined in psvpan.c
+extern std::ofstream logFile; //Defined in svarp.c
 
 //#define max(x, y) (((x) > (y)) ? (x) : (y))
 //#define min(x, y) (((x) < (y)) ? (x) : (y))

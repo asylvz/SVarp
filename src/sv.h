@@ -17,6 +17,8 @@ public:
 	std::set <std::string> reads_h2;
 	std::vector <int> breakpoints; 		//The SV breakpoints that contribute to this svtig
 	int sv_size;
+	int start_pos;
+	int end_pos;
 	bool phased;
 	
 	svtig()
@@ -42,7 +44,7 @@ public:
 	bool phased;
 	std::string node;
 	char node_strand;
-	
+
 	variant()
 	{
 	}
@@ -64,7 +66,9 @@ public:
 
 variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, std::string path, int path_start, int path_end, int ref_pos, int cigar_len, char sv_type);
 
-int refine_svs(std::map<std::string, variant*> initial_insertions, std::map<std::string, std::vector<svtig*>>& insertions);
+int refine_svs(std::map<std::string, variant*> initial_variations, std::map<std::string, std::vector<svtig*>>& final_ins, std::map<std::string, std::vector<svtig*>>& final_del);
 
+
+int find_deletions(parameters* params, std::map<std::string, std::vector<svtig*>> deletions);
 
 #endif

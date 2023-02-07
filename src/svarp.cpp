@@ -14,12 +14,12 @@
 
 int main(int argc, char** argv)
 {
-	std::map <std::string, variant*> insertions_tmp;	
+	std::map <std::string, variant*> variations_tmp;	
 	std::map <std::string, gfaNode*> gfa;
 	std::map <std::string, phase*> phased_reads;
-	std::map <std::string, std::vector<svtig*>> insertions;
+	std::map <std::string, std::vector<svtig*>> insertions, deletions;
 	std::map <std::string, Contig*> ref;
-
+	
 	parameters* params = new parameters;	
 	if (parse_command_line(argc, argv, params) != RETURN_SUCCESS)
 		return RETURN_ERROR;
@@ -29,17 +29,17 @@ int main(int argc, char** argv)
 	if (read_gfa(params, ref, gfa) != RETURN_SUCCESS)
 		return RETURN_ERROR;
 
-	if (read_alignments(params, ref, gfa, insertions_tmp) != RETURN_SUCCESS)
+	if (read_alignments(params, ref, gfa, variations_tmp) != RETURN_SUCCESS)
 		return RETURN_ERROR;
 
-	refine_svs(insertions_tmp, insertions);
+	refine_svs(variations_tmp, insertions, deletions);
 
 	//Read the TSV file and phase the reads
 	std::cout<<"Phasing"<<std::endl;	
 	if (read_phase_file(params, phased_reads) == RETURN_SUCCESS)
-		phase_svs(phased_reads, insertions);
+		phase_svs(phased_reads, insertions, deletions);
 	
-	//calculate_n50(params, phased_reads);
+	find_deletions(params, deletions);
 	run_assembly(params, insertions);	
 
 	//merge assembly output in a single fasta file

@@ -75,9 +75,9 @@ void contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string,
 }
 
 
-int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*> gfa, std::map<std::string, variant*>& insertions)
+int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*> gfa, std::map<std::string, variant*>& variations)
 {
-	int secondary = 0, primary = 0, insertion_count = 0, line_count = 0, perc = 0;
+	int secondary = 0, primary = 0, insertion_count = 0, deletion_count = 0, line_count = 0, perc = 0;
 	
 	std::cout<<"Reading the GAF file"<<std::endl;
 	
@@ -153,18 +153,42 @@ int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, st
 							insertion_count++;
 								
 							std::string var_name = var->contig + ":" + std::to_string(var->ref_start) + "_" + std::to_string(var->ref_end);
-							std::map<std::string, variant*>::iterator it = insertions.find(var_name);
-							if (it != insertions.end())
+							std::map<std::string, variant*>::iterator it = variations.find(var_name);
+							if (it != variations.end())
 								it->second->reads_h1.insert(tokens[0]);	
 							else
 							{
 								var->reads_h1.insert(tokens[0]);
-								insertions.insert(std::pair<std::string, variant*>(var_name, var));
+								variations.insert(std::pair<std::string, variant*>(var_name, var));
 							}
 						}
 						else
 							std::cout<<"RETURNED NULL\n";
 					}
+					else if (cigarOp[c] == DELETION && cigarLen[c] > MINSVSIZE)
+					{
+						variant* var = generate_sv_node(gfa, tokens[5], stoi(tokens[7]), stoi(tokens[8]), ref_pos, cigarLen[c], DELETION);
+						
+						if (var)
+						{
+							var->sv_size = cigarLen[c];	
+							deletion_count++;
+								
+							std::string var_name = var->contig + ":" + std::to_string(var->ref_start) + "_" + std::to_string(var->ref_end);
+							std::map<std::string, variant*>::iterator it = variations.find(var_name);
+							if (it != variations.end())
+								it->second->reads_h1.insert(tokens[0]);	
+							else
+							{
+								var->reads_h1.insert(tokens[0]);
+								variations.insert(std::pair<std::string, variant*>(var_name, var));
+							}
+						}
+						else
+							std::cout<<"RETURNED NULL\n";
+
+					}
+
 					if (cigarOp[c] != 'I')
 						ref_pos += cigarLen[c];
 				}
@@ -188,7 +212,7 @@ int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, st
 		if(line_count > TEST_SAMPLE_SIZE)
 			break;
 	}
-	std::cout<<"\n--->there are "<<primary<<" primary mappings and "<<insertion_count<<" insertions\n\n";
+	std::cout<<"\n--->there are "<<primary<<" primary mappings and "<<insertion_count<<" insertion - "<<deletion_count<<" deletion loci\n\n";
 
 	std::map<std::string, Contig*>::iterator it;
 	for (it=ref.begin(); it != ref.end(); ++it)

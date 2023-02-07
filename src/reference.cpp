@@ -9,6 +9,7 @@
 #include "reference.h"
 #include "common.h"
 
+
 int read_gfa(parameters* params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa)
 {	
 	// Read the S lines in the GFA file
