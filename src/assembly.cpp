@@ -111,7 +111,7 @@ int index_fasta(parameters* params, std::map<std::string, unsigned long>& fasta_
 }
 
 
-void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>& insertions)
+void run_assembly(parameters* params, std::map <std::string, Contig*>& ref, std::map<std::string, std::vector<svtig*>>& insertions)
 {
 	std::map<std::string, unsigned long> fasta_index;
 	std::map<std::string, std::vector<svtig*>>::iterator itr;
@@ -124,16 +124,25 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 	index_fasta(params, fasta_index);	
 
 	std::cout<<"--->assembling the reads using wtdbg2"<<std::endl;
-	int svtig_cnt = 0;
-	int h1 = 0, h2 = 0;
-	int cnt = 0, perc = 0;
+	int svtig_cnt = 0, svtig_hicov = 0, svtig_lowcov = 0;
+	int h1 = 0, h2 = 0, cnt = 1, perc = 0;
 	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
 	{
 		//Generate fastq files
 		for (auto &sv : itr->second) 
 		{
-			if ((sv->reads_h1).size() < MIN_READ_SUPPORT)
+			if (ref["overall"]->coverage * 2 < sv->reads_h1.size())
+			{
+				svtig_hicov++;
+				//std::cout<<"Coverage of "<<sv->contig <<" = " << ref[sv->contig]->coverage<<" Read count = "<<sv->reads_h1.size()<<std::endl;
 				continue;
+			}
+
+			if ((sv->reads_h1).size() < (ref["overall"]->coverage)/4)
+			{
+				svtig_lowcov++;
+				continue;
+			}
 
 			std::string filename = sv->contig + "_svtig" + std::to_string(svtig_cnt++) + "_H1";
 				
@@ -157,13 +166,23 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " &>"+ output_path+".log";
 			
 			//std::cout<<"\n"<<wtdbg2_cmd<<"\nSV size=" << sv->sv_size<< std::endl;
-			system(wtdbg2_cmd.c_str());
+			//system(wtdbg2_cmd.c_str());
 		}
 
 		for (auto &sv : itr->second) 
 		{
-			if ((sv->reads_h2).size() < MIN_READ_SUPPORT)
+			if (ref["overall"]->coverage * 3 < sv->reads_h2.size())
+			{
+				//std::cout<<"Coverage of "<<sv->contig <<" = " << ref[sv->contig]->coverage<<" Read count = "<<sv->reads_h2.size()<<std::endl;
+				svtig_hicov++;
 				continue;
+			}
+
+			if ((sv->reads_h2).size() < (ref["overall"]->coverage)/2)
+			{
+				svtig_lowcov++;
+				continue;
+			}
 			
 			std::string filename = sv->contig + "_svtig" + std::to_string(svtig_cnt++) + "_H2";
 				
@@ -187,17 +206,18 @@ void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>
 			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " &>"+ output_path+".log";	
 			
 			//std::cout<<"\n"<<wtdbg2_cmd<<"\nSV size=" << sv->sv_size<< std::endl;
-			system(wtdbg2_cmd.c_str());
+			//system(wtdbg2_cmd.c_str());
 		}
 
-		/*int perc_tmp = ((double) cnt++ / insertions.size()) * 100;
+		int perc_tmp = ((double) cnt++ / insertions.size()) * 100;
 		if (perc_tmp > perc)
 		{
 			perc = perc_tmp;
 			fprintf(stderr, "--->%d%%\r",perc);
 			fflush(stderr);
-		}*/
+		}
 	}
-	std::cout<<"\nThere are "<<h1+h2<<" SVs that have >"<<MIN_READ_SUPPORT<<" minimum read support ("<<h1<<" H1 - "<<h2<<" H2)" <<std::endl;
+	std::cout<<"\n--->assembled "<<h1+h2<<" SVs that have >"<<MIN_READ_SUPPORT<<" minimum read support ("<<h1<<" H1 - "<<h2<<" H2)"<<std::endl;
+	std::cout<<"--->"<<svtig_hicov<< " SVtigs are eliminated due to relatively high and "<<svtig_lowcov<<" SVtigs for low coverage\n";
 }
 

@@ -11,6 +11,7 @@
 int find_deletions(parameters* params, std::map<std::string, std::vector<svtig*>> deletions)
 {
 
+	std::cout<<"\nFinding final deletions"<<std::endl;	
 	std::map<std::string, std::vector<svtig*>>::iterator itr;
 	int read_support_filter = 0, final_sv = 0;
 
@@ -41,7 +42,7 @@ int find_deletions(parameters* params, std::map<std::string, std::vector<svtig*>
 			}
 		}
 	}
-	std::cout<<"There are "<<final_sv<<" deletions (written to "<<log_path + "deletions.bed)\n";
+	std::cout<<"--->there are "<<final_sv<<" deletions (written to "<<log_path + "deletions.bed)\n";
 
 	return RETURN_SUCCESS;
 }

@@ -40,7 +40,8 @@ int main(int argc, char** argv)
 		phase_svs(phased_reads, insertions, deletions);
 	
 	find_deletions(params, deletions);
-	run_assembly(params, insertions);	
+
+	run_assembly(params, ref, insertions);	
 
 	//merge assembly output in a single fasta file
 	merge_assemblies();		

@@ -1,2 +1,2 @@
-# svapan
-Phased structural variation discovery in pangenomes
+#SVarp
+Structural variation discovery using pangenomes

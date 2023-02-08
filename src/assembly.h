@@ -6,7 +6,7 @@
 #include "sv.h"
 
 
-void run_assembly(parameters* params, std::map<std::string, std::vector<svtig*>>& insertions);
+void run_assembly(parameters* params, std::map <std::string, Contig*>& ref, std::map<std::string, std::vector<svtig*>>& insertions);
 int index_fasta(parameters* params, std::map<std::string, unsigned long>& fasta_index);
 int remap_assemblies(parameters* params);
 int merge_assemblies();
