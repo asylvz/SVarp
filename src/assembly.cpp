@@ -163,8 +163,9 @@ void run_assembly(parameters* params, std::map <std::string, Contig*>& ref, std:
 				var_size = 1;
 			
 			h1++;
-			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " &>"+ output_path+".log";
+			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " 2>"+ output_path+".log";
 			
+   			exec(wtdbg2_cmd, false); 
 			//std::cout<<"\n"<<wtdbg2_cmd<<"\nSV size=" << sv->sv_size<< std::endl;
 			//system(wtdbg2_cmd.c_str());
 		}
@@ -203,8 +204,9 @@ void run_assembly(parameters* params, std::map <std::string, Contig*>& ref, std:
 				var_size = 1;
 			
 			h2++;
-			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " &>"+ output_path+".log";	
+			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " 2>"+ output_path+".log";	
 			
+   			exec(wtdbg2_cmd, false); 
 			//std::cout<<"\n"<<wtdbg2_cmd<<"\nSV size=" << sv->sv_size<< std::endl;
 			//system(wtdbg2_cmd.c_str());
 		}

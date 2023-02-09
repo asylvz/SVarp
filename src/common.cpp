@@ -5,6 +5,26 @@
 #include "common.h"
 
 
+std::string exec(std::string command, bool return_out) 
+{
+	FILE* pipe = popen(command.c_str(), "r");
+	if (!pipe)
+		return "Error";
+
+	if (return_out)
+   	{
+		char buffer[128];
+   	   	std::string result = "";
+	   	while (!feof(pipe)) 
+			if (fgets(buffer, 128, pipe) != NULL)
+				result += buffer;
+   		
+		pclose(pipe);
+   		return result;
+	}
+	return "Success";
+}
+
 
 /* The codes for the dictionary is taken from The C Programming language 
  * 2nd edition - Brian Kernighan and Dennis Ritchie */

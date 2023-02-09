@@ -55,5 +55,6 @@ unsigned hash(char *s);
 void init_params(parameters** params);
 void set_str(char **target, char *source);
 int decompose_cigars(std::string cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp);
+std::string exec(std::string command, bool return_out); 
 
 #endif
