@@ -10,8 +10,8 @@ int merge_assemblies()
 	std::cout<<"\nMerging assembly outputs..."<<std::endl;		
 	
 	std::string cwd = std::filesystem::current_path().string();
-	//std::string assembly_path = cwd + "/log/out";
-	std::string assembly_path = cwd + "/out_tmp";
+	std::string assembly_path = cwd + "/log/out";
+	//std::string assembly_path = cwd + "/out_tmp";
 
 	std::string line;
 
