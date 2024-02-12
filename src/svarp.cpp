@@ -1,64 +1,64 @@
 #include <iostream>
 #include <map>
-#include <unistd.h>
-#include <algorithm>
 #include "cmdline.h"
 #include "reference.h"
 #include "alignment.h"
 #include "assembly.h"
 #include "phasing.h"
 #include "remap.h"
-
-//ctags *.c
+#include "asm.h"
 
 
 int main(int argc, char** argv)
 {
-	std::map <std::string, variant*> variations_tmp;	
+	std::map <std::string, Variant*> tmp_var;
 	std::map <std::string, gfaNode*> gfa;
+	std::map <std::string, std::vector<std::string>> incoming, outgoing;
+	std::set <std::string> unmapped_reads;
+
 	std::map <std::string, phase*> phased_reads;
-	std::map <std::string, std::vector<svtig*>> insertions, deletions;
-	std::map <std::string, Contig*> ref;
+	std::map <std::string, std::vector<Svtig*>> vars;
+	std::map <std::string, Contig*> depth;
+	std::map <std::string, FinalSvtig*> final_svtigs;
 	
-	parameters* params = new parameters;	
+	parameters params = parameters();
 	if (parse_command_line(argc, argv, params) != RETURN_SUCCESS)
 		return RETURN_ERROR;
 	
-	init_logs(params);	
-
-	if (read_gfa(params, ref, gfa) != RETURN_SUCCESS)
-		return RETURN_ERROR;
-
-	if (read_alignments(params, ref, gfa, variations_tmp) != RETURN_SUCCESS)
-		return RETURN_ERROR;
-
-	refine_svs(variations_tmp, insertions, deletions);
-
-	//Read the TSV file and phase the reads
-	std::cout<<"Phasing"<<std::endl;	
-	if (read_phase_file(params, phased_reads) == RETURN_SUCCESS)
-		phase_svs(phased_reads, insertions, deletions);
+	init_logs(params);
 	
-	find_deletions(params, deletions);
+	if (read_gfa(params, depth, gfa, incoming, outgoing) != RETURN_SUCCESS)
+		return RETURN_ERROR;	
+		
+	if(params.asm_mode)
+	{
+		if (read_alignments_asm(params, depth, gfa, unmapped_reads) != RETURN_SUCCESS)
+			return RETURN_ERROR;
+	}
+	else
+	{
+		if (read_alignments(params, depth, gfa, tmp_var, unmapped_reads) != RETURN_SUCCESS)
+			return RETURN_ERROR;
+		
+		refine_svs(params, gfa, tmp_var, vars, incoming, outgoing);
+ 
+		//Read the TSV file and phase the reads
+		if (!(params.phase_tags).empty())
+		{
+			std::cout<<"Phasing"<<std::endl;	
+			if (read_phase_file(params, phased_reads) == RETURN_SUCCESS)
+				phase_svs(phased_reads, vars);
+		}
+		run_assembly(params, depth, vars, unmapped_reads, final_svtigs);
 
-	run_assembly(params, ref, insertions);	
+		//Filter SVtigs by remapping to the graph
+		filter_svtigs(params, gfa, final_svtigs);
+	}
 
-	//merge assembly output in a single fasta file
-	merge_assemblies();		
+	std::cout<<"\nThank you for using SVarp... Tschüs, güle güle, adios, bye...\n" <<std::endl;
 	
-	//Run minigraph for remapping insertion assemblies
-	remap_assemblies(params);	
-	
-	//Read remapped svtigs
-	read_remappings(gfa);
-
-	char *username= new char[50];
-	getlogin_r(username, 50);
-	
-	std::cout<<"\nThank you for using SVarp "<<username<< "... Tschüs, güle güle, adios, bye...\n" <<std::endl;
-	
-	logFile.close();
-	//delete[] username;
+	params.fp_logs.close();
 
 	return RETURN_SUCCESS;
 }
+

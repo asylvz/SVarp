@@ -1,225 +1,270 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <chrono>
+#include <zlib.h>
+#include <htslib/faidx.h>
 #include "assembly.h"
 
 
-
-int merge_assemblies()
-{	
-	std::cout<<"\nMerging assembly outputs..."<<std::endl;		
-	
-	std::string cwd = std::filesystem::current_path().string();
-	std::string assembly_path = cwd + "/log/out";
-	//std::string assembly_path = cwd + "/out_tmp";
-
-	std::string line;
-
-	std::string out_file = cwd + "/log/" + FASTA_OUTPUT;
-	std::ofstream fp_write(out_file);
-	
-	//Find the files ending with ".cns.fa"
-	for (const auto& entry : std::filesystem::directory_iterator(assembly_path)) 
-	{
-		//std::string file_name = entry.path().filename().string();	
-		if (entry.path().extension() == ".fa" && entry.path().stem().extension() == ".cns")
-		{
-			//std::cout<<entry.path()<<"\n";
-			std::string file_name = entry.path().stem().stem();
-			std::ifstream fp_read(entry.path());	
-			if (!fp_read)
-			{
-        		std::cerr << "Error opening "<<entry.path().filename()<< std::endl;
-				return RETURN_ERROR;
-			}
-
-			while(getline(fp_read, line))
-			{
-				if (line[0] == '>')	
-					fp_write<< ">"<<file_name<< std::endl;
-				else
-					fp_write<< line << std::endl;
-				
-				line.clear();
-			}
-		}
-	}	
-
-	return RETURN_SUCCESS;
-}
+int filter_hicov = 0, filter_lowcov = 0, filter_support = 0;
 
 
-
-void generate_fastq_file(parameters* params, std::map<std::string, unsigned long>& fasta_index, std::set <std::string>& reads, std::string file_path)
+void generate_fasta_file(parameters& params, faidx_t*& fasta_index, std::set <std::string>& reads, std::string file_path)
 {
-	std::ifstream fp_read(params->fasta);
-	std::ofstream fp_write(file_path);
+	std::ofstream fp_write(file_path);	
 	
-	unsigned long char_pos;	
+	int loc_length;
 	std::string line;	
-	
+	const size_t line_len = 60;
+
 	for (auto &read: reads)
 	{
-		if (fasta_index.find(read)!=fasta_index.end())
-		{
-			char_pos = fasta_index[read];
+		char* tmp = faidx_fetch_seq(fasta_index, read.c_str(), 0, MAX_FETCH_LEN, &loc_length);
+		if (tmp == NULL)
+			continue;
 
-			fp_read.seekg(char_pos, std::ios::beg);
-			
-			getline(fp_read, line);
-			fp_write<< line << std::endl;
-			line.clear();
-			while(getline(fp_read, line))
+		std::string seq(tmp);
+
+		fp_write<<">"<<read << std::endl;
+
+		for (unsigned int i = 0; i < seq.size(); i += line_len)
+		{
+			std::string tmp = (seq.substr(i, line_len));
+			fp_write<< tmp << std::endl;
+    	}
+	}
+	fp_write.close();
+}
+
+
+int write_svtigs(std::string& f_path, const std::string& f_name, int pos, std::string& contig, int coverage, std::ofstream& fp_write)
+{
+	std::ifstream fp_read(f_path);	
+	std::string line;
+	int contig_cnt = 0;
+	std::string svtig_name = f_name;
+
+	if (!fp_read)
+	{
+     	std::cerr << "Error opening "<<f_path<< std::endl;
+		exit(1);
+	}
+	
+	while(getline(fp_read, line))
+	{
+		if (line[0] == '>')
+	{	
+			if (contig_cnt > 0)
 			{
-				if(!fp_read || line[0] == '>')
-					break;
-				fp_write<< line << std::endl;
-				line.clear();
+				//continue;
+				svtig_name = f_name + "_" + std::to_string(contig_cnt + 1);
 			}
+			
+			contig_cnt++;
+			if (contig == "" && pos == 0 && coverage == 0)
+				fp_write<< ">"<<svtig_name<< std::endl;
+			else
+				fp_write<< ">"<<svtig_name<<" contig="<<contig<<" pos="<<pos<<" support="<<coverage<< std::endl;
 		}
 		else
-			std::cout<<"Not found"<<read<<std::endl;	
+			fp_write<< line << std::endl;
+				
+		line.clear();
 	}
-}
-
-int index_fasta(parameters* params, std::map<std::string, unsigned long>& fasta_index)
-{
-	std::cout<<"--->indexing the fasta file"<<std::endl;
-	std::ifstream fp_read(params->fasta);
-	std::string line, read_name;
-	unsigned long char_count = 0;
-
-	if(!fp_read.good())
-	{
-        std::cerr << "Error opening '"<<params->fasta<< std::endl;
-        return RETURN_ERROR;
-    }
-	while(std::getline(fp_read, line))
-	{
-        if(line[0] == '>')
-		{
-			int pos = line.find(" ");
-        	read_name = line.substr(1, pos - 1);
-
-			fasta_index.insert(std::pair<std::string, unsigned long>(read_name, char_count));
-			read_name.clear();
-		}
-		// +1 is for the newline character
-		char_count += line.length() + 1;
-    }
-	return RETURN_SUCCESS;
+	return contig_cnt;
 }
 
 
-void run_assembly(parameters* params, std::map <std::string, Contig*>& ref, std::map<std::string, std::vector<svtig*>>& insertions)
+int merge_svtigs(parameters& params)
 {
-	std::map<std::string, unsigned long> fasta_index;
-	std::map<std::string, std::vector<svtig*>>::iterator itr;
-
-	std::string cwd = std::filesystem::current_path().string();
-	std::string log_path = cwd + "/log/";
-
-	std::cout<<"\nAssembly..."<<std::endl;		
+	int cnt = 0;
+	std::string asm_folder_path = params.log_path + "tmp/";
 	
-	index_fasta(params, fasta_index);	
-
-	std::cout<<"--->assembling the reads using wtdbg2"<<std::endl;
-	int svtig_cnt = 0, svtig_hicov = 0, svtig_lowcov = 0;
-	int h1 = 0, h2 = 0, cnt = 1, perc = 0;
-	for (itr=insertions.begin(); itr != insertions.end(); ++itr)
+	//Find the files ending with ".cns.fa"
+	for (const auto& entry : std::filesystem::directory_iterator(asm_folder_path))
 	{
-		//Generate fastq files
-		for (auto &sv : itr->second) 
+		if (entry.path().extension() == ".fa" && entry.path().stem().extension() == ".cns")
 		{
-			if (ref["overall"]->coverage * 2 < sv->reads_h1.size())
+			std::string file_path = entry.path();
+			std::string file_name = entry.path().stem().stem();
+			std::string tmp = "";
+			cnt += write_svtigs(file_path, file_name, 0, tmp, 0,  params.fp_svtigs);
+
+			if(params.debug)
 			{
-				svtig_hicov++;
-				//std::cout<<"Coverage of "<<sv->contig <<" = " << ref[sv->contig]->coverage<<" Read count = "<<sv->reads_h1.size()<<std::endl;
-				continue;
+				std::string tmp_cmd = "cp " + file_path + " " + params.log_path + "out/";
+				system(tmp_cmd.c_str());
 			}
-
-			if ((sv->reads_h1).size() < (ref["overall"]->coverage)/4)
-			{
-				svtig_lowcov++;
-				continue;
-			}
-
-			std::string filename = sv->contig + "_svtig" + std::to_string(svtig_cnt++) + "_H1";
-				
-			//logFile<<"H1 "<<sv->reads_h1.size()<<" "<<itr->first <<std::endl;
-			//for (auto &a: sv->reads_h1)
-			//	logFile<<"\t"<<a<<std::endl;
-
-			std::string file_path = log_path + "in/" + filename + ".fasta";	
-			std::string output_path = log_path + "out/" + filename;
-			
-			generate_fastq_file(params, fasta_index, sv->reads_h1, file_path);	
-			
-  			if (! std::filesystem::create_directory(output_path))
-        		std::cerr << "Error creating the folder "<<output_path << std::endl;
-
-			int var_size = (sv->sv_size * 2) / 1000;
-			if(var_size == 0)
-				var_size = 1;
-			
-			h1++;
-			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " 2>"+ output_path+".log";
-			
-   			exec(wtdbg2_cmd, false); 
-			//std::cout<<"\n"<<wtdbg2_cmd<<"\nSV size=" << sv->sv_size<< std::endl;
-			//system(wtdbg2_cmd.c_str());
-		}
-
-		for (auto &sv : itr->second) 
-		{
-			if (ref["overall"]->coverage * 3 < sv->reads_h2.size())
-			{
-				//std::cout<<"Coverage of "<<sv->contig <<" = " << ref[sv->contig]->coverage<<" Read count = "<<sv->reads_h2.size()<<std::endl;
-				svtig_hicov++;
-				continue;
-			}
-
-			if ((sv->reads_h2).size() < (ref["overall"]->coverage)/2)
-			{
-				svtig_lowcov++;
-				continue;
-			}
-			
-			std::string filename = sv->contig + "_svtig" + std::to_string(svtig_cnt++) + "_H2";
-				
-			//logFile<<"H2"<<sv->reads_h1.size()<<" "<<itr->first <<std::endl;
-			//for (auto &a: sv->reads_h1)
-			//	logFile<<"\t"<<a<<std::endl;
-
-			std::string file_path = log_path + "in/" + filename + ".fasta";	
-			std::string output_path = log_path + "out/" + filename;
-			
-			generate_fastq_file(params, fasta_index, sv->reads_h2, file_path);	
-			
-  			if (! std::filesystem::create_directory(output_path))
-        		std::cerr << "Error creating the folder "<<output_path << std::endl;
-
-			int var_size = (sv->sv_size * 2) / 1000;
-			if(var_size == 0)
-				var_size = 1;
-			
-			h2++;
-			std::string wtdbg2_cmd = "wtdbg2.pl -t 16 -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " 2>"+ output_path+".log";	
-			
-   			exec(wtdbg2_cmd, false); 
-			//std::cout<<"\n"<<wtdbg2_cmd<<"\nSV size=" << sv->sv_size<< std::endl;
-			//system(wtdbg2_cmd.c_str());
-		}
-
-		int perc_tmp = ((double) cnt++ / insertions.size()) * 100;
-		if (perc_tmp > perc)
-		{
-			perc = perc_tmp;
-			fprintf(stderr, "--->%d%%\r",perc);
-			fflush(stderr);
 		}
 	}
-	std::cout<<"\n--->assembled "<<h1+h2<<" SVs that have >"<<MIN_READ_SUPPORT<<" minimum read support ("<<h1<<" H1 - "<<h2<<" H2)"<<std::endl;
-	std::cout<<"--->"<<svtig_hicov<< " SVtigs are eliminated due to relatively high and "<<svtig_lowcov<<" SVtigs for low coverage\n";
+
+	return cnt;
 }
 
+//Assemble SV clusters
+int final_assembly(parameters& params, faidx_t*& fasta_index, std::set <std::string>& read_set, std::string& svtig_name, double& contig_depth, Svtig*& sv, std::map <std::string, FinalSvtig*>& final_svtigs)
+{
+	int svtig_tmp_cnt = 0;	
+	if (contig_depth * 2 < read_set.size())
+	{
+		filter_hicov++;
+		return 0;
+	}
+	else if (contig_depth > 5 * read_set.size())
+	{
+		filter_lowcov++;
+		return 0;
+	}
+	else if (read_set.size() < 2)
+	{
+		filter_support++;
+		return 0;
+	}
+	else if (contig_depth > MAX_CONTIG_DEPTH)
+	{
+		filter_hicov++;
+		return 0;
+	}
+
+	if (sv != nullptr)
+	{
+		FinalSvtig *tmp = new FinalSvtig;
+		tmp->name = svtig_name;
+		tmp->pos = sv->ref_pos;
+		(tmp->reads).insert(read_set.begin(), read_set.end());
+		tmp->contig = sv->contig;
+		final_svtigs.insert(std::pair<std::string, FinalSvtig*>(tmp->name, tmp));
+	}
+
+	std::string file_path = params.log_path + "tmp/" + svtig_name + ".fasta";	
+	std::string output_path = params.log_path + "tmp/" + svtig_name;
+	
+	generate_fasta_file(params, fasta_index, read_set, file_path);
+
+	if(params.assembler == "Shasta")
+	{
+		std::string shasta_cmd = "shasta --input " + file_path + " --assemblyDirectory " + params.log_path + "out/tmp/" + " --config Nanopore-May2022 --suppressStdoutLog --Assembly.mode2.suppressDetailedOutput --Assembly.mode2.suppressGfaOutput --threads " + std::to_string(params.threads) + " > /dev/null 2>&1";
+		system(shasta_cmd.c_str());
+		
+		std::string minimap = "minimap2 -t " + std::to_string(params.threads) + " -ax map-pb -r2k " + params.log_path + "out/Assembly.fasta "+ file_path +" | samtools sort -@" + std::to_string(params.threads) + " > " + params.log_path + "out/dbg.bam";
+		system(minimap.c_str());
+		
+		std::string polish = "samtools view -F0x900 " + params.log_path + "out/dbg.bam | wtpoa-cns -t " + std::to_string(params.threads) + " -d " + params.log_path + "out/dbg.raw.fa -i - -fo " + output_path + ".cns.fa > /dev/null 2>&1";
+		system(polish.c_str());
+	
+		std::string tmp = "rm -rf " + params.log_path + "out/tmp/";
+		system(tmp.c_str());
+	}
+	else
+	{
+		int var_size = 4;
+		//--ctg-min-nodes 2 -p 0 -k 15 -AS 2 --edge-min 1
+		std::string wtdbg2_cmd = "wtdbg2.pl -t " + std::to_string(params.threads) + " -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " > /dev/null 2>&1";
+		system(wtdbg2_cmd.c_str());
+	}
+	
+	//Write the assembly to the tmp fasta file
+	svtig_tmp_cnt = merge_svtigs(params);
+
+	//Remove the files in the folder
+	for (const auto& entry : std::filesystem::directory_iterator(params.log_path + "tmp/")) 
+	{
+		if(params.debug)
+		{
+			if (entry.path() == file_path)
+			{
+				std::string tmp_cmd = "mv " + file_path + " " + params.log_path + "in/";
+				system(tmp_cmd.c_str());
+			}
+		}
+		std::filesystem::remove_all(entry.path());
+	}
+	
+	return svtig_tmp_cnt;
+}
+
+
+int assemble_clusters(parameters& params, faidx_t*& fasta_index, std::vector<Svtig*>& sv_cluster, std::map <std::string, Contig*>& depth, std::map <std::string, FinalSvtig*>& final_svtigs)
+{
+	int initial_svtigs_cnt = 0;
+
+	for (auto &sv : sv_cluster) 
+	{
+		double contig_depth = depth[sv->contig]->coverage;
+		if (contig_depth < 5)
+			contig_depth = 5;
+		
+		std::string svtig_name;
+		if ((params.phase_tags).empty())
+		{
+			//Create Svtigs for untagged reads
+			svtig_name = sv->node + "_" + std::to_string(sv->start_pos);
+			initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_untagged, svtig_name, contig_depth, sv, final_svtigs);
+		}
+		else
+		{
+			svtig_name = "H1-" +sv->node + "_" + std::to_string(sv->start_pos);	
+			initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_h1, svtig_name, contig_depth, sv, final_svtigs);
+
+			svtig_name = "H2-" +sv->node + "_" + std::to_string(sv->start_pos);	
+			initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_h2, svtig_name, contig_depth, sv, final_svtigs);
+			
+			if(!params.skip_untagged)
+			{
+				svtig_name = "None-" +sv->node + "_" + std::to_string(sv->start_pos);	
+				initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_untagged, svtig_name, contig_depth, sv, final_svtigs);	
+			}
+		}
+	}
+
+
+	return initial_svtigs_cnt;
+}
+
+
+void run_assembly(parameters& params, std::map <std::string, Contig*>& depth, std::map<std::string, std::vector<Svtig*>>& vars, std::set <std::string>& unmapped, std::map <std::string, FinalSvtig*>& final_svtigs)
+{
+	int initial_svtigs_cnt = 0;
+	std::map<std::string, std::vector<Svtig*>>::iterator itr;
+
+	auto t1 = std::chrono::steady_clock::now();
+	std::cout<<"\nAssembly..."<<std::endl;		
+	std::cout<<"--->assembling reads using "<<params.assembler<< std::endl;
+		
+	std::string svtigs_tmp_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
+	params.fp_svtigs.open(svtigs_tmp_path);
+	
+	faidx_t* fasta_index = fai_load((params.fasta).c_str());	
+	
+	for (itr=vars.begin(); itr != vars.end(); ++itr)
+		initial_svtigs_cnt += assemble_clusters(params, fasta_index, itr->second, depth, final_svtigs);
+		
+
+	// Assemble unmapped reads
+	double unmapped_count = static_cast<double>(unmapped.size());
+	//std::cout <<"Size of unmapped is "<<unmapped_count<<"\n";
+	if(unmapped_count > 0)
+	{
+		Svtig* tmp = nullptr;
+		std::string svtig_name = "None-unmapped_" + std::to_string(0);	
+		initial_svtigs_cnt += final_assembly(params, fasta_index, unmapped, svtig_name, unmapped_count, tmp, final_svtigs);
+	}
+	
+	std::cout<<"--->there are "<< initial_svtigs_cnt <<" SVtigs before filtering \n";
+	params.fp_logs<<"--->there are "<< initial_svtigs_cnt <<" SVtigs before filtering \n";
+	
+	if(std::filesystem::exists(params.log_path + "tmp/"))
+		std::filesystem::remove_all(params.log_path + "tmp/");	
+
+	params.fp_svtigs.close();
+	fai_destroy(fasta_index);
+	
+	std::cout<<"--->"<<filter_hicov<< " read clusters filtered due to relatively high and "<<filter_lowcov<<" read clusters for low coverage. Also "<<filter_support<<" for low read support\n";
+	
+	params.fp_logs<<"--->"<<filter_hicov<< " read clusters filtered due to relatively high and "<<filter_lowcov<<" read clusters for low coverage. Also "<<filter_support<<" for low read support\n";
+	
+	auto t2 = std::chrono::steady_clock::now();
+
+	std::cout<<"--->assembly execution time: "<<std::chrono::duration<double> (t2 - t1).count()<<" sec.\n";
+}

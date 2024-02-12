@@ -2,8 +2,58 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <algorithm>
 #include "common.h"
 
+
+//Returns a vector of incoming or outgoing nodes based on the input map object
+/*const std::vector<std::string>& find_prev_next_nodes(std::map <std::string, std::vector<std::string>> inout_nodes, std::string node)
+{
+	std::map<std::string, std::vector<std::string>>::iterator it;
+	for (it=inout_nodes.begin(); it != inout_nodes.end(); ++it)
+	{
+		if(it->first == node)
+			return it->second;
+	}
+}
+*/
+
+
+double overlap_ratio(int x_start, int x_end, int y_start, int y_end)
+{
+	int overlap = std::max(0, std::min(x_end, y_end) - std::max(x_start, y_start));
+	int total_length = x_end - x_start + y_end - y_start;
+	int x_length = x_end - x_start;
+	int y_length = y_end - y_start;
+	
+	double a = (double) 2 * (overlap / (double) total_length);
+	double b = (double) overlap / (double) x_length;
+	double c = (double) (overlap / (double) y_length);
+	if (a > b)
+	{
+		if (c > a)
+			return c;
+		else
+			return a;
+	}
+	else
+	{
+		if (c > b)
+			return c;
+		else
+			return b;
+	}
+	//std::cout<<a<<" "<<b<<" "<<c<<" "<<max_overlap<<"\n";
+
+	return -1;
+}
+
+
+void error(const char* const msg)
+{
+	std::cerr<<msg<<std::endl;
+    exit(EXIT_FAILURE);
+}
 
 std::string exec(std::string command, bool return_out) 
 {
@@ -87,35 +137,58 @@ void print_error( char* msg)
 
 int decompose_cigars(std::string cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp)
 {
-	/*get the Cigar*/
 	size_t cigar_offset = 0, str_offset = 0, cigar_cnt = 0;
 	char* cigar_copy = (char*) cigar.c_str();	
-	char *tmp_str = new char[6];
+	//std::cout<<cigar_copy<<"\n";
+
 	while(cigar_offset < cigar.length())
 	{
 		if (isdigit(*(cigar_copy + cigar_offset)) == 0)
-		{
-			cigarOp.push_back (*(cigar_copy + cigar_offset));
-			cigarLen.push_back (atoi(tmp_str));
+		{	
+			std::string s = "";
+			for (int z = str_offset; z > 0; z--)
+				s += *(cigar_copy + cigar_offset - z);
 			
-			delete[] tmp_str; 	
-			tmp_str = new char[6];
+			cigarOp.push_back (*(cigar_copy + cigar_offset));
+			cigarLen.push_back (stoi(s));
+			
+			//std::cout<<*(cigar_copy + cigar_offset) << " "<< stoi(s) <<"\n";
 			str_offset = 0;
 			cigar_cnt++;			
 		}
 		else 
-		{
-			*(tmp_str + str_offset) = *(cigar_copy + cigar_offset);
 			str_offset++;
-		}
+
 		cigar_offset++;
+		
 	}
-	delete[] tmp_str;
-	
 	return cigar_cnt;
 }
 
 
+std::string& reverse_complement(std::string& seq)
+{
+	std::reverse(seq.begin(), seq.end());
+	for (std::size_t i = 0; i < seq.length(); ++i)
+	{
+		switch (seq[i])
+		{
+			case 'A':
+				seq[i] = 'T';
+				break;
+			case 'C':
+				seq[i] = 'G';
+				break;
+			case 'G':
+				seq[i] = 'C';
+				break;
+			case 'T':
+				seq[i] = 'A';
+				break;
+		}
+	}
+	return seq;
+}
 
 /* void calculate_n50_phase(parameters* params, std::map <std::string, phase*> phased_reads)
 {

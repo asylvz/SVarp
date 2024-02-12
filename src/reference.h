@@ -5,9 +5,9 @@
 #include <set>
 #include "common.h"
 
-
 typedef struct _contig
 {
+public:
 	//std::string contig_name;
 	//long read_count;
 	long mapped_bases;
@@ -50,5 +50,8 @@ public:
 };
 
 
-int read_gfa(parameters* params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa);
+int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, Gaf& line);
+int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing);
+
+
 #endif

@@ -6,363 +6,343 @@
 #include <iterator>
 #include <algorithm>
 #include <limits>
+#include <filesystem>
+#include <zlib.h>
+#include <chrono>
 #include "alignment.h"
 
+int primary_cnt = 0, secondary_cnt = 0, inter_cnt = 0, intra_cnt = 0, insertion_cnt = 0, deletion_cnt = 0;
 
-void contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::vector <std::string>& tokens)
+
+
+Gaf parse_gaf_line(std::string& line)
 {
-	char *path_copy = (char *) tokens[5].c_str();
+	Gaf gafline;	
+	std::vector <std::string> tokens;	
 	
-	char *mytoken = strtok(path_copy,"><");
+	std::string tmp_str;
+	std::stringstream s(line);
+	while(getline(s, tmp_str, '\t'))
+		tokens.push_back(tmp_str);
 	
-	int node_count = 0, total_so_far = 0;
-	int path_start = stoi(tokens[7]);
-	int path_end = stoi(tokens[8]);
-	int total_path_length = path_end - path_start;
-	while(mytoken) 
+	gafline.query_name = tokens[0].substr(0, tokens[0].find(' '));
+	gafline.query_length = stoi(tokens[1]);
+	gafline.query_start = stoi(tokens[2]);
+	gafline.query_end = stoi(tokens[3]);
+	gafline.strand = tokens[4];
+	gafline.path = tokens[5];
+	gafline.path_length = stoi(tokens[6]);
+	gafline.path_start = stoi(tokens[7]);
+	gafline.path_end = stoi(tokens[8]);
+	gafline.residue_matches = stoi(tokens[9]);
+	gafline.alignment_block_length = stoi(tokens[10]);
+	gafline.mapping_quality = stoi(tokens[11]);
+	gafline.is_primary = true;
+
+
+	for (auto& tok : tokens) 
 	{
-		//std::cout<<mytoken<<std::endl;
-		node_count += 1;
-		std::string node = mytoken;
-
-		mytoken = strtok(NULL, "><");
-		//std::cout<<mytoken<<std::endl;
-		
-		if ((node_count == 1) && (!mytoken)) //the single node
+		if(strstr(tok.c_str(), "tp:A:"))
 		{
-			std::string contig = gfa[node]->contig; 
-			ref[contig]->mapped_bases += path_end - path_start;	
-			ref[contig]->mapped_reads++;	
-
-			ref["overall"]->mapped_reads++;	
-			ref["overall"]->mapped_bases += path_end - path_start;
+			if (tok.substr(5, 6) != "P")
+				gafline.is_primary = false;
 		}
-		else if((node_count == 1) && (mytoken)) //first node
-		{
-			std::string contig = gfa[node]->contig; 
-			ref[contig]->mapped_bases += gfa[node]->len - path_start;	
-			ref[contig]->mapped_reads++;	
-
-			ref["overall"]->mapped_reads++;	
-			ref["overall"]->mapped_bases += gfa[node]->len - path_start;
-			
-			total_so_far += gfa[node]->len - path_start;
-		}
-		else if(!mytoken) //Last node
-		{
-			std::string contig = gfa[node]->contig; 
-			ref[contig]->mapped_bases += total_path_length - total_so_far;
-			ref[contig]->mapped_reads++;	
-
-			ref["overall"]->mapped_reads++;	
-			ref["overall"]->mapped_bases += total_path_length - total_so_far;
-
-			//if(total_path_length - total_so_far < 0)
-			//	std::cout<< "middles: "<<middles <<" " <<total_path_length<<" "<<total_so_far<<std::endl;
-		}
-		else //middle node
-		{
-			std::string contig = gfa[node]->contig; 
-			ref[contig]->mapped_bases += gfa[node]->len;		
-			ref[contig]->mapped_reads++;	
-
-			ref["overall"]->mapped_reads++;	
-			ref["overall"]->mapped_bases += gfa[node]->len;		
-
-			total_so_far += gfa[node]->len;
-		}
+	
+		if(strstr(tok.c_str(), "cg:Z:"))
+			gafline.cigar = tok.substr(5);
 	}
+
+	return gafline;
 }
 
 
-int read_alignments(parameters *params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*> gfa, std::map<std::string, variant*>& variations)
+int find_var(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, Gaf& line, std::map <std::string, int>& read_freq, std::set <std::string>& unmapped)
 {
-	int secondary = 0, primary = 0, insertion_count = 0, deletion_count = 0, line_count = 0, perc = 0;
-	
-	std::cout<<"Reading the GAF file"<<std::endl;
-	
-	std::string line;	
-	std::vector <std::string> tokens;
 	std::vector<int> cigarLen;
 	std::vector<char> cigarOp;
 	
-	std::ifstream fp(params->gaf);
-	if(!fp.good())
-	{
-        std::cerr << "Error opening '"<<params->gaf<< std::endl;
-        return RETURN_ERROR;
-    }
-
-    int total_line_count = 0;
-    char endline_char = '\n';
-    while (fp.ignore(std::numeric_limits<std::streamsize>::max(), fp.widen(endline_char)))
-		++total_line_count;
+	//Check if the read is unmapped
+	if ((line.query_start == 0) && (line.query_end == 0))
+		unmapped.insert(line.query_name);
 	
-	fp.clear() ; // clear the failed state of the stream
-	fp.seekg(0) ; // seek to the first character in the file
+	if(line.mapping_quality < MINMAPQ)
+		return RETURN_ERROR;
 	
-	if (total_line_count > TEST_SAMPLE_SIZE)
-		total_line_count = TEST_SAMPLE_SIZE;
-
-	while(fp)
+	//If the read has multiple mappings, then the ends are putative SV loci
+	std::map<std::string, int>::iterator it = read_freq.find(line.query_name);
+	if (it != read_freq.end())
+		inter_cnt += mapping_start_end(gfa, line, vars);
+	
+	if (line.is_primary == false)
 	{
-		getline(fp, line);
-		line_count++;
+		secondary_cnt++;
+		return -1;
+	}
+	else
+		primary_cnt++;
+	
+	cigarLen.clear();
+	cigarOp.clear();
 
-		std::string tmp_str;
-		std::stringstream s(line);
-		tokens.clear();
-		
-		while(getline(s, tmp_str, '\t'))
-        	tokens.push_back(tmp_str);
-		
-		if(stoi(tokens[11]) < MINMAPQ)
-			continue;
-			
-		bool isPrimary = true;	
-		std::string cigar;
-		for (auto& tok : tokens) 
+	int cigar_cnt = decompose_cigars(line.cigar, cigarLen, cigarOp);
+	int base_pos = 0;
+	for (int c = 0; c < cigar_cnt; c++)
+	{
+		if (cigarOp[c] == INSERTION && cigarLen[c] > MINSVSIZE)
 		{
-			if(strstr(tok.c_str(), "tp:A:"))
+			Variant* var = generate_sv_node(gfa, line, base_pos + 1, cigarLen[c], INSERTION);
+			if (var)
 			{
-				if (tok.substr(5, 6) != "P")
+				//std::cout<<var->contig<<" - "<< var->pos_in_ref<<"\n";
+				var->sv_size = cigarLen[c];	
+				intra_cnt++;
+				std::string var_name = var->node + ":" + std::to_string(var->pos_in_node);
+
+				std::map<std::string, Variant*>::iterator it = vars.find(var_name);
+				if (it != vars.end())
+					it->second->reads_untagged.insert(line.query_name);
+				else
 				{
-					isPrimary = false;
-					secondary++;
-					break;
-				}
-				primary++;
-			}
-			else if(strstr(tok.c_str(), "cg:Z:"))
-			{
-				cigarLen.clear();
-				cigarOp.clear();
-
-				cigar = tok.substr(5);
-				int cigar_cnt = decompose_cigars(cigar, cigarLen, cigarOp);
-				int ref_pos = 0;
-				for (int c = 0; c < cigar_cnt; c++)
-				{
-					if (cigarOp[c] == INSERTION && cigarLen[c] > MINSVSIZE)
-					{
-						variant* var = generate_sv_node(gfa, tokens[5], stoi(tokens[7]), stoi(tokens[8]), ref_pos, cigarLen[c], INSERTION);
-						
-						if (var)
-						{
-							var->sv_size = cigarLen[c];	
-							insertion_count++;
-								
-							std::string var_name = var->contig + ":" + std::to_string(var->ref_start) + "_" + std::to_string(var->ref_end);
-							std::map<std::string, variant*>::iterator it = variations.find(var_name);
-							if (it != variations.end())
-								it->second->reads_h1.insert(tokens[0]);	
-							else
-							{
-								var->reads_h1.insert(tokens[0]);
-								variations.insert(std::pair<std::string, variant*>(var_name, var));
-							}
-						}
-						else
-							std::cout<<"RETURNED NULL\n";
-					}
-					else if (cigarOp[c] == DELETION && cigarLen[c] > MINSVSIZE)
-					{
-						variant* var = generate_sv_node(gfa, tokens[5], stoi(tokens[7]), stoi(tokens[8]), ref_pos, cigarLen[c], DELETION);
-						
-						if (var)
-						{
-							var->sv_size = cigarLen[c];	
-							deletion_count++;
-								
-							std::string var_name = var->contig + ":" + std::to_string(var->ref_start) + "_" + std::to_string(var->ref_end);
-							std::map<std::string, variant*>::iterator it = variations.find(var_name);
-							if (it != variations.end())
-								it->second->reads_h1.insert(tokens[0]);	
-							else
-							{
-								var->reads_h1.insert(tokens[0]);
-								variations.insert(std::pair<std::string, variant*>(var_name, var));
-							}
-						}
-						else
-							std::cout<<"RETURNED NULL\n";
-
-					}
-
-					if (cigarOp[c] != 'I')
-						ref_pos += cigarLen[c];
+					var->reads_untagged.insert(line.query_name);
+					vars.insert(std::pair<std::string, Variant*>(var_name, var));
+					insertion_cnt++;
 				}
 			}
-   		}
-		//Check the read depth/coverage here
-		contig_coverage(ref, gfa, tokens);	
-
-		if(!isPrimary)
-			continue;
-
-		int perc_tmp = ((double) line_count / total_line_count) * 100;
-		if (perc_tmp > perc)
+			else
+				std::cout<<"RETURNED NULL\n";
+		}
+		else if (cigarOp[c] == DELETION && cigarLen[c] > MINSVSIZE)
 		{
-			perc = perc_tmp;
-			fprintf(stderr, "--->%d%%\r",perc);
-			fflush(stderr);
+			Variant* var = generate_sv_node(gfa, line, base_pos + 1, cigarLen[c], DELETION);
+						
+			if (var)
+			{
+				//std::cout<<var->contig<<" - "<< var->pos_in_ref<<"\n";
+				var->sv_size = cigarLen[c];	
+				intra_cnt++;
+						
+				std::string var_name = var->node + ":" + std::to_string(var->pos_in_node);
+				std::map<std::string, Variant*>::iterator it = vars.find(var_name);
+						
+				if (it != vars.end())
+					it->second->reads_untagged.insert(line.query_name);
+				else
+				{
+					var->reads_untagged.insert(line.query_name);
+					vars.insert(std::pair<std::string, Variant*>(var_name, var));
+					deletion_cnt++;
+				}
+			}
+			else
+				std::cout<<"RETURNED NULL\n";
 		}
 
-		//alignment_within_gfa(gaf, ref, tokens);
-		if(line_count > TEST_SAMPLE_SIZE)
-			break;
+		if (cigarOp[c] != 'I')
+			base_pos += cigarLen[c];
 	}
-	std::cout<<"\n--->there are "<<primary<<" primary mappings and "<<insertion_count<<" insertion - "<<deletion_count<<" deletion loci\n\n";
+	//Check the read depth/coverage here
+	contig_coverage(ref, gfa, line);
+	
+	return RETURN_SUCCESS;
+}
 
-	std::map<std::string, Contig*>::iterator it;
-	for (it=ref.begin(); it != ref.end(); ++it)
+int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::set <std::string>& unmapped, std::map <std::string, int>& read_freq)
+{
+
+	std::map<std::string, int>::iterator it;	
+	std::map <std::string, int> read_freq_tmp;
+	std::string line;
+	
+	gzFile myfile = gzopen((params.gaf).c_str(), "rb");		
+	if (!myfile)
+		error("Error: Error opening .gz file");
+
+	char buffer[BUFLEN];	
+	char *offset = buffer;
+	
+	while(1)
 	{
-		it->second->coverage = (double) it->second->mapped_bases / it->second->contig_length;	
-		logFile<< it->first<<"---> LEN= "<<it->second->contig_length<<" - Mapped bases= "<< it->second->mapped_bases<<" - Mapped reads= "<<it->second->mapped_reads << " - Cov= "<<it->second->coverage <<std::endl;		
-	}			
+		int err, len = sizeof(buffer) - (offset - buffer);
+		if (len == 0) 
+			error("Error: Buffer too small");
+
+		len	= gzread(myfile, offset, len);
+		if (len == 0) 
+			break;   
+    	if (len < 0) 
+			error(gzerror(myfile, &err));
+		
+		char* cur = buffer;
+    	char* end = offset + len;	
+	
+ 	   	for (char* eol; (cur < end) && (eol = std::find(cur, end, '\n')) < end; cur = eol + 1)
+    	{
+			line = std::string(cur, eol);
+			Gaf g = parse_gaf_line(line);
+
+			
+			it = read_freq_tmp.find(g.query_name);
+			if (it != read_freq_tmp.end())
+				it->second++;
+			else
+				read_freq_tmp.insert(std::pair<std::string, int>(g.query_name, 1));
+
+		}
+    	offset = std::copy(cur, end, buffer);
+	}
+
+	int cnt_multiple = 0, cnt_single = 0;	
+	for (it=read_freq_tmp.begin(); it != read_freq_tmp.end(); ++it)
+	{
+		if (it->second > 1)
+		{
+			cnt_multiple++;
+			read_freq.insert(std::pair<std::string, int>(it->first, it->second));
+		}
+		else
+			cnt_single++;
+	}
+	//std::cout<<"Single: "<<cnt_single<<" Multiple: "<<cnt_multiple<<"\n";
+	int line_count = 0;
+	gzrewind(myfile);
+	
+	memset(buffer, '\0', sizeof(buffer));
+	offset = buffer;
+	bool tst = false;
+	while(1)
+	{
+		int err, len = sizeof(buffer) - (offset - buffer);
+		if (len == 0) 
+		{
+			std::cout<<"Line = "<< line_count<<"\n";
+			error("Error: Buffer too small");
+		}
+
+		len	= gzread(myfile, offset, len);
+
+		if (len == 0) break;   
+    	if (len < 0) error(gzerror(myfile, &err));
+		
+		char* cur = buffer;
+    	char* end = offset + len;	
+	
+ 	   	for (char* eol; (cur < end) && (eol = std::find(cur, end, '\n')) < end; cur = eol + 1)
+    	{
+			line = std::string(cur, eol);
+			line_count++;
+			
+			Gaf g = parse_gaf_line(line);		
+			find_var(ref, gfa, vars, g, read_freq, unmapped);
+			
+			if(line_count > TEST_SAMPLE_SIZE)
+			{
+				tst = true;
+				break;
+			}
+		}
+		if (tst)
+			break;
+			
+    	offset = std::copy(cur, end, buffer);
+	}
+
+   	if (gzclose(myfile) != Z_OK) 
+		error("ERROR: GZCLOSE FAILED");
 	
 	return RETURN_SUCCESS;
 }
 
 
-/*void alignment_within_gfa(std::multimap<string, alignment*>& gaf, std::map<string, gfaNode*> gfa, vector <std::string> tokens)
+int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::set <std::string>& unmapped)
 {
-	char *path_copy = (char *) tokens[5].c_str();
-	
-	char *mytoken = strtok(path_copy,"><");
-	
-	int offset = 0, node_count = 0, total_so_far = 0, total_node_length = 0;
-	int path_start = stoi(tokens[7]);
-	int path_end = stoi(tokens[8]);
-	int total_path_length = path_end - path_start;
 
+	std::cout<<"Reading the GAF file"<<std::endl;
+	auto t1 = std::chrono::steady_clock::now();
+		
+	std::map <std::string, int> read_freq_tmp, read_freq;
+	std::map<std::string, int>::iterator it;
+	std::filesystem::path gaf_path = params.gaf;
 	
-	while(mytoken) 
+	if (gaf_path.extension() == ".gz")
+		read_gz(params, ref, gfa, vars, unmapped, read_freq);
+	else
 	{
-		alignment *aln = new alignment();
-			
-		aln->node = mytoken;
-		aln->strand = tokens[5][offset];
-		aln->read_name = tokens[0];
-		aln->path = tokens[5];
-		node_count += 1;
-		offset += strlen(mytoken) + 1;
-		mytoken = strtok(NULL, "><");
+		std::string line;
+		std::ifstream fp(params.gaf);
 		
-		if ((node_count == 1) && (mytoken == NULL)) //which means there is only a single node
+		if(!fp.good())
 		{
-			if(aln->strand == '>')
+			std::cerr << "Error opening '"<<params.gaf<< std::endl;
+        	return RETURN_ERROR;
+		}
+
+		while(getline(fp, line))
+		{
+			Gaf g = parse_gaf_line(line);
+				
+			it = read_freq_tmp.find(g.query_name);
+			if (it != read_freq_tmp.end())
+				it->second++;
+			else
+				read_freq_tmp.insert(std::pair<std::string, int>(g.query_name, 1));
+		}
+
+		int cnt_multiple = 0, cnt_single = 0;	
+		for (it=read_freq_tmp.begin(); it != read_freq_tmp.end(); ++it)
+		{
+			if (it->second > 1)
 			{
-				aln->start = gfa[aln->node]->offset + path_start;
-				aln->end = gfa[aln->node]->offset + path_end;
+				cnt_multiple++;
+				read_freq.insert(std::pair<std::string, int>(it->first, it->second));
 			}
 			else
-			{
-				aln->start = gfa[aln->node]->offset + (gfa[aln->node]->len - path_end);
-				aln->end = gfa[aln->node]->offset + (gfa[aln->node]->len - path_start);
-			}	
-			
-			if(aln->end < aln->start)
-				cout<<"problem1";
-			
-			total_so_far += (aln->end - aln->start);
-			total_node_length += gfa[aln->node]->len;
+				cnt_single++;
 		}
-		else if((node_count == 1) && (mytoken != NULL))
+		//std::cout<<"Single: "<<cnt_single<<" Multiple: "<<cnt_multiple<<"\n";
+		int line_count = 0;
+
+
+		fp.clear() ; // clear the failed state of the stream
+		fp.seekg(0) ; // seek to the first character in the file
+				
+		while(getline(fp, line))
 		{
-			if(aln->strand == '>')
-			{
-				aln->start = gfa[aln->node]->offset + path_start;
-				aln->end = gfa[aln->node]->offset + gfa[aln->node]->len;
-			}
-			else
-			{
-				aln->start = gfa[aln->node]->offset;
-				aln->end = gfa[aln->node]->offset + (gfa[aln->node]->len - path_start);
-			}
+			Gaf g = parse_gaf_line(line);
+			line_count++;
+			find_var(ref, gfa, vars, g, read_freq, unmapped);
 			
-			if(aln->end < aln->start)
-				cout<<"problem2";
-
-			total_so_far += (aln->end - aln->start);
-			total_node_length += gfa[aln->node]->len;
+			if(line_count > TEST_SAMPLE_SIZE)
+				break;
 		}
-		else if(mytoken == NULL)
-		{
-			if(aln->strand == '>')
-			{
-				aln->start = gfa[aln->node]->offset;
-				aln->end = gfa[aln->node]->offset + (total_path_length - total_so_far);
-			}
-			else
-			{
-				aln->start = gfa[aln->node]->offset + (gfa[aln->node]->len - (total_path_length - total_so_far));
-				aln->end = gfa[aln->node]->offset + gfa[aln->node]->len;
-			}
-
-			if(aln->end < aln->start)
-				cout<<"problem3"; 
-		}
-		else //middle node
-		{
-			aln->start = gfa[aln->node]->offset;
-			aln->end = gfa[aln->node]->offset + gfa[aln->node]->len;
-			
-			total_so_far += gfa[aln->node]->len;
-			total_node_length += gfa[aln->node]->len;
-
-			if(aln->end < aln->start)
-				cout<< "problem4";
-		}
-		
-		//if (gfa[aln->node]->contig == "CHM13#0#chr1")
-		//{
-		//	cout<<"aln - \tstart: "<<aln->start<<"\tend: "<<aln->end<<endl;
-		//}
-		gaf.insert(std::pair<std::string, alignment*>(gfa[aln->node]->contig, aln));
-		//cout<<"inserted "<<gfa[aln->node]->contig<<endl;
-	}
-}*/
-
-
-
-/*void find_supporting_reads(std::map<std::string, gfaNode*> ref, std::multimap<std::string, alignment*> aln, std::set<std::string> contigs, std::multimap<std::string, variant*>& insertions)
-{
+	}	
 	
-	cout<<"Finding the supporting reads"<<endl;
-	treenode* root;
-	
-	for(auto c: contigs)
+	/*for (auto &a: vars)
 	{
-		//Insert the alignments of this contig into the interval tree		
-		root = NULL;
-		auto aln_range = aln.equal_range(c);
-		for (auto i = aln_range.first; i != aln_range.second; ++i)
-			root = insert_treenode(root, i->second);
-		
-		//if (find_height(root) >0 )
-		
-		//if (c == "CHM13#0#chr1")
-		//	cout<<"Contig:"<<c<<" tree height: "<<find_height(root) <<endl;
-		
-		auto sv_range = insertions.equal_range(c);
-		for (auto i = sv_range.first; i != sv_range.second; ++i)
-		{
-			std::set <alignment*> overlaps;
-			find_overlaps(root, i->second, overlaps);
-			
-			//if (i->second->contig == "CHM13#0#chr1")
-			//{
-			//	cout<<"For SV = "<< i->second->ref_start<< " "<< i->second->ref_end<<" - "<< overlaps.size()<<endl;
-			//}
-			for (auto t:overlaps)
-			{
-				//cout<<t->read_name<<endl;
-				i->second->reads_h1.insert(t->read_name);
-				//cout<<i->second->reads.size();
-			}
-		}
-	}
+		//if (a.second->reads_h1.size() > 1 || a.second->reads_h1.size() == 0)
+		//	std::cout<<a.first<<"\n"<< a.second->reads_h1.size()<<"\n\n";
+		if (a.second->type == INTRA && a.second->sv_type == DELETION)
+			std::cout<<a.second->contig<<"\t"<<a.second->pos_in_ref<<"\t"<<a.second->sv_size<<"\t"<<a.second->reads_untagged.size()<<"\n";
+	}*/
+	auto t2 = std::chrono::steady_clock::now();
+
+	std::cout<<"--->execution time: "<<std::chrono::duration<double> (t2 - t1).count()<<"sec.\n";
+	std::cout<<"--->"<<primary_cnt<<" primary mappings and "<<insertion_cnt<<" insertion, "<<deletion_cnt<<" deletion loci in the cigar\n";
+	std::cout<<"--->there are "<<inter_cnt + intra_cnt<<" SV signal (" <<inter_cnt<< " inter alignment and "<<intra_cnt<<" intra alignment)\n";
+	std::cout<<"--->there are "<<unmapped.size()<<" unmapped alignments\n";
+	
+	params.fp_logs<<"--->"<<primary_cnt<<" primary mappings and "<<insertion_cnt<<" insertion, "<<deletion_cnt<<" deletion loci in the cigar\n";
+	params.fp_logs<<"--->there are "<<inter_cnt + intra_cnt<<" SV signal (" <<inter_cnt<< " inter alignment and "<<intra_cnt<<" intra alignment)\n";
+	params.fp_logs<<"--->there are "<<unmapped.size()<<" unmapped alignments\n";
+	
+	std::map<std::string, Contig*>::iterator it2;
+	
+	params.fp_logs<<"------->Contig coverage\n\n";
+	for (it2=ref.begin(); it2 != ref.end(); ++it2)
+	{
+		it2->second->coverage = (double) it2->second->mapped_bases / it2->second->contig_length;	
+		params.fp_logs<< it2->first<<"---> LEN= "<<it2->second->contig_length<<" - Mapped bases= "<< it2->second->mapped_bases<<" - Mapped reads= "<<it2->second->mapped_reads << " - Cov= "<<it2->second->coverage <<std::endl;		
+	}			
+	
+	return RETURN_SUCCESS;
 }
 
-*/
