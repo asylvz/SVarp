@@ -26,11 +26,18 @@ SVarp is developed and tested using Linux Ubuntu operating system
 
 ## Dependencies
 
-* **wtdbg2** (git clone https://github.com/ruanjue/wtdbg2 && cd wtdbg2 && make *Then copy wtdbg2.pl to your PATH*)
-* **zlib** (sudo apt-get install zlib1g-d)
-* **GraphAligner** (https://github.com/maickrau/GraphAligner)
-* **Samtools** (https://github.com/samtools/samtools)
-* **HTSlib and WFA2-lib** (You can either use ***make libs*** or follow the steps below)
+* **wtdbg2** 
+ 	- git clone https://github.com/ruanjue/wtdbg2 && cd wtdbg2 && make (copy *wtdbg2*, *wtpoa-cns* and *wtdbg2.pl* to your PATH)
+* **zlib**
+  	- sudo apt-get install zlib1g-d
+* **GraphAligner**
+  	- https://github.com/maickrau/GraphAligner
+* **Samtools**
+  	- https://github.com/samtools/samtools
+* **Minimap2**
+  	- git clone https://github.com/lh3/minimap2 && cd minimap2 && make
+* **HTSlib and WFA2-lib**
+  	- You can either use ***make libs*** or follow the steps below
 
 ### HTSlib (https://github.com/samtools/htslib)
 	wget https://github.com/samtools/htslib/releases/download/1.17/htslib-1.17.tar.bz2
