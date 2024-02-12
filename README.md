@@ -31,7 +31,7 @@ SVarp is developed and tested using Linux Ubuntu operating system
 * **zlib**
   	- sudo apt-get install zlib1g-d
 * **GraphAligner**
-  	- https://github.com/maickrau/GraphAligner
+  	- conda install -c bioconda graphaligner (https://github.com/maickrau/GraphAligner)
 * **Samtools**
   	- https://github.com/samtools/samtools
 * **Minimap2**
