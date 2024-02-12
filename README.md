@@ -14,7 +14,7 @@ The aim of SVarp is to discover haplotype resolved SVs on top of a pangenome gra
 
 ## Requirements
 
-CONGA is developed and tested using Linux Ubuntu operating system
+SVarp is developed and tested using Linux Ubuntu operating system
 
 * You need the FASTA of the reads bgzipped (i.e., bgzip NA12878.fasta)
 * GAF file needs to be in **unstable coordinate system**. (more info here: https://github.com/lh3/gfatools/blob/master/doc/rGFA.md)
