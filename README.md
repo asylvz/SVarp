@@ -17,10 +17,10 @@ The aim of SVarp is to discover haplotype resolved SVs on top of a pangenome gra
 SVarp is developed and tested using Linux Ubuntu operating system
 
 * You need the FASTA of the reads **bgzipped** (i.e., bgzip NA12878.fasta)
-* GAF file needs to be in **unstable coordinate system**. (more info here: https://github.com/lh3/gfatools/blob/master/doc/rGFA.md)
-* Pangenome reference needs to be in GFA format. We tested SVarp with **HPRC pangenome** (https://zenodo.org/record/6983934)
+* GAF file needs to be in **unstable coordinate system**. (https://github.com/lh3/gfatools/blob/master/doc/rGFA.md)
+* Pangenome ref. needs to be in GFA format. We tested SVarp with **HPRC Minigraph pangenome** (https://zenodo.org/record/6983934)
 	- GAF alignments must be generated using the same GFA file that you use as input
-* For **phased variants**, you need to provide tags in ".tsv" format using **whatshap haplotag** (https://whatshap.readthedocs.io/)
+* For **phased variants**, tags need to be generated in ".tsv" format using **whatshap haplotag** (https://whatshap.readthedocs.io/)
 	- E.g., *whatshap haplotag NA12878.vcf.gz NA12878.bam -o NA12878_phase --reference ref_genome.fasta --output-haplotag-list tags.tsv*
 
 
