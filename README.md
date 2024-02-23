@@ -73,3 +73,6 @@ SVarp is developed and tested using Linux Ubuntu operating system
 	--threads(-t)               : Number of threads for assembly and realignment (default:32)
 	--help                      : Print this help menu
 
+## Citation
+
+*Soylev, A., Ebler, J., Pani, S., Rausch, T., Korbel, J., & Marschall, T. (2024). **SVarp: pangenome-based structural variant discovery**. bioRxiv, 2024-02.*
