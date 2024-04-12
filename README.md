@@ -6,7 +6,7 @@ The aim of SVarp is to discover haplotype resolved SVs on top of a pangenome gra
 *Please open an issue for your questions or feel free to send me an e-mail (arda.soylev@hhu.de)*
 
 ## Quick Start
-	git clone https://git.hhu.de/liy34nag/svarp.git
+	git clone https://github.com/asylvz/SVarp.git
 	cd svarp
 	make
 	build/svarp -a xxx.gaf -g xxx.gfa --fasta xxx.fasta.gz --phase read_tags.tsv -i SAMPLE_NAME -o OUTPUT_FOLDER
