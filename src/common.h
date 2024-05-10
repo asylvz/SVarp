@@ -14,7 +14,7 @@
 #define HASHSIZE 1001
 #define MINSVSIZE 50
 
-#define MINMAPQ 20
+#define MINMAPQ 5
 #define MINMAPQREMAP 1
 #define TEST_SAMPLE_SIZE 250000000
 #define MAX_FETCH_LEN 1000000
@@ -81,6 +81,7 @@ public:
 	int mapping_quality;
 	bool is_primary;
 	std::string cigar;
+	float aln_score;
 	
 	Gaf(std::string& _query_name, int& _query_length, int& _query_start, int& _query_end, std::string& _strand, std::string& _path, 
 			int& _path_length, int& _path_start, int& _path_end, int& _residue_matches, int& _alignment_block_length, int& _mapping_quality, 
@@ -131,6 +132,8 @@ int decompose_cigars(std::string cigar, std::vector<int>& cigarLen, std::vector<
 std::string exec(std::string command, bool return_out); 
 void error(const char* const msg);
 double overlap_ratio(int x_start, int x_end, int y_start, int y_end);
+int parse_gaf_line(std::string& line, Gaf& gafline);
+
 
 std::string& reverse_complement(std::string& seq);
 const std::vector<std::string>& find_prev_next_nodes(std::map <std::string, std::vector<std::string>> inout_nodes, std::string node);

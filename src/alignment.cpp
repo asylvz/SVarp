@@ -11,50 +11,54 @@
 #include <chrono>
 #include "alignment.h"
 
-int primary_cnt = 0, secondary_cnt = 0, inter_cnt = 0, intra_cnt = 0, insertion_cnt = 0, deletion_cnt = 0;
+int primary_cnt = 0, secondary_cnt = 0, inter_cnt = 0, intra_cnt = 0, insertion_cnt = 0, deletion_cnt = 0, mismatch_cnt = 0;
 
-
-
-Gaf parse_gaf_line(std::string& line)
+//We store the variants in vars
+int add_variant(std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, Gaf& line, int pos_in_cigar, char var_type, int var_len)
 {
-	Gaf gafline;	
-	std::vector <std::string> tokens;	
-	
-	std::string tmp_str;
-	std::stringstream s(line);
-	while(getline(s, tmp_str, '\t'))
-		tokens.push_back(tmp_str);
-	
-	gafline.query_name = tokens[0].substr(0, tokens[0].find(' '));
-	gafline.query_length = stoi(tokens[1]);
-	gafline.query_start = stoi(tokens[2]);
-	gafline.query_end = stoi(tokens[3]);
-	gafline.strand = tokens[4];
-	gafline.path = tokens[5];
-	gafline.path_length = stoi(tokens[6]);
-	gafline.path_start = stoi(tokens[7]);
-	gafline.path_end = stoi(tokens[8]);
-	gafline.residue_matches = stoi(tokens[9]);
-	gafline.alignment_block_length = stoi(tokens[10]);
-	gafline.mapping_quality = stoi(tokens[11]);
-	gafline.is_primary = true;
-
-
-	for (auto& tok : tokens) 
+	Variant* var = generate_sv_node(gfa, line, pos_in_cigar + 1, var_len, var_type);
+	if (var)
 	{
-		if(strstr(tok.c_str(), "tp:A:"))
-		{
-			if (tok.substr(5, 6) != "P")
-				gafline.is_primary = false;
-		}
-	
-		if(strstr(tok.c_str(), "cg:Z:"))
-			gafline.cigar = tok.substr(5);
-	}
+		//std::cout<<var->contig<<" - "<< var->pos_in_ref<<"\n";
+		var->sv_size = var_len;	
+		intra_cnt++;
+		std::string var_name = var->node + ":" + std::to_string(var->pos_in_node);
 
-	return gafline;
+		std::map<std::string, Variant*>::iterator it = vars.find(var_name);
+		if (it != vars.end())
+			it->second->reads_untagged.insert(line.query_name);
+		else
+		{
+			var->reads_untagged.insert(line.query_name);
+			vars.insert(std::pair<std::string, Variant*>(var_name, var));
+			if (var_type == INSERTION)
+				insertion_cnt++;
+			else if (var_type == DELETION)
+				deletion_cnt++;
+			else if (var_type == MISMATCH)
+				mismatch_cnt++;
+		}
+		return RETURN_SUCCESS;
+	}
+	else
+		return RETURN_ERROR;
 }
 
+int is_alignment_valid(Gaf& line)
+{
+	if(line.mapping_quality < MINMAPQ)
+		return RETURN_ERROR;
+	
+	if (line.is_primary == false)
+	{
+		//secondary_cnt++;
+		return RETURN_ERROR;
+	}
+	if (line.aln_score && line.aln_score < 50)
+		return RETURN_ERROR;
+
+	return RETURN_SUCCESS;
+}
 
 int find_var(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, Gaf& line, std::map <std::string, int>& read_freq, std::set <std::string>& unmapped)
 {
@@ -63,23 +67,21 @@ int find_var(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode
 	
 	//Check if the read is unmapped
 	if ((line.query_start == 0) && (line.query_end == 0))
+	{
+		
 		unmapped.insert(line.query_name);
+		return RETURN_SUCCESS;
+	}	
 	
-	if(line.mapping_quality < MINMAPQ)
+	if(is_alignment_valid(line) == RETURN_ERROR)
 		return RETURN_ERROR;
+	else
+		primary_cnt++;
 	
 	//If the read has multiple mappings, then the ends are putative SV loci
 	std::map<std::string, int>::iterator it = read_freq.find(line.query_name);
 	if (it != read_freq.end())
 		inter_cnt += mapping_start_end(gfa, line, vars);
-	
-	if (line.is_primary == false)
-	{
-		secondary_cnt++;
-		return -1;
-	}
-	else
-		primary_cnt++;
 	
 	cigarLen.clear();
 	cigarOp.clear();
@@ -88,52 +90,14 @@ int find_var(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode
 	int base_pos = 0;
 	for (int c = 0; c < cigar_cnt; c++)
 	{
-		if (cigarOp[c] == INSERTION && cigarLen[c] > MINSVSIZE)
+		if (cigarOp[c] == INSERTION && cigarLen[c] >= MINSVSIZE)
 		{
-			Variant* var = generate_sv_node(gfa, line, base_pos + 1, cigarLen[c], INSERTION);
-			if (var)
-			{
-				//std::cout<<var->contig<<" - "<< var->pos_in_ref<<"\n";
-				var->sv_size = cigarLen[c];	
-				intra_cnt++;
-				std::string var_name = var->node + ":" + std::to_string(var->pos_in_node);
-
-				std::map<std::string, Variant*>::iterator it = vars.find(var_name);
-				if (it != vars.end())
-					it->second->reads_untagged.insert(line.query_name);
-				else
-				{
-					var->reads_untagged.insert(line.query_name);
-					vars.insert(std::pair<std::string, Variant*>(var_name, var));
-					insertion_cnt++;
-				}
-			}
-			else
+			if (add_variant(gfa, vars, line, base_pos, INSERTION, cigarLen[c]) == RETURN_ERROR)
 				std::cout<<"RETURNED NULL\n";
 		}
-		else if (cigarOp[c] == DELETION && cigarLen[c] > MINSVSIZE)
+		else if (cigarOp[c] == DELETION && cigarLen[c] >= MINSVSIZE)
 		{
-			Variant* var = generate_sv_node(gfa, line, base_pos + 1, cigarLen[c], DELETION);
-						
-			if (var)
-			{
-				//std::cout<<var->contig<<" - "<< var->pos_in_ref<<"\n";
-				var->sv_size = cigarLen[c];	
-				intra_cnt++;
-						
-				std::string var_name = var->node + ":" + std::to_string(var->pos_in_node);
-				std::map<std::string, Variant*>::iterator it = vars.find(var_name);
-						
-				if (it != vars.end())
-					it->second->reads_untagged.insert(line.query_name);
-				else
-				{
-					var->reads_untagged.insert(line.query_name);
-					vars.insert(std::pair<std::string, Variant*>(var_name, var));
-					deletion_cnt++;
-				}
-			}
-			else
+			if (add_variant(gfa, vars, line, base_pos, DELETION, cigarLen[c]) == RETURN_ERROR)
 				std::cout<<"RETURNED NULL\n";
 		}
 
@@ -178,15 +142,23 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
  	   	for (char* eol; (cur < end) && (eol = std::find(cur, end, '\n')) < end; cur = eol + 1)
     	{
 			line = std::string(cur, eol);
-			Gaf g = parse_gaf_line(line);
-
+			Gaf g;
 			
+			if (parse_gaf_line(line, g) != RETURN_SUCCESS)
+				continue;
+
+			if(is_alignment_valid(g) == RETURN_ERROR)
+				continue;
+		
+			
+			if(g.mapping_quality == 0)
+				continue;
+
 			it = read_freq_tmp.find(g.query_name);
 			if (it != read_freq_tmp.end())
 				it->second++;
 			else
 				read_freq_tmp.insert(std::pair<std::string, int>(g.query_name, 1));
-
 		}
     	offset = std::copy(cur, end, buffer);
 	}
@@ -203,6 +175,8 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 			cnt_single++;
 	}
 	//std::cout<<"Single: "<<cnt_single<<" Multiple: "<<cnt_multiple<<"\n";
+	read_freq_tmp.clear();
+
 	int line_count = 0;
 	gzrewind(myfile);
 	
@@ -231,7 +205,8 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 			line = std::string(cur, eol);
 			line_count++;
 			
-			Gaf g = parse_gaf_line(line);		
+			Gaf g;
+			parse_gaf_line(line, g);		
 			find_var(ref, gfa, vars, g, read_freq, unmapped);
 			
 			if(line_count > TEST_SAMPLE_SIZE)
@@ -255,7 +230,6 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 
 int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::set <std::string>& unmapped)
 {
-
 	std::cout<<"Reading the GAF file"<<std::endl;
 	auto t1 = std::chrono::steady_clock::now();
 		
@@ -273,12 +247,22 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 		if(!fp.good())
 		{
 			std::cerr << "Error opening '"<<params.gaf<< std::endl;
-        	return RETURN_ERROR;
+			return RETURN_ERROR;
 		}
-
+	
+		//Here, we count the number of mappings for a read. Stored in "read_freq"
+		//Multiple alignment is an indication of a variant
 		while(getline(fp, line))
 		{
-			Gaf g = parse_gaf_line(line);
+			Gaf g;		
+			if (parse_gaf_line(line, g) != RETURN_SUCCESS)
+				continue;
+			
+			//if(g.mapping_quality == 0)
+			//	continue;
+			
+			if(is_alignment_valid(g) == RETURN_ERROR)
+				continue;
 				
 			it = read_freq_tmp.find(g.query_name);
 			if (it != read_freq_tmp.end())
@@ -297,18 +281,27 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 			}
 			else
 				cnt_single++;
-		}
-		//std::cout<<"Single: "<<cnt_single<<" Multiple: "<<cnt_multiple<<"\n";
-		int line_count = 0;
 
+		}
+		read_freq_tmp.clear();
+
+		/*for (it=read_freq.begin(); it != read_freq.end(); ++it)
+			std::cout<<it->first<<"\t"<<it->second<<"\n";	
+		
+		std::cout<<"Single: "<<cnt_single<<" Multiple: "<<cnt_multiple<<"\n";
+		*/
+		int line_count = 0;
 
 		fp.clear() ; // clear the failed state of the stream
 		fp.seekg(0) ; // seek to the first character in the file
 				
 		while(getline(fp, line))
 		{
-			Gaf g = parse_gaf_line(line);
+			Gaf g;	
+			parse_gaf_line(line, g);
+
 			line_count++;
+			
 			find_var(ref, gfa, vars, g, read_freq, unmapped);
 			
 			if(line_count > TEST_SAMPLE_SIZE)
@@ -317,11 +310,17 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 	}	
 	
 	/*for (auto &a: vars)
-	{
-		//if (a.second->reads_h1.size() > 1 || a.second->reads_h1.size() == 0)
-		//	std::cout<<a.first<<"\n"<< a.second->reads_h1.size()<<"\n\n";
+	
 		if (a.second->type == INTRA && a.second->sv_type == DELETION)
-			std::cout<<a.second->contig<<"\t"<<a.second->pos_in_ref<<"\t"<<a.second->sv_size<<"\t"<<a.second->reads_untagged.size()<<"\n";
+			std::cout<<"INTRAA DEL -----------"<<a.second->contig<<"\t"<<a.second->pos_in_ref<<"\t"<<a.second->sv_size<<"\t"<<a.second->reads_untagged.size()<<"\n";
+		else if (a.second->type == INTRA && a.second->sv_type == INSERTION)
+			std::cout<<"INTRAA INS -----------"<<a.second->contig<<"\t"<<a.second->pos_in_ref<<"\t"<<a.second->sv_size<<"\t"<<a.second->reads_untagged.size()<<"\n";
+		else if (a.second->reads_untagged.size() > 1 && a.second->type == INTER)
+		{
+			std::cout<<"INTER -------------"<<a.first<<"\n"<< a.second->reads_untagged.size()<<"\n\n";
+			for(auto &b: a.second->reads_untagged)
+				std::cout<<b<<"\n";
+		}
 	}*/
 	auto t2 = std::chrono::steady_clock::now();
 

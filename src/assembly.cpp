@@ -3,20 +3,19 @@
 #include <filesystem>
 #include <chrono>
 #include <zlib.h>
-#include <htslib/faidx.h>
 #include "assembly.h"
+//#include "msa.h"
 
 
-int filter_hicov = 0, filter_lowcov = 0, filter_support = 0;
 
-
-void generate_fasta_file(parameters& params, faidx_t*& fasta_index, std::set <std::string>& reads, std::string file_path)
+void Assembly::generate_fasta_file(parameters& params, faidx_t*& fasta_index, std::set <std::string>& reads, std::string file_path)
 {
 	std::ofstream fp_write(file_path);	
 	
 	int loc_length;
 	std::string line;	
 	const size_t line_len = 60;
+	std::set <std::string> read_seqs;
 
 	for (auto &read: reads)
 	{
@@ -33,12 +32,46 @@ void generate_fasta_file(parameters& params, faidx_t*& fasta_index, std::set <st
 			std::string tmp = (seq.substr(i, line_len));
 			fp_write<< tmp << std::endl;
     	}
+		read_seqs.insert(seq);
 	}
+
 	fp_write.close();
 }
 
 
-int write_svtigs(std::string& f_path, const std::string& f_name, int pos, std::string& contig, int coverage, std::ofstream& fp_write)
+/*void run_abpoa(parameters& params, faidx_t*& fasta_index, std::set <std::string>& reads, std::string& svtig_name)
+{
+	int loc_length;
+	std::string res_seq;
+	std::set <std::string> read_seqs;
+
+	for (auto &read: reads)
+	{
+		char* tmp = faidx_fetch_seq(fasta_index, read.c_str(), 0, MAX_FETCH_LEN, &loc_length);
+		if (tmp == NULL)
+			continue;
+
+		std::string seq(tmp);
+		read_seqs.insert(seq);
+	}
+	poa(read_seqs, res_seq);
+	//std::cout<<res_seq<<"\n";
+	
+	std::string asm_folder_path = params.log_path + "tmp/";
+	
+	params.fp_svtigs<< ">"<<svtig_name<<" support="<<read_seqs.size() << std::endl;
+	params.fp_svtigs<< res_seq << std::endl;
+
+	//if(params.debug)
+	//{
+	//	std::string file_path =	asm_folder_path + "/" + svtig_name + ".fa";
+	//	std::string tmp_cmd = "cp " + file_path + " " + params.log_path + "out/";
+	//	system(tmp_cmd.c_str());
+	//}
+}*/
+
+
+int Assembly::write_svtigs(std::string& f_path, const std::string& f_name, int pos, std::string& contig, int coverage, std::ofstream& fp_write)
 {
 	std::ifstream fp_read(f_path);	
 	std::string line;
@@ -54,7 +87,7 @@ int write_svtigs(std::string& f_path, const std::string& f_name, int pos, std::s
 	while(getline(fp_read, line))
 	{
 		if (line[0] == '>')
-	{	
+		{	
 			if (contig_cnt > 0)
 			{
 				//continue;
@@ -76,7 +109,7 @@ int write_svtigs(std::string& f_path, const std::string& f_name, int pos, std::s
 }
 
 
-int merge_svtigs(parameters& params)
+int Assembly::merge_svtigs(parameters& params)
 {
 	int cnt = 0;
 	std::string asm_folder_path = params.log_path + "tmp/";
@@ -86,6 +119,11 @@ int merge_svtigs(parameters& params)
 	{
 		if (entry.path().extension() == ".fa" && entry.path().stem().extension() == ".cns")
 		{
+			if (entry.file_size() == 0)
+			{
+				unassembled_cnt++;
+				continue;
+			}
 			std::string file_path = entry.path();
 			std::string file_name = entry.path().stem().stem();
 			std::string tmp = "";
@@ -98,35 +136,41 @@ int merge_svtigs(parameters& params)
 			}
 		}
 	}
-
 	return cnt;
 }
 
+
 //Assemble SV clusters
-int final_assembly(parameters& params, faidx_t*& fasta_index, std::set <std::string>& read_set, std::string& svtig_name, double& contig_depth, Svtig*& sv, std::map <std::string, FinalSvtig*>& final_svtigs)
+int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index, std::set <std::string>& read_set, std::string& svtig_name, double& contig_depth, Svtig*& sv, std::map <std::string, FinalSvtig*>& final_svtigs)
 {
-	int svtig_tmp_cnt = 0;	
+	unsigned int support_threshold = static_cast<unsigned int>(params.support)/2;
+	if (support_threshold < 3) support_threshold = 3;
+	int svtig_tmp_cnt = 0;
+	
 	if (contig_depth * 2 < read_set.size())
 	{
-		filter_hicov++;
+		this->filter_hicov++;
 		return 0;
 	}
 	else if (contig_depth > 5 * read_set.size())
 	{
-		filter_lowcov++;
+		this->filter_lowcov++;
 		return 0;
 	}
-	else if (read_set.size() < 2)
+	else if (read_set.size() < support_threshold)
+	//else if (read_set.size() < 3)
 	{
-		filter_support++;
+		this->filter_support++;
 		return 0;
 	}
 	else if (contig_depth > MAX_CONTIG_DEPTH)
 	{
-		filter_hicov++;
+		this->filter_hicov++;
 		return 0;
 	}
 
+	//std::cout<<svtig_name<<" Read size: "<<read_set.size()<< " Contig depth: "<< contig_depth<<"\n";
+	
 	if (sv != nullptr)
 	{
 		FinalSvtig *tmp = new FinalSvtig;
@@ -140,10 +184,15 @@ int final_assembly(parameters& params, faidx_t*& fasta_index, std::set <std::str
 	std::string file_path = params.log_path + "tmp/" + svtig_name + ".fasta";	
 	std::string output_path = params.log_path + "tmp/" + svtig_name;
 	
-	generate_fasta_file(params, fasta_index, read_set, file_path);
 
+	/*if (params.assembler == "abpoa")
+	{
+		run_abpoa(params,fasta_index, read_set, svtig_name);
+		svtig_tmp_cnt = 1;
+	}*/
 	if(params.assembler == "Shasta")
 	{
+		generate_fasta_file(params, fasta_index, read_set, file_path);
 		std::string shasta_cmd = "shasta --input " + file_path + " --assemblyDirectory " + params.log_path + "out/tmp/" + " --config Nanopore-May2022 --suppressStdoutLog --Assembly.mode2.suppressDetailedOutput --Assembly.mode2.suppressGfaOutput --threads " + std::to_string(params.threads) + " > /dev/null 2>&1";
 		system(shasta_cmd.c_str());
 		
@@ -158,6 +207,7 @@ int final_assembly(parameters& params, faidx_t*& fasta_index, std::set <std::str
 	}
 	else
 	{
+		generate_fasta_file(params, fasta_index, read_set, file_path);
 		int var_size = 4;
 		//--ctg-min-nodes 2 -p 0 -k 15 -AS 2 --edge-min 1
 		std::string wtdbg2_cmd = "wtdbg2.pl -t " + std::to_string(params.threads) + " -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " > /dev/null 2>&1";
@@ -179,16 +229,15 @@ int final_assembly(parameters& params, faidx_t*& fasta_index, std::set <std::str
 			}
 		}
 		std::filesystem::remove_all(entry.path());
-	}
-	
+	}	
 	return svtig_tmp_cnt;
 }
 
 
-int assemble_clusters(parameters& params, faidx_t*& fasta_index, std::vector<Svtig*>& sv_cluster, std::map <std::string, Contig*>& depth, std::map <std::string, FinalSvtig*>& final_svtigs)
+int Assembly::assemble_clusters(parameters& params, faidx_t*& fasta_index, std::vector<Svtig*>& sv_cluster, std::map <std::string, Contig*>& depth, std::map <std::string, FinalSvtig*>& final_svtigs)
 {
 	int initial_svtigs_cnt = 0;
-
+	//Iterating over SV clusters of a contig
 	for (auto &sv : sv_cluster) 
 	{
 		double contig_depth = depth[sv->contig]->coverage;
@@ -218,12 +267,11 @@ int assemble_clusters(parameters& params, faidx_t*& fasta_index, std::vector<Svt
 		}
 	}
 
-
 	return initial_svtigs_cnt;
 }
 
 
-void run_assembly(parameters& params, std::map <std::string, Contig*>& depth, std::map<std::string, std::vector<Svtig*>>& vars, std::set <std::string>& unmapped, std::map <std::string, FinalSvtig*>& final_svtigs)
+void Assembly::run_assembly(parameters& params, std::map <std::string, Contig*>& depth, std::map<std::string, std::vector<Svtig*>>& vars, std::set <std::string>& unmapped, std::map <std::string, FinalSvtig*>& final_svtigs)
 {
 	int initial_svtigs_cnt = 0;
 	std::map<std::string, std::vector<Svtig*>>::iterator itr;
@@ -235,11 +283,11 @@ void run_assembly(parameters& params, std::map <std::string, Contig*>& depth, st
 	std::string svtigs_tmp_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
 	params.fp_svtigs.open(svtigs_tmp_path);
 	
-	faidx_t* fasta_index = fai_load((params.fasta).c_str());	
-	
+	faidx_t* fasta_index = fai_load((params.fasta).c_str());
+
+	//Iterating over contigs; i.e., check SV clusters of each contig
 	for (itr=vars.begin(); itr != vars.end(); ++itr)
 		initial_svtigs_cnt += assemble_clusters(params, fasta_index, itr->second, depth, final_svtigs);
-		
 
 	// Assemble unmapped reads
 	double unmapped_count = static_cast<double>(unmapped.size());
@@ -250,19 +298,22 @@ void run_assembly(parameters& params, std::map <std::string, Contig*>& depth, st
 		std::string svtig_name = "None-unmapped_" + std::to_string(0);	
 		initial_svtigs_cnt += final_assembly(params, fasta_index, unmapped, svtig_name, unmapped_count, tmp, final_svtigs);
 	}
-	
-	std::cout<<"--->there are "<< initial_svtigs_cnt <<" SVtigs before filtering \n";
-	params.fp_logs<<"--->there are "<< initial_svtigs_cnt <<" SVtigs before filtering \n";
-	
+		
 	if(std::filesystem::exists(params.log_path + "tmp/"))
 		std::filesystem::remove_all(params.log_path + "tmp/");	
 
 	params.fp_svtigs.close();
 	fai_destroy(fasta_index);
 	
-	std::cout<<"--->"<<filter_hicov<< " read clusters filtered due to relatively high and "<<filter_lowcov<<" read clusters for low coverage. Also "<<filter_support<<" for low read support\n";
+	std::cout<<"--->"<<(filter_hicov)+(this->filter_lowcov)+(this->filter_support)<<" filtered (" <<this->filter_hicov<<" high, "<<this->filter_lowcov<<" low coverage read clusters and "<<this->filter_support<<" low read support)\n";
 	
-	params.fp_logs<<"--->"<<filter_hicov<< " read clusters filtered due to relatively high and "<<filter_lowcov<<" read clusters for low coverage. Also "<<filter_support<<" for low read support\n";
+	params.fp_logs<<"--->"<<(this->filter_hicov)+(this->filter_lowcov)+(this->filter_support)<<" filtered (" <<this->filter_hicov<<" high, "<<this->filter_lowcov<<" low coverage read clusters and "<<this->filter_support<<" low read support)\n";
+	
+	std::cout<<"--->"<<unassembled_cnt<<" clusters cannot be assembled\n";	
+	params.fp_logs<<"--->"<<unassembled_cnt<<" clusters cannot be assembled\n";
+
+	std::cout<<"--->there are "<< initial_svtigs_cnt <<" svtigs before final filtering \n";
+	params.fp_logs<<"--->there are "<< initial_svtigs_cnt <<" svtigs before final filtering \n";
 	
 	auto t2 = std::chrono::steady_clock::now();
 

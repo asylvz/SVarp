@@ -79,7 +79,7 @@ public:
 
 
 Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const int base_pos, int var_len, char sv_type);
-int refine_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::map<std::string, std::vector<Svtig*>>& final_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing);
+int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::map<std::string, std::vector<Svtig*>>& final_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing);
 
 int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<std::string, Variant*>& variations_inter);
 int find_deletions(parameters* params, std::map<std::string, std::vector<Svtig*>> deletions);

@@ -112,10 +112,15 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		return RETURN_ERROR;
 	}
 	
-	if((params.assembler).empty())
+	if((params.assembler).empty() || params.assembler == "wtdbg" || params.assembler == "wtdbg2")
 	{
 		params.assembler = "wtdbg2";
 		std::cerr<<"Using wtdbg2 for assembly...\n";
+	}
+	else if (params.assembler == "abpoa" || params.assembler == "poa")
+	{
+		params.assembler = "abpoa";
+		std::cerr<<"Using abPOA for assembly...\n";
 	}
 	else if(params.assembler == "shasta" || params.assembler == "Shasta")
 	{

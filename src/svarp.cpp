@@ -6,7 +6,7 @@
 #include "assembly.h"
 #include "phasing.h"
 #include "remap.h"
-#include "asm.h"
+//#include "asm.h"
 
 
 int main(int argc, char** argv)
@@ -26,34 +26,33 @@ int main(int argc, char** argv)
 		return RETURN_ERROR;
 	
 	init_logs(params);
-	
 	if (read_gfa(params, depth, gfa, incoming, outgoing) != RETURN_SUCCESS)
 		return RETURN_ERROR;	
 		
-	if(params.asm_mode)
+	/*if(params.asm_mode)
 	{
 		if (read_alignments_asm(params, depth, gfa, unmapped_reads) != RETURN_SUCCESS)
 			return RETURN_ERROR;
 	}
-	else
-	{
-		if (read_alignments(params, depth, gfa, tmp_var, unmapped_reads) != RETURN_SUCCESS)
-			return RETURN_ERROR;
+	*/
+	if (read_alignments(params, depth, gfa, tmp_var, unmapped_reads) != RETURN_SUCCESS)
+		return RETURN_ERROR;
 		
-		refine_svs(params, gfa, tmp_var, vars, incoming, outgoing);
- 
-		//Read the TSV file and phase the reads
-		if (!(params.phase_tags).empty())
-		{
-			std::cout<<"Phasing"<<std::endl;	
-			if (read_phase_file(params, phased_reads) == RETURN_SUCCESS)
-				phase_svs(phased_reads, vars);
-		}
-		run_assembly(params, depth, vars, unmapped_reads, final_svtigs);
-
-		//Filter SVtigs by remapping to the graph
-		filter_svtigs(params, gfa, final_svtigs);
+	merge_svs(params, gfa, tmp_var, vars, incoming, outgoing);
+	
+	//Read the TSV file and phase the reads
+	if (!(params.phase_tags).empty())
+	{
+		std::cout<<"Phasing"<<std::endl;	
+		if (read_phase_file(params, phased_reads) == RETURN_SUCCESS)
+			phase_svs(phased_reads, vars);
 	}
+	Assembly s;
+	s.run_assembly(params, depth, vars, unmapped_reads, final_svtigs);
+
+	//Filter SVtigs by remapping to the graph
+	filter_svtigs(params, gfa, final_svtigs);
+	
 
 	std::cout<<"\nThank you for using SVarp... Tschüs, güle güle, adios, bye...\n" <<std::endl;
 	

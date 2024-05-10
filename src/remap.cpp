@@ -53,7 +53,7 @@ int write_final_svtigs_fasta(faidx_t*& fasta_index, std::string& svtig_name, int
 std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <std::string, FinalSvtig*>& final_svtigs, int& extra_added)
 {
 	std::pair<int, int> dup_legit(0,0);
-
+	std::map<std::string, FinalSvtig*>::iterator it_svtigs;
 	std::sort(tmp_svtig.begin(), tmp_svtig.end(), cmp);
 	
 	for(unsigned int i = 0; i < tmp_svtig.size(); i++)
@@ -90,6 +90,7 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 				}
 			}
 		}
+		//Add if not a duplicate
 		if (toAdd)
 		{
 			//If the assembly is fragmented (i.e., multiple contigs), then we need to add the additional contig because it is not in final_svtigs DS (only None-s237302_123 is in final_svtigs). e.g., None-s237302_123 and None-s237302_123_2
@@ -99,7 +100,7 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 			if (npos != npos2)
 			{
 				tmp_str = r->rname.substr(0, npos);
-				std::map<std::string, FinalSvtig*>::iterator it_svtigs = final_svtigs.find(tmp_str);
+				it_svtigs = final_svtigs.find(tmp_str);
 				
 				//Add it to the final_svtigs
 				if (it_svtigs != final_svtigs.end())
@@ -128,6 +129,29 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 			//std::cout<<"Legit, added\n";
 		}
 	}
+	//Add the unmapped reads as well
+	
+	/*bool is_aligned = false;
+	for (it_svtigs=final_svtigs.begin(); it_svtigs != final_svtigs.end(); ++it_svtigs)
+	{
+		std::cout<<"Checking "<<it_svtigs->first<<"\t";
+		is_aligned = false;
+		for (auto & element : tmp_svtig)
+		{
+			if (it_svtigs->first == element->rname)
+			{
+				std::cout<<"Aligned\n";
+				is_aligned = true;
+				break;
+			}	
+		}
+		if (!is_aligned)
+		{
+			std::cout<<"Unmapped\n";
+			it_svtigs->second->output = true;
+		}
+	}*/
+
 	return dup_legit;
 }
 
@@ -182,7 +206,6 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 
 	//Read the gaf once to find the largest mappings of the svtigs. If that's more than half of the svtig, get it	
 	std::map<std::string, Read*>::iterator it;
-	std::map<std::string, std::string>::iterator it_dup;
 	std::map <std::string, Read*> reads;
 	std::map <std::string, std::string> non_dup_by_pos, non_dup_by_rname;
 	std::vector<int> cigarLen;
@@ -193,7 +216,8 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 	double map_ratio = 0.0;
 	while(getline(fp, line))
 	{
-		Gaf g = parse_gaf_line(line);
+		Gaf g;
+		parse_gaf_line(line, g);
 		
 		bool hasSV = false, LowMQ = false;	
 		
@@ -278,27 +302,29 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 
 	std::vector <Read*> tmp_svtig;
 	int filtered = 0;
-
+	
 	for (auto &t: reads)
 	{
 		if(t.second->highest_map_ratio > 0)
-		{
+		{	
 			if(t.second->freq > 1)
 				tmp_svtig.push_back(t.second);
 			else if(t.second->highest_map_ratio < params.min_map_ratio)
 				tmp_svtig.push_back(t.second);
-			else if (!(t.second->sv_in_cigar))
+			else if (t.second->sv_in_cigar)
+				tmp_svtig.push_back(t.second);
+			else
 				filtered++;
 		}
 		else
 			filtered++;
 	}
-	
+	//If an svtig is in tmp_svtig, check if it is a duplicate. If not set "->output=true"
+	//Check the unmapped svtigs and add them tooo
 	std::pair<int, int> dup_legit = remove_duplicates(tmp_svtig, final_svtigs, extra_added);
 
-	std::cout<<"--->There are "<<reads.size()<<" svtigs and "<< filtered << " filtered and " << dup_legit.first<<" duplicates\n";
-
-	std::cout<<"--->"<<dup_legit.second<< " legitimate mappings(primary and high mapq) - " << primary<<" primary, "<<secondary<<" secondary mappings, "<<lowmq<<" low MAPQ(<"<<MINMAPQREMAP<<"), duplicates = " <<dup_legit.first<<", svtigs from multiple contig assemblies = "<<extra_added<<"\n";
+	std::cout<<"--->"<< filtered << " filtered - " << dup_legit.first<<" duplicate\n";
+	std::cout<<"--->"<< primary<<" primary, "<<secondary<<" secondary mappings, "<<lowmq<<" low MAPQ(<"<<MINMAPQREMAP<<")" <<"; svtigs from multiple contig assemblies = "<<extra_added<<"\n";
 
 	return RETURN_SUCCESS;
 }
@@ -347,15 +373,15 @@ int write_final_svtigs(parameters& params, std::string file_path, faidx_t*& fast
 
 int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map <std::string, FinalSvtig*>& final_svtigs)
 {
-
-	std::cout<<"\nFiltering SVtigs"<<std::endl;	
+	std::cout<<"\nFiltering svtigs"<<std::endl;	
 	std::string svtigs_tmp_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
 
 	if (!params.no_remap)
 	{
-		std::cout<<"--->remapping SVtigs onto the graph using Graphaligner"<<std::endl;			
+		std::cout<<"--->remapping svtigs onto the graph using Graphaligner"<<std::endl;			
 		
 		std::string graphaligner_cmd = "GraphAligner -g " + params.ref_graph + " -f " + svtigs_tmp_path + " -a " + params.remap_gaf_path + " -t " + std::to_string(params.threads) + " -x vg --precise-clipping " + std::to_string(params.min_precise_clipping) + " --min-alignment-score " + std::to_string(params.min_alignment_score) + " --multimap-score-fraction 0.9 > /dev/null 2>&1";
+		//std::string graphaligner_cmd = "GraphAligner -g " + params.ref_graph + " -f " + svtigs_tmp_path + " -a " + params.remap_gaf_path + " -t " + std::to_string(params.threads) + " -x vg > /dev/null 2>&1";
 		
 		system(graphaligner_cmd.c_str());
 		
@@ -368,13 +394,12 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 	}
 	else
 	{
-		//TODO: Implement remapping skipping function
+		//TODO: Implement remap skipping function
 		
 		std::cout<<"--->Skipping remapping step..."<<std::endl;
 		exit(0);
 	}
-
-		
+	
 	std::string file_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
 	faidx_t* fasta_index = fai_load((file_path).c_str());
 
@@ -387,7 +412,7 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 		svtigs_path = params.log_path + params.sample_name + "_svtigs.fa";
 		int h1 = write_final_svtigs(params, file_path, fasta_index, final_svtigs, svtigs_path, "None");
 
-		std::cout<<"--->there are "<<h1<<" SVtigs"<<"\n";
+		std::cout<<"--->there are "<<h1<<" svtigs"<<"\n";
 	}
 	else
 	{
@@ -402,10 +427,10 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 			svtigs_path = params.log_path + params.sample_name + "_svtigs_untagged.fa";
 			int untagged = write_final_svtigs(params, file_path, fasta_index, final_svtigs, svtigs_path, "None");
 			
-			std::cout<<"--->there are "<<h1<<" haplotype 1, " <<h2<<" haplotype 2 and "<<untagged<<" untagged SVtigs"<<"\n";
+			std::cout<<"--->there are "<<h1<<" haplotype 1, " <<h2<<" haplotype 2 and "<<untagged<<" untagged svtigs"<<"\n";
 		}
 		else
-			std::cout<<"--->there are "<<h1<<" haplotype 1, " <<h2<<" haplotype 2 SVtigs"<<"\n";
+			std::cout<<"--->there are "<<h1<<" haplotype 1, " <<h2<<" haplotype 2 svtigs"<<"\n";
 	}
 	fai_destroy(fasta_index);
 

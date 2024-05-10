@@ -6,7 +6,6 @@
 #include "variant.h"
 
 
-
 // Compares two intervals according to ending times in descending order.
 inline bool cmp(Variant* i1, Variant* i2)
 {
@@ -39,9 +38,7 @@ int arrange_variants(std::map<std::string, Variant*>& vars, std::map<std::string
 		}
 	}
 
-	//std::cout<<"sorting.......................\n";
 	//Now sort the vector of variants for each contig
-
 	for (it=vars_by_node.begin(); it != vars_by_node.end(); ++it)
 		std::sort((it->second).begin(), (it->second).end(), cmp);
 	
@@ -49,11 +46,14 @@ int arrange_variants(std::map<std::string, Variant*>& vars, std::map<std::string
 	for (it=vars_by_node.begin(); it != vars_by_node.end(); ++it)
 	{
 		cnt++;
-		std::cout<<"\n\n"<<it->first<<"\n";
-		for (auto &sv : it->second) 
-			std::cout<<cnt <<"\t"<< sv->pos_in_node<<"  ";
-	}
-	exit(1);*/
+		if (it->first == "s105205" || it->first == "s105207")
+		{
+			std::cout<<"\n\n"<<it->first<<"("<<cnt<<")\n";
+			for (auto &sv : it->second) 
+				std::cout<<sv->pos_in_node<<"\t";
+		}
+	}*/
+	//exit(1);
 	
 	return RETURN_SUCCESS;
 }
@@ -137,7 +137,7 @@ int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gf
 			std::cout<<"Empty...\n";
 			continue;
 		}
-		//For each node, get the sv at the front and at the back of the vector.
+		//For each node, get the SV at the front and at the back of the vector.
 		//This can be done since they are sorted based on the position within the node
 		//These may need to be merged with the SVs in the neighboring nodes
 		Svtig* svtig_front = nd.second.front();
@@ -226,6 +226,9 @@ int find_final_svtigs(parameters& params, std::map<std::string, std::vector<Svti
 			if (svtig->filter)
 				continue;
 			
+			//if (node.first == "s105205" || node.first == "s105207")
+				//std::cout<<node.first<<"\t"<<svtig->start_pos<<" "<<svtig->reads_untagged.size()<<"\n";
+
 			if (svtig->reads_untagged.size() > static_cast<unsigned int>(params.support))
 				var_vector.push_back(svtig);	
 		}
@@ -242,20 +245,20 @@ int find_final_svtigs(parameters& params, std::map<std::string, std::vector<Svti
 
 
 //Put the variants into a map of vectors with contig name as the key
-//We don't do this while iterating the gaf file in alignment.cpp because we want to 
-//find the sv later in O(1) using "contig_name:start_end" in order to add reads to the
-//read set of the variant
-int refine_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::map<std::string, std::vector<Svtig*>>& final_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing)
+//We don't do this while iterating the GAF file in alignment.cpp because we want to 
+//find the SV O(1) using "contig_name:start_end" in order to add reads to the
+//read set of the variant during the GAF processing
+int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::map<std::string, std::vector<Svtig*>>& final_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing)
 {	
 	std::map<std::string, std::vector<Variant*>>::iterator it;
 	std::map<std::string, std::vector<Variant*>> vars_by_node;
 	std::map<std::string, std::vector<Svtig*>> init_svtigs;
 
 	std::vector<Svtig*> var_vector;
-
+	
+	//store variants in node-based map s.t. each node record has sorted variant positons in a vector
 	arrange_variants(vars, vars_by_node);
-
-	std::cout<<"\nMerging nearby SVs"<<std::endl;	
+	std::cout<<"\nMerging nearby SV signals"<<std::endl;	
 		
 	int svtig_cnt = 0, svtig_cnt_rp_filtered = 0;
 	for (it=vars_by_node.begin(); it != vars_by_node.end(); ++it)
@@ -263,8 +266,7 @@ int refine_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::ma
 		//std::cout<<it->first<< " " <<(it->second).size() <<std::endl;
 		var_vector.clear();
 		
-		//If the distance between any two SV is smaller than MIN_SV_DISTANCE, 
-		//we merge the reads of these SVs
+		//If the distance between any two SVs <MIN_SV_DISTANCE, merge the reads of these SVs
 		merge_svs_within_node(params, gfa, it, var_vector);
 		if (!var_vector.empty())
 		{
@@ -279,18 +281,27 @@ int refine_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::ma
 		
 	/*for(auto &a: final_svtigs)
 	{
-		//std::cout<<a.first<<" "<< a.second.size() <<"\n";
-		for (auto &tmp: a.second)
-		{
-			//std::cout<<tmp->name<<"\n";	
-			if (tmp->node == "s439952" && tmp->start_pos == 359)
-				std::cout<<"REFINE ---   "<<a.first<<" "<<tmp->contig<< " " <<tmp->ref_pos<<"\n";
-			//std::cout<<tmp->node<< " " <<tmp->start_pos << "\t"<< tmp->contig<<"\n";
-		}
-		//std::cout<<"\n\n";
+		//if (a.first == "s105205" || a.first == "s105207")
+		//{
+			//std::cout<<a.first<<" "<< "--->\n";
+			for (auto &tmp: a.second)
+				std::cout<<tmp->node<< " " <<tmp->start_pos << "\t"<<tmp->reads_untagged.size() <<"\t"<< tmp->contig<<"\n";
+			std::cout<<"\n";
+		//}
 	}*/
-	
-	std::cout<<"--->there are "<<svtig_cnt<<" SVtigs after merging and "<<svtig_cnt_rp_filtered<<" after filtering based on minimum read support\n\n";
+
+	/*for(auto &a: final_svtigs)
+	{
+		for (auto &tmp: a.second)
+			if(tmp->reads_untagged.size() > 10)
+			{
+				std::cout<<tmp->node<< " " <<tmp->start_pos << "\t"<<tmp->reads_untagged.size() <<"\t"<< tmp->contig<<"\n";
+				poa(tmp->reads_untagged);
+			}
+	}
+	*/
+	std::cout<<"--->"<<svtig_cnt<<" read clusters (putative svtigs) after merging and\n";
+	std::cout<<"--->"<<svtig_cnt_rp_filtered<<" read clusters after filtering based on minimum read support\n\n";
 
 	return RETURN_SUCCESS;
 }
@@ -305,6 +316,7 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 
 	//breakpoint1 is the position of the reads starting at that loci
 	int node_count = 0, offset = 0, br1_start, br2_end, node_map_size = 0;
+	
 	
 	if (line.query_start < MIN_READ_START_END_WINDOW)
 		skip_start = true;
@@ -323,8 +335,6 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 		offset += strlen(mytoken) + 1;
 		mytoken = strtok(NULL, "><");
 		
-		//std::cout<<"mytoken= "<<mytoken<<" current_token= "<< current_node<<"\n";
-
 		if ((node_count == 1) && (!mytoken)) //means there is only a single node
 		{
 			if (!skip_start)
@@ -392,10 +402,11 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 			v->type = INTER;
 			variations_inter.insert(std::pair<std::string, Variant*>(var_name, v));
 			inserted_var_cnt++;
-			//if (tokens[0] == "637c403e-43ba-4c67-9918-238263625f39")
-			//	std::cout<<"HEREEE  INTRAA "<<v->pos_in_node<<"\n";
-			if (v->node == "s439952" && v->pos_in_node == 359)
-				std::cout<<"HEREEE   "<<gfa[v->node]->offset<<"\n";
+			/*if(line.query_name =="1ba13b99-0167-4631-80c9-59bd7c8945fa")
+			{
+				std::cout<<"HEREEE\n";
+				std::cout<<v->contig<<" - "<< v->pos_in_ref<<" - "<<v->node <<"\n";
+			}*/
 		}
 
 	}
@@ -419,8 +430,11 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 			v->type = INTER;	
 			variations_inter.insert(std::pair<std::string, Variant*>(var_name, v));
 			inserted_var_cnt++;
-			if (v->node == "s439952" && v->pos_in_node == 359)
-				std::cout<<"HEREEE   "<<gfa[v->node]->offset<<"\n";
+			/*if(line.query_name =="1ba13b99-0167-4631-80c9-59bd7c8945fa")
+			{
+				std::cout<<"HEREEE\n";
+				std::cout<<v->contig<<" - "<< v->pos_in_ref<<" - "<<v->node <<"\n";
+			}*/
 		}
 	}
 

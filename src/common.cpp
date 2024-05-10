@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <algorithm>
+#include <sstream>
 #include "common.h"
 
 
@@ -17,6 +18,48 @@
 	}
 }
 */
+
+int parse_gaf_line(std::string& line, Gaf& gafline)
+{
+	//Gaf gafline;	
+	std::vector <std::string> tokens;	
+	
+	std::string tmp_str;
+	std::stringstream s(line);
+	while(getline(s, tmp_str, '\t'))
+		tokens.push_back(tmp_str);
+	
+	gafline.query_name = tokens[0].substr(0, tokens[0].find(' '));
+	gafline.query_length = stoi(tokens[1]);
+	gafline.query_start = stoi(tokens[2]);
+	gafline.query_end = stoi(tokens[3]);
+	gafline.strand = tokens[4];
+	gafline.path = tokens[5];
+	gafline.path_length = stoi(tokens[6]);
+	gafline.path_start = stoi(tokens[7]);
+	gafline.path_end = stoi(tokens[8]);
+	gafline.mapping_quality = stoi(tokens[11]);
+	gafline.residue_matches = stoi(tokens[9]);
+	gafline.alignment_block_length = stoi(tokens[10]);
+	gafline.is_primary = true;
+
+	for (auto& tok : tokens) 
+	{
+		if(strstr(tok.c_str(), "tp:A:"))
+		{
+			if (tok.substr(5, 6) != "P")
+				gafline.is_primary = false;
+		}
+		if(strstr(tok.c_str(), "AS:f:"))
+			gafline.aln_score = std::stof(tok.substr(5));
+		
+	
+		if(strstr(tok.c_str(), "cg:Z:"))
+			gafline.cigar = tok.substr(5);
+	}
+
+	return RETURN_SUCCESS;
+}
 
 
 double overlap_ratio(int x_start, int x_end, int y_start, int y_end)

@@ -61,8 +61,6 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 			
 			free(path_copy);
 			return total_path_length;
-			//if(total_path_length - total_so_far < 0)
-			//	std::cout<< "middles: "<<middles <<" " <<total_path_length<<" "<<total_so_far<<std::endl;
 		}
 		else //middle node
 		{
@@ -78,7 +76,7 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 	}
 	std::cout<<"Error in contig_coverage()\n";
 	free(path_copy);
-	return -1;
+	return RETURN_ERROR;
 }
 
 int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing)
@@ -119,8 +117,7 @@ int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<
 			if (tokens[0] == "L")
 			{
 				//std::cout<<tokens[1]<<" " << tokens[3]<<"\n";
-				//Add incoming
-				
+				//Add incoming	
 				it = incoming.find(tokens[3]);
 				if (it != incoming.end())
 				{	

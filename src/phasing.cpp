@@ -47,7 +47,7 @@ void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string,
 
 	std::cout<<"--->reading SVs to phase"<<std::endl;	
 	for (itr=vars.begin(); itr != vars.end(); ++itr)
-	{	
+	{
 		for (auto &sv: itr->second) 
 		{
 			for (auto &read: sv->reads_untagged)
@@ -85,8 +85,25 @@ void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string,
 			//std::cout<<"h1: "<<sv->reads_h1.size()<< "\th2: "<<sv->reads_h2.size()<<std::endl;
 		}
 	}
+
+	int svtig_h1 = 0, svtig_h2 = 0, svtig_untagged = 0;
+	for (itr=vars.begin(); itr != vars.end(); ++itr)
+	{
+		for (auto &sv: itr->second) 
+		{
+			if (sv->reads_h1.size() > 0)
+				svtig_h1++;
+			if (sv->reads_h2.size() > 0)
+				svtig_h2++;
+			if (sv->reads_untagged.size() > 0)
+				svtig_untagged++;
+		}
+
+	}
 	//std::cout<<"--->"<<phased<<" SVtigs phased - "<<not_phased<< " not...\n";	
-	std::cout<<"--->"<<h1_cnt<<" reads are haplotype 1, "<<h2_cnt<< " haplotype 2 and "<<none_cnt<< " are untagged...\n";	
+	std::cout<<"--->" <<svtig_h1+svtig_h2+svtig_untagged<<" phased read clusters ("<<svtig_h1<<" H1, " <<svtig_h2 << " H2, "<< svtig_untagged <<" untagged based on read-support > 0).\n";	
+	//std::cout<<"--->" <<vars.size()<<" putative svtigs after phasing and initial filtering based on read support\n";	
+	std::cout<<"--->" <<h1_cnt<<" reads in haplotype 1, "<<h2_cnt<< " in haplotype 2 and "<<none_cnt<< " are untagged in total\n";	
 }
 
 

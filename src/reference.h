@@ -8,8 +8,6 @@
 typedef struct _contig
 {
 public:
-	//std::string contig_name;
-	//long read_count;
 	long mapped_bases;
 	long mapped_reads;
 	long contig_length;
