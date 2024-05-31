@@ -39,38 +39,6 @@ void Assembly::generate_fasta_file(parameters& params, faidx_t*& fasta_index, st
 }
 
 
-/*void run_abpoa(parameters& params, faidx_t*& fasta_index, std::set <std::string>& reads, std::string& svtig_name)
-{
-	int loc_length;
-	std::string res_seq;
-	std::set <std::string> read_seqs;
-
-	for (auto &read: reads)
-	{
-		char* tmp = faidx_fetch_seq(fasta_index, read.c_str(), 0, MAX_FETCH_LEN, &loc_length);
-		if (tmp == NULL)
-			continue;
-
-		std::string seq(tmp);
-		read_seqs.insert(seq);
-	}
-	poa(read_seqs, res_seq);
-	//std::cout<<res_seq<<"\n";
-	
-	std::string asm_folder_path = params.log_path + "tmp/";
-	
-	params.fp_svtigs<< ">"<<svtig_name<<" support="<<read_seqs.size() << std::endl;
-	params.fp_svtigs<< res_seq << std::endl;
-
-	//if(params.debug)
-	//{
-	//	std::string file_path =	asm_folder_path + "/" + svtig_name + ".fa";
-	//	std::string tmp_cmd = "cp " + file_path + " " + params.log_path + "out/";
-	//	system(tmp_cmd.c_str());
-	//}
-}*/
-
-
 int Assembly::write_svtigs(std::string& f_path, const std::string& f_name, int pos, std::string& contig, int coverage, std::ofstream& fp_write)
 {
 	std::ifstream fp_read(f_path);	
@@ -141,7 +109,7 @@ int Assembly::merge_svtigs(parameters& params)
 
 
 //Assemble SV clusters
-int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index, std::set <std::string>& read_set, std::string& svtig_name, double& contig_depth, Svtig*& sv, std::map <std::string, FinalSvtig*>& final_svtigs)
+int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index, std::set <std::string>& read_set, std::string& svtig_name, double& contig_depth, SVCluster*& sv, std::map <std::string, SVtig*>& final_svtigs)
 {
 	unsigned int support_threshold = static_cast<unsigned int>(params.support)/2;
 	if (support_threshold < 3) support_threshold = 3;
@@ -158,7 +126,6 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index, std::set
 		return 0;
 	}
 	else if (read_set.size() < support_threshold)
-	//else if (read_set.size() < 3)
 	{
 		this->filter_support++;
 		return 0;
@@ -173,46 +140,22 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index, std::set
 	
 	if (sv != nullptr)
 	{
-		FinalSvtig *tmp = new FinalSvtig;
+		SVtig *tmp = new SVtig;
 		tmp->name = svtig_name;
 		tmp->pos = sv->ref_pos;
 		(tmp->reads).insert(read_set.begin(), read_set.end());
 		tmp->contig = sv->contig;
-		final_svtigs.insert(std::pair<std::string, FinalSvtig*>(tmp->name, tmp));
+		final_svtigs.insert(std::pair<std::string, SVtig*>(tmp->name, tmp));
 	}
 
 	std::string file_path = params.log_path + "tmp/" + svtig_name + ".fasta";	
 	std::string output_path = params.log_path + "tmp/" + svtig_name;
-	
 
-	/*if (params.assembler == "abpoa")
-	{
-		run_abpoa(params,fasta_index, read_set, svtig_name);
-		svtig_tmp_cnt = 1;
-	}*/
-	if(params.assembler == "Shasta")
-	{
-		generate_fasta_file(params, fasta_index, read_set, file_path);
-		std::string shasta_cmd = "shasta --input " + file_path + " --assemblyDirectory " + params.log_path + "out/tmp/" + " --config Nanopore-May2022 --suppressStdoutLog --Assembly.mode2.suppressDetailedOutput --Assembly.mode2.suppressGfaOutput --threads " + std::to_string(params.threads) + " > /dev/null 2>&1";
-		system(shasta_cmd.c_str());
-		
-		std::string minimap = "minimap2 -t " + std::to_string(params.threads) + " -ax map-pb -r2k " + params.log_path + "out/Assembly.fasta "+ file_path +" | samtools sort -@" + std::to_string(params.threads) + " > " + params.log_path + "out/dbg.bam";
-		system(minimap.c_str());
-		
-		std::string polish = "samtools view -F0x900 " + params.log_path + "out/dbg.bam | wtpoa-cns -t " + std::to_string(params.threads) + " -d " + params.log_path + "out/dbg.raw.fa -i - -fo " + output_path + ".cns.fa > /dev/null 2>&1";
-		system(polish.c_str());
-	
-		std::string tmp = "rm -rf " + params.log_path + "out/tmp/";
-		system(tmp.c_str());
-	}
-	else
-	{
-		generate_fasta_file(params, fasta_index, read_set, file_path);
-		int var_size = 4;
-		//--ctg-min-nodes 2 -p 0 -k 15 -AS 2 --edge-min 1
-		std::string wtdbg2_cmd = "wtdbg2.pl -t " + std::to_string(params.threads) + " -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " > /dev/null 2>&1";
-		system(wtdbg2_cmd.c_str());
-	}
+	generate_fasta_file(params, fasta_index, read_set, file_path);
+	int var_size = 4;
+	//--ctg-min-nodes 2 -p 0 -k 15 -AS 2 --edge-min 1
+	std::string wtdbg2_cmd = "wtdbg2.pl -t " + std::to_string(params.threads) + " -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " > /dev/null 2>&1";
+	system(wtdbg2_cmd.c_str());
 	
 	//Write the assembly to the tmp fasta file
 	svtig_tmp_cnt = merge_svtigs(params);
@@ -234,7 +177,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index, std::set
 }
 
 
-int Assembly::assemble_clusters(parameters& params, faidx_t*& fasta_index, std::vector<Svtig*>& sv_cluster, std::map <std::string, Contig*>& depth, std::map <std::string, FinalSvtig*>& final_svtigs)
+int Assembly::assemble_clusters(parameters& params, faidx_t*& fasta_index, std::vector<SVCluster*>& sv_cluster, std::map <std::string, Contig*>& depth, std::map <std::string, SVtig*>& final_svtigs)
 {
 	int initial_svtigs_cnt = 0;
 	//Iterating over SV clusters of a contig
@@ -271,10 +214,10 @@ int Assembly::assemble_clusters(parameters& params, faidx_t*& fasta_index, std::
 }
 
 
-void Assembly::run_assembly(parameters& params, std::map <std::string, Contig*>& depth, std::map<std::string, std::vector<Svtig*>>& vars, std::set <std::string>& unmapped, std::map <std::string, FinalSvtig*>& final_svtigs)
+void Assembly::run_assembly(parameters& params, std::map <std::string, Contig*>& depth, std::map<std::string, std::vector<SVCluster*>>& vars, std::set <std::string>& unmapped, std::map <std::string, SVtig*>& final_svtigs)
 {
 	int initial_svtigs_cnt = 0;
-	std::map<std::string, std::vector<Svtig*>>::iterator itr;
+	std::map<std::string, std::vector<SVCluster*>>::iterator itr;
 
 	auto t1 = std::chrono::steady_clock::now();
 	std::cout<<"\nAssembly..."<<std::endl;		
@@ -294,7 +237,7 @@ void Assembly::run_assembly(parameters& params, std::map <std::string, Contig*>&
 	//std::cout <<"Size of unmapped is "<<unmapped_count<<"\n";
 	if(unmapped_count > 0)
 	{
-		Svtig* tmp = nullptr;
+		SVCluster* tmp = nullptr;
 		std::string svtig_name = "None-unmapped_" + std::to_string(0);	
 		initial_svtigs_cnt += final_assembly(params, fasta_index, unmapped, svtig_name, unmapped_count, tmp, final_svtigs);
 	}

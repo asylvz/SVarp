@@ -39,9 +39,9 @@ int read_phase_file(parameters& params, std::map<std::string, phase*>& phased_re
 	return RETURN_SUCCESS;
 }
 
-void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string, std::vector<Svtig*>>& vars)
+void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string, std::vector<SVCluster*>>& vars)
 {
-	std::map<std::string, std::vector<Svtig*>>::iterator itr;
+	std::map<std::string, std::vector<SVCluster*>>::iterator itr;
 
 	int h1_cnt = 0, h2_cnt = 0, none_cnt = 0;
 

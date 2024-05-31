@@ -7,7 +7,7 @@
 #include "reference.h" 
 #include "common.h"
 
-class Svtig
+class SVCluster
 {
 private:
 public:
@@ -25,14 +25,14 @@ public:
 	bool phased;
 	bool filter = false;
 	std::string	path;
-	Svtig()
+	SVCluster()
 	{
 	}
-	virtual ~Svtig() {};
+	virtual ~SVCluster() {};
 };
 
 
-class FinalSvtig
+class SVtig
 {
 private:
 public:
@@ -43,6 +43,7 @@ public:
 	std::string contig;
 	std::set <std::string> reads; //Read names that support this SVtig
 	bool output = false; //Whether to output after remapping (filtered if false)
+	std::string seq; //svtig genomic sequence
 };
 
 
@@ -79,9 +80,9 @@ public:
 
 
 Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const int base_pos, int var_len, char sv_type);
-int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::map<std::string, std::vector<Svtig*>>& final_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing);
+int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::map<std::string, std::vector<SVCluster*>>& final_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing);
 
 int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<std::string, Variant*>& variations_inter);
-int find_deletions(parameters* params, std::map<std::string, std::vector<Svtig*>> deletions);
+int find_deletions(parameters* params, std::map<std::string, std::vector<SVCluster*>> deletions);
 
 #endif

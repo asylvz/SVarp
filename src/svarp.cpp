@@ -17,9 +17,9 @@ int main(int argc, char** argv)
 	std::set <std::string> unmapped_reads;
 
 	std::map <std::string, phase*> phased_reads;
-	std::map <std::string, std::vector<Svtig*>> vars;
+	std::map <std::string, std::vector<SVCluster*>> vars;
 	std::map <std::string, Contig*> depth;
-	std::map <std::string, FinalSvtig*> final_svtigs;
+	std::map <std::string, SVtig*> svtigs;
 	
 	parameters params = parameters();
 	if (parse_command_line(argc, argv, params) != RETURN_SUCCESS)
@@ -29,12 +29,6 @@ int main(int argc, char** argv)
 	if (read_gfa(params, depth, gfa, incoming, outgoing) != RETURN_SUCCESS)
 		return RETURN_ERROR;	
 		
-	/*if(params.asm_mode)
-	{
-		if (read_alignments_asm(params, depth, gfa, unmapped_reads) != RETURN_SUCCESS)
-			return RETURN_ERROR;
-	}
-	*/
 	if (read_alignments(params, depth, gfa, tmp_var, unmapped_reads) != RETURN_SUCCESS)
 		return RETURN_ERROR;
 		
@@ -48,11 +42,10 @@ int main(int argc, char** argv)
 			phase_svs(phased_reads, vars);
 	}
 	Assembly s;
-	s.run_assembly(params, depth, vars, unmapped_reads, final_svtigs);
+	s.run_assembly(params, depth, vars, unmapped_reads, svtigs);
 
 	//Filter SVtigs by remapping to the graph
-	filter_svtigs(params, gfa, final_svtigs);
-	
+	filter_svtigs(params, gfa, svtigs);
 
 	std::cout<<"\nThank you for using SVarp... Tschüs, güle güle, adios, bye...\n" <<std::endl;
 	

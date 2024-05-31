@@ -59,9 +59,9 @@ int arrange_variants(std::map<std::string, Variant*>& vars, std::map<std::string
 }
 
 
-int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<Variant*>>::iterator& vars_by_node ,std::vector<Svtig*>& var_vector)
+int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<Variant*>>::iterator& vars_by_node ,std::vector<SVCluster*>& var_vector)
 {
-	Svtig* svtig_tmp;
+	SVCluster* svtig_tmp;
 	int start_pos = -1000;
 	bool first = true;
 	
@@ -71,7 +71,7 @@ int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& g
 	{
 		if(first)
 		{
-			svtig_tmp = new Svtig();
+			svtig_tmp = new SVCluster();
 			svtig_tmp->node = vars_by_node->first;
 			svtig_tmp->phased = false;
 			svtig_tmp->contig = gfa[vars_by_node->first]->contig;
@@ -101,7 +101,7 @@ int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& g
 				else
 					delete svtig_tmp;
 				
-				svtig_tmp = new Svtig();
+				svtig_tmp = new SVCluster();
 				svtig_tmp->node = vars_by_node->first;
 				svtig_tmp->phased = false;
 				svtig_tmp->contig = gfa[vars_by_node->first]->contig;
@@ -125,11 +125,11 @@ int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& g
 }
 
 
-int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<Svtig*>> init_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing)
+int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<SVCluster*>> init_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing)
 {
 
 	std::map<std::string, std::vector<std::string>>::iterator it_nodes;
-	std::map<std::string, std::vector<Svtig*>>::iterator it_neighbors;
+	std::map<std::string, std::vector<SVCluster*>>::iterator it_neighbors;
 	for (auto &nd: init_svtigs)
 	{
 		if (nd.second.empty())
@@ -140,8 +140,8 @@ int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gf
 		//For each node, get the SV at the front and at the back of the vector.
 		//This can be done since they are sorted based on the position within the node
 		//These may need to be merged with the SVs in the neighboring nodes
-		Svtig* svtig_front = nd.second.front();
-		//Svtig* svtig_back = nd.second.back();
+		SVCluster* svtig_front = nd.second.front();
+		//SVCluster* svtig_back = nd.second.back();
 		
 		//First check the svtigs at the front of the vector of svs for this node
 		if (svtig_front->start_pos < params.dist_threshold)
@@ -154,7 +154,7 @@ int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gf
 					it_neighbors = init_svtigs.find(incoming_node);
 					if(it_neighbors != init_svtigs.end())
 					{
-						Svtig* svtig_incoming = it_neighbors->second.back();
+						SVCluster* svtig_incoming = it_neighbors->second.back();
 						
 						int node_len = gfa[incoming_node]->len;
 						if ((node_len - svtig_incoming->start_pos + svtig_front->start_pos) < params.dist_threshold)
@@ -185,7 +185,7 @@ int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gf
 					it_neighbors = init_svtigs.find(outgoing_node);
 					if(it_neighbors != init_svtigs.end())
 					{
-						Svtig* svtig_outgoing = it_neighbors->second.front();
+						SVCluster* svtig_outgoing = it_neighbors->second.front();
 						//If we added the reads of this svtig to the next one in the above step, skip.
 						if (svtig_outgoing->filter == true)
 							continue;
@@ -212,9 +212,9 @@ int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gf
 }
 
 
-int find_final_svtigs(parameters& params, std::map<std::string, std::vector<Svtig*>>& init_svtigs, std::map<std::string, std::vector<Svtig*>>& final_svtigs, int& svtig_cnt_rp_filtered)
+int find_final_svtigs(parameters& params, std::map<std::string, std::vector<SVCluster*>>& init_svtigs, std::map<std::string, std::vector<SVCluster*>>& final_svtigs, int& svtig_cnt_rp_filtered)
 {	
-	std::vector<Svtig*> var_vector;
+	std::vector<SVCluster*> var_vector;
 	for (auto &node: init_svtigs)
 	{
 		if (node.second.empty())
@@ -234,7 +234,7 @@ int find_final_svtigs(parameters& params, std::map<std::string, std::vector<Svti
 		}
 		if (!var_vector.empty())
 		{
-			final_svtigs.insert(std::pair<std::string, std::vector<Svtig*>>(node.first, var_vector));
+			final_svtigs.insert(std::pair<std::string, std::vector<SVCluster*>>(node.first, var_vector));
 			svtig_cnt_rp_filtered += var_vector.size();
 		}
 	}
@@ -248,13 +248,13 @@ int find_final_svtigs(parameters& params, std::map<std::string, std::vector<Svti
 //We don't do this while iterating the GAF file in alignment.cpp because we want to 
 //find the SV O(1) using "contig_name:start_end" in order to add reads to the
 //read set of the variant during the GAF processing
-int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::map<std::string, std::vector<Svtig*>>& final_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing)
+int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::map<std::string, std::vector<SVCluster*>>& final_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing)
 {	
 	std::map<std::string, std::vector<Variant*>>::iterator it;
 	std::map<std::string, std::vector<Variant*>> vars_by_node;
-	std::map<std::string, std::vector<Svtig*>> init_svtigs;
+	std::map<std::string, std::vector<SVCluster*>> init_svtigs;
 
-	std::vector<Svtig*> var_vector;
+	std::vector<SVCluster*> var_vector;
 	
 	//store variants in node-based map s.t. each node record has sorted variant positons in a vector
 	arrange_variants(vars, vars_by_node);
@@ -270,7 +270,7 @@ int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map
 		merge_svs_within_node(params, gfa, it, var_vector);
 		if (!var_vector.empty())
 		{
-			init_svtigs.insert(std::pair<std::string, std::vector<Svtig*>>(it->first, var_vector));
+			init_svtigs.insert(std::pair<std::string, std::vector<SVCluster*>>(it->first, var_vector));
 			svtig_cnt += var_vector.size();
 		}
 	}

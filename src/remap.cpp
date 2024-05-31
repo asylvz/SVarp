@@ -31,6 +31,15 @@ inline bool cmp(Read* i1, Read* i2)
 }
 
 
+int get_middle_string(std::string& s)
+{
+	int y = (s.length() - (s.length()/10)) / 2;
+	s.erase(0, y);
+	s.erase(s.length() - y, s.length());
+	return y;
+}
+
+
 int write_final_svtigs_fasta(faidx_t*& fasta_index, std::string& svtig_name, int pos, std::string& contig, int coverage, std::ofstream& fp_write)
 {
 	
@@ -39,6 +48,7 @@ int write_final_svtigs_fasta(faidx_t*& fasta_index, std::string& svtig_name, int
 	const size_t line_len = 60;
 
 	std::string seq = faidx_fetch_seq(fasta_index, svtig_name.c_str(), 0, MAX_FETCH_LEN, &loc_length);
+	//int new_pos = get_middle_string(seq);
 	fp_write<< ">"<<svtig_name<<" contig="<<contig<<" pos="<<pos<<" support="<<coverage<< std::endl;
 
 	for (unsigned int i = 0; i < seq.size(); i += line_len)
@@ -50,10 +60,10 @@ int write_final_svtigs_fasta(faidx_t*& fasta_index, std::string& svtig_name, int
 }
 
 
-std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <std::string, FinalSvtig*>& final_svtigs, int& extra_added)
+std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <std::string, SVtig*>& final_svtigs, int& extra_added)
 {
 	std::pair<int, int> dup_legit(0,0);
-	std::map<std::string, FinalSvtig*>::iterator it_svtigs;
+	std::map<std::string, SVtig*>::iterator it_svtigs;
 	std::sort(tmp_svtig.begin(), tmp_svtig.end(), cmp);
 	
 	for(unsigned int i = 0; i < tmp_svtig.size(); i++)
@@ -105,13 +115,13 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 				//Add it to the final_svtigs
 				if (it_svtigs != final_svtigs.end())
 				{
-					FinalSvtig *tmp = new FinalSvtig;
+					SVtig *tmp = new SVtig;
 					tmp->name = r->rname;
 					tmp->pos = it_svtigs->second->pos;
 					(tmp->reads).insert(it_svtigs->second->reads.begin(), it_svtigs->second->reads.end());
 					tmp->contig = it_svtigs->second->contig;
 					tmp->output = true;
-					final_svtigs.insert(std::pair<std::string, FinalSvtig*>(r->rname, tmp));
+					final_svtigs.insert(std::pair<std::string, SVtig*>(r->rname, tmp));
 					extra_added++;
 				}
 				else
@@ -119,7 +129,7 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 			}
 			else
 			{
-				std::map<std::string, FinalSvtig*>::iterator it_svtigs = final_svtigs.find(r->rname);
+				std::map<std::string, SVtig*>::iterator it_svtigs = final_svtigs.find(r->rname);
 				if (it_svtigs != final_svtigs.end())
 					it_svtigs->second->output = true;
 				else
@@ -187,7 +197,7 @@ void wfa_align(std::map<std::string, gfaNode*>& gfa, std::string& cigar, std::st
 }
 
 
-int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map <std::string, FinalSvtig*>& final_svtigs, faidx_t*& fasta_index)
+int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map <std::string, SVtig*>& final_svtigs, faidx_t*& fasta_index)
 {
 	int secondary = 0, primary = 0, lowmq = 0, extra_added = 0;
 
@@ -330,10 +340,10 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 }
 
 
-int write_final_svtigs(parameters& params, std::string file_path, faidx_t*& fasta_index, std::map <std::string, FinalSvtig*>& final_svtigs, std::string& out_file, std::string haplotype)
+int write_final_svtigs(parameters& params, std::string file_path, faidx_t*& fasta_index, std::map <std::string, SVtig*>& final_svtigs, std::string& out_file, std::string haplotype)
 {
 	int cnt = 0;
-	std::map<std::string, FinalSvtig*>::iterator itr;
+	std::map<std::string, SVtig*>::iterator itr;
 	std::ofstream fp_write(out_file);
 	
 	//Find the files ending with ".cns.fa"
@@ -346,8 +356,6 @@ int write_final_svtigs(parameters& params, std::string file_path, faidx_t*& fast
 		if (itr->second->output == true)
 		{
 			file_name = itr->second->name;
-			//std::cout<<file_path<<" ------- "<<file_name<<"\n";	
-
 			if (haplotype != "None" && (file_name.find(haplotype) != std::string::npos))
 			{
 				write_final_svtigs_fasta(fasta_index, file_name, itr->second->pos, itr->second->contig, itr->second->reads.size(), fp_write);
@@ -371,32 +379,21 @@ int write_final_svtigs(parameters& params, std::string file_path, faidx_t*& fast
 }
 
 
-int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map <std::string, FinalSvtig*>& final_svtigs)
+int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map <std::string, SVtig*>& final_svtigs)
 {
 	std::cout<<"\nFiltering svtigs"<<std::endl;	
 	std::string svtigs_tmp_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
 
-	if (!params.no_remap)
+	std::cout<<"--->remapping svtigs onto the graph using Graphaligner"<<std::endl;			
+		
+	std::string graphaligner_cmd = "GraphAligner -g " + params.ref_graph + " -f " + svtigs_tmp_path + " -a " + params.remap_gaf_path + " -t " + std::to_string(params.threads) + " -x vg --precise-clipping " + std::to_string(params.min_precise_clipping) + " --min-alignment-score " + std::to_string(params.min_alignment_score) + " --multimap-score-fraction 0.9 > /dev/null 2>&1";
+		
+	system(graphaligner_cmd.c_str());
+		
+	if (std::filesystem::is_empty(params.remap_gaf_path))
 	{
-		std::cout<<"--->remapping svtigs onto the graph using Graphaligner"<<std::endl;			
-		
-		std::string graphaligner_cmd = "GraphAligner -g " + params.ref_graph + " -f " + svtigs_tmp_path + " -a " + params.remap_gaf_path + " -t " + std::to_string(params.threads) + " -x vg --precise-clipping " + std::to_string(params.min_precise_clipping) + " --min-alignment-score " + std::to_string(params.min_alignment_score) + " --multimap-score-fraction 0.9 > /dev/null 2>&1";
-		//std::string graphaligner_cmd = "GraphAligner -g " + params.ref_graph + " -f " + svtigs_tmp_path + " -a " + params.remap_gaf_path + " -t " + std::to_string(params.threads) + " -x vg > /dev/null 2>&1";
-		
-		system(graphaligner_cmd.c_str());
-		
-		if (std::filesystem::is_empty(params.remap_gaf_path))
-		{
-			std::cout<< "Error: Graphaligner did not run successfully..."<< "\n";
-			std::cout<< "--->Command: " << graphaligner_cmd << "\n";
-			exit(0);
-		}
-	}
-	else
-	{
-		//TODO: Implement remap skipping function
-		
-		std::cout<<"--->Skipping remapping step..."<<std::endl;
+		std::cout<< "Error: Graphaligner did not run successfully..."<< "\n";
+		std::cout<< "--->Command: " << graphaligner_cmd << "\n";
 		exit(0);
 	}
 	
