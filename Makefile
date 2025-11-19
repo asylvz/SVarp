@@ -1,5 +1,5 @@
 SVARP_VERSION := "1.0"
-SVARP_UPDATE := "May 10, 2024"
+SVARP_UPDATE := "Nov 19, 2025"
 SVARP_DEBUG := 0
 BUILD_DATE := "$(shell date)"
 
@@ -30,8 +30,10 @@ libs:
 	wget https://github.com/samtools/htslib/releases/download/1.17/htslib-1.17.tar.bz2
 	mkdir htslib && tar -xvf htslib-1.17.tar.bz2 -C htslib --strip-components=1
 	cd htslib && autoconf -i && ./configure --disable-lzma --disable-bz2 --disable-libcurl && make && cd ..
-	wget https://github.com/smarco/WFA2-lib/archive/refs/tags/v2.3.4.tar.gz --strip-components=1
-	mkdir wfa && tar -xzf v2.3.4.tar.gz -C wfa
+	wget https://github.com/smarco/WFA2-lib/archive/refs/tags/v2.3.4.tar.gz
+	mkdir wfa && tar -xzf v2.3.4.tar.gz --strip-components=1 -C wfa
 	cd wfa && make clean all
+
+
 
 .PHONY: clean
