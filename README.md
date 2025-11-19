@@ -46,8 +46,8 @@ SVarp is developed and tested using Linux Ubuntu operating system
 	(htslib folder needs to reside inside SVarp's main folder)
 
 ### WFA2-lib (https://github.com/smarco/WFA2-lib)
-	wget https://github.com/smarco/WFA2-lib/archive/refs/tags/v2.3.4.tar.gz --strip-components=1
-	mkdir wfa && tar -xzf v2.3.4.tar.gz -C wfa
+	wget https://github.com/smarco/WFA2-lib/archive/refs/tags/v2.3.4.tar.gz
+	mkdir wfa && tar -xzf v2.3.4.tar.gz --strip-components=1 -C wfa
 	cd wfa && make clean all
 	(wfa folder needs to reside inside SVarp's main folder)
 
