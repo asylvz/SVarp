@@ -3,7 +3,7 @@
 
 The aim of SVarp is to discover haplotype resolved SVs on top of a pangenome graph reference using long sequencing reads. It outputs local assemblies of SV alleles, termed *svtigs*.
 
-*Please open an issue for your questions or feel free to send me an e-mail (arda.soylev@hhu.de)*
+*Please open an issue for your questions or feel free to send me an e-mail (asoylev@gmail.com)*
 
 ## Quick Start
 	git clone https://github.com/asylvz/SVarp.git
@@ -37,19 +37,7 @@ SVarp is developed and tested using Linux Ubuntu operating system
 * **Minimap2**
   	- git clone https://github.com/lh3/minimap2 && cd minimap2 && make
 * **HTSlib and WFA2-lib**
-  	- You can either use ***make libs*** or follow the steps below
-
-### HTSlib (https://github.com/samtools/htslib)
-	wget https://github.com/samtools/htslib/releases/download/1.17/htslib-1.17.tar.bz2
-	mkdir htslib && tar -xvf htslib-1.17.tar.bz2 -C htslib --strip-components=1
-	cd htslib && autoconf -i && ./configure --disable-lzma --disable-bz2 --disable-libcurl && make
-	(htslib folder needs to reside inside SVarp's main folder)
-
-### WFA2-lib (https://github.com/smarco/WFA2-lib)
-	wget https://github.com/smarco/WFA2-lib/archive/refs/tags/v2.3.4.tar.gz
-	mkdir wfa && tar -xzf v2.3.4.tar.gz --strip-components=1 -C wfa
-	cd wfa && make clean all
-	(wfa folder needs to reside inside SVarp's main folder)
+  	- You can run ***make libs*** to install HTSlib and WFA2-lib
 
 ## All parameters
 
