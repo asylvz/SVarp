@@ -154,8 +154,10 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index, std::set
 	generate_fasta_file(params, fasta_index, read_set, file_path);
 	int var_size = 4;
 	//--ctg-min-nodes 2 -p 0 -k 15 -AS 2 --edge-min 1
-	std::string wtdbg2_cmd = "wtdbg2.pl -t " + std::to_string(params.threads) + " -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " > /dev/null 2>&1";
-	system(wtdbg2_cmd.c_str());
+	std::string wtdbg_dir = "dep/wtdbg2/";
+	std::string wtdbg2_cmd = wtdbg_dir + "wtdbg2.pl -t " + std::to_string(params.threads) + " -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " > /dev/null 2>&1";
+    //std::cout<<wtdbg2_cmd<<"\n";
+    system(wtdbg2_cmd.c_str());
 	
 	//Write the assembly to the tmp fasta file
 	svtig_tmp_cnt = merge_svtigs(params);
@@ -229,7 +231,7 @@ void Assembly::run_assembly(parameters& params, std::map <std::string, Contig*>&
 	faidx_t* fasta_index = fai_load((params.fasta).c_str());
 
 	//Iterating over contigs; i.e., check SV clusters of each contig
-	for (itr=vars.begin(); itr != vars.end(); ++itr)
+	for (itr = vars.begin(); itr != vars.end(); ++itr)
 		initial_svtigs_cnt += assemble_clusters(params, fasta_index, itr->second, depth, final_svtigs);
 
 	// Assemble unmapped reads

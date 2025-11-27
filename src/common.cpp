@@ -42,6 +42,7 @@ int parse_gaf_line(std::string& line, Gaf& gafline)
 	gafline.residue_matches = stoi(tokens[9]);
 	gafline.alignment_block_length = stoi(tokens[10]);
 	gafline.is_primary = true;
+    gafline.aln_score = 0.0f;
 
 	for (auto& tok : tokens) 
 	{
@@ -58,6 +59,7 @@ int parse_gaf_line(std::string& line, Gaf& gafline)
 			gafline.cigar = tok.substr(5);
 	}
 
+    //std::cout<<gafline.aln_score<<" - " << gafline.mapping_quality<<"\n";
 	return RETURN_SUCCESS;
 }
 

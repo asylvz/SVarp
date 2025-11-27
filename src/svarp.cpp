@@ -3,9 +3,9 @@
 #include "cmdline.h"
 #include "reference.h"
 #include "alignment.h"
-#include "assembly.h"
 #include "phasing.h"
 #include "remap.h"
+#include "assembly.h"
 //#include "asm.h"
 
 
@@ -46,7 +46,6 @@ int main(int argc, char** argv)
 
 	//Filter SVtigs by remapping to the graph
 	filter_svtigs(params, gfa, svtigs);
-
 	std::cout<<"\nThank you for using SVarp... Tschüs, güle güle, adios, bye...\n" <<std::endl;
 	
 	params.fp_logs.close();

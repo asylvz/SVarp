@@ -120,6 +120,7 @@ public:
 		mapping_quality = -1;
 		is_primary = false;
 		cigar = "";
+        aln_score = 0.0f;
 	}
 
 };

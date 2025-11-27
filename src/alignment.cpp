@@ -2,10 +2,7 @@
 #include <string>
 #include <cstring>
 #include <fstream>
-#include <sstream>
-#include <iterator>
 #include <algorithm>
-#include <limits>
 #include <filesystem>
 #include <zlib.h>
 #include <chrono>
@@ -47,16 +44,21 @@ int add_variant(std::map<std::string, gfaNode*>& gfa, std::map<std::string, Vari
 int is_alignment_valid(Gaf& line)
 {
 	if(line.mapping_quality < MINMAPQ)
+    {
+        //std::cout<<"minmapq - "<< line.mapping_quality<<"\n";
 		return RETURN_ERROR;
-	
+    }
 	if (line.is_primary == false)
 	{
 		//secondary_cnt++;
+        //std::cout<<"secondary\n";
 		return RETURN_ERROR;
 	}
-	if (line.aln_score && line.aln_score < 50)
+	if (line.aln_score >0.0f && line.aln_score < 50.0f)
+    {
+        //std::cout<<"aln_score: "<<line.aln_score<<"\n";
 		return RETURN_ERROR;
-
+    }
 	return RETURN_SUCCESS;
 }
 
@@ -71,8 +73,8 @@ int find_var(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode
 		
 		unmapped.insert(line.query_name);
 		return RETURN_SUCCESS;
-	}	
-	
+	}
+
 	if(is_alignment_valid(line) == RETURN_ERROR)
 		return RETURN_ERROR;
 	else
@@ -207,7 +209,8 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 			
 			Gaf g;
 			parse_gaf_line(line, g);		
-			find_var(ref, gfa, vars, g, read_freq, unmapped);
+			
+            find_var(ref, gfa, vars, g, read_freq, unmapped);
 			
 			if(line_count > TEST_SAMPLE_SIZE)
 			{
@@ -256,22 +259,25 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 		{
 			Gaf g;		
 			if (parse_gaf_line(line, g) != RETURN_SUCCESS)
+            {
+                std::cout<<"Fail";
 				continue;
-			
-			//if(g.mapping_quality == 0)
-			//	continue;
+            }
 			
 			if(is_alignment_valid(g) == RETURN_ERROR)
+            {
+                //std::cout<<"Alignment not valid\n";
 				continue;
-				
-			it = read_freq_tmp.find(g.query_name);
+            }
+			
+            it = read_freq_tmp.find(g.query_name);
 			if (it != read_freq_tmp.end())
 				it->second++;
 			else
 				read_freq_tmp.insert(std::pair<std::string, int>(g.query_name, 1));
 		}
-
-		int cnt_multiple = 0, cnt_single = 0;	
+		
+        int cnt_multiple = 0, cnt_single = 0;	
 		for (it=read_freq_tmp.begin(); it != read_freq_tmp.end(); ++it)
 		{
 			if (it->second > 1)
@@ -297,16 +303,18 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 				
 		while(getline(fp, line))
 		{
-			Gaf g;	
-			parse_gaf_line(line, g);
-
-			line_count++;
+			Gaf g;
+            parse_gaf_line(line, g);
 			
+            line_count++;
+
 			find_var(ref, gfa, vars, g, read_freq, unmapped);
 			
 			if(line_count > TEST_SAMPLE_SIZE)
 				break;
 		}
+
+        //std::cout<<"Line count: "<<line_count<<"\n";
 	}	
 	
 	/*for (auto &a: vars)
