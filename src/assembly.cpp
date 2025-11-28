@@ -154,8 +154,8 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index, std::set
 	generate_fasta_file(params, fasta_index, read_set, file_path);
 	int var_size = 4;
 	//--ctg-min-nodes 2 -p 0 -k 15 -AS 2 --edge-min 1
-	std::string wtdbg_dir = "dep/wtdbg2/";
-	std::string wtdbg2_cmd = wtdbg_dir + "wtdbg2.pl -t " + std::to_string(params.threads) + " -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " > /dev/null 2>&1";
+	//std::string wtdbg_dir = "dep/wtdbg2/";
+	std::string wtdbg2_cmd = "wtdbg2.pl -t " + std::to_string(params.threads) + " -x ont -g " + std::to_string(var_size) + "m -o " + output_path + " " + file_path + " > /dev/null 2>&1";
     //std::cout<<wtdbg2_cmd<<"\n";
     system(wtdbg2_cmd.c_str());
 	
