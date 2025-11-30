@@ -1,11 +1,11 @@
-SVARP_VERSION := "1.0"
-SVARP_UPDATE  := "Nov 24, 2025"
+SVARP_VERSION := "1.0.1"
+SVARP_UPDATE  := "Nov 30, 2025"
 SVARP_DEBUG   := 0
 BUILD_DATE    := "$(shell date)"
 
 # ================================================================
 # Mode switch (bare-metal vs conda-build)
-#   USE_CONDA = 0  -> HTSLIB + WFA2 + WTDGB2 local build (GitHub kullanıcısı)
+#   USE_CONDA = 0  -> HTSLIB + WFA2 + WTDGB2 local build (GitHub)
 #   USE_CONDA = 1  -> HTSLIB + WFA2 conda'dan, WTDGB2 conda'dan (Bioconda)
 # ================================================================
 USE_CONDA ?= 0
@@ -39,11 +39,21 @@ WFA_TARBALL     := $(DEP_DIR)/WFA2-lib-$(WFA_VERSION).tar.gz
 # ================================================================
 CXX = g++
 
-CXXFLAGS = -O0 -g -Wall -std=c++17 \
+# Build type: release (default) veya debug
+BUILD ?= release
+
+CXXFLAGS = -Wall -std=c++17 \
            -DSVARP_VERSION=\"$(SVARP_VERSION)\" \
            -DBUILD_DATE=\"$(BUILD_DATE)\" \
            -DSVARP_UPDATE=\"$(SVARP_UPDATE)\" \
            -DSVAPR_DEBUG=$(SVARP_DEBUG)
+
+# Optimizasyon seviyeleri (build tipine göre)
+ifeq ($(BUILD),debug)
+    CXXFLAGS += -O0 -g
+else
+    CXXFLAGS += -O3 -DNDEBUG
+endif
 
 # ------------------------------------------------
 # Conda modu (htslib + wfa2-lib conda'dan)
