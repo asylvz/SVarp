@@ -6,7 +6,7 @@ BUILD_DATE    := "$(shell date)"
 # ================================================================
 # Mode switch (bare-metal vs conda-build)
 #   USE_CONDA = 0  -> HTSLIB + WFA2 + WTDGB2 local build (GitHub)
-#   USE_CONDA = 1  -> HTSLIB + WFA2 conda'dan, WTDGB2 conda'dan (Bioconda)
+#   USE_CONDA = 1  -> HTSLIB + WTDGB2 conda'dan, WFA2 her zaman bundled
 # ================================================================
 USE_CONDA ?= 0
 
@@ -60,25 +60,15 @@ else
 endif
 
 # ------------------------------------------------
-# Conda modu (htslib + wfa2-lib conda'dan)
+# Conda modu (HTSLIB + wtdbg2 conda'dan, WFA2 bundled)
 # ------------------------------------------------
 ifeq ($(USE_CONDA),1)
 
-    # Header'lar conda env'den
-    CXXFLAGS += -I$(PREFIX)/include -I$(PREFIX)/include/wfa2lib
+    # Header'lar: HTSLIB için conda, WFA2 için bundled
+    CXXFLAGS += -I$(PREFIX)/include -I$(WFA_DIR)
 
-    # WFA2-lib kütüphanesini dosya bazında bul (isim ne olursa olsun):
-    WFA2_LIB := $(firstword \
-        $(wildcard $(PREFIX)/lib/libwfa*.so) \
-        $(wildcard $(PREFIX)/lib/libwfa*.a)  \
-    )
-
-    ifeq ($(WFA2_LIB),)
-        $(error "Could not find WFA2-lib library under $(PREFIX)/lib (tried libwfa*.so / libwfa*.a)")
-    endif
-
-    # Link conda kütüphaneleri (dosya yolu ile)
-    LDFLAGS  += -L$(PREFIX)/lib $(WFA2_LIB) -lhts -lz -lpthread
+    # HTSLIB conda'dan, WFA2 bundled, z/pthread sistem/conda
+    LDFLAGS  += -L$(PREFIX)/lib $(WFA_LIB) -lhts -lz -lpthread
 
 else
 # ------------------------------------------------
@@ -142,8 +132,9 @@ post-build:
 # libs target
 # ================================================================
 ifeq ($(USE_CONDA),1)
-libs:
-	@echo "Using conda-provided libraries (htslib, wfa2-lib, wtdbg); nothing to build."
+# Conda modu: HTSLIB + wtdbg2 conda'dan; WFA2 her zaman bundled
+libs: $(WFA_LIB)
+	@echo "Using conda-provided HTSlib and wtdbg2; building bundled WFA2-lib."
 else
 libs: $(HTSLIB_LIB) $(WFA_LIB) $(WTDBG2_BIN)
 endif
@@ -161,7 +152,7 @@ $(HTSLIB_TARBALL):
 	wget https://github.com/samtools/htslib/releases/download/$(HTSLIB_VERSION)/htslib-$(HTSLIB_VERSION).tar.bz2 -O $(HTSLIB_TARBALL)
 
 # ================================================================
-# WFA2-lib (only bare-metal)
+# WFA2-lib (bundled, both modes)
 # ================================================================
 $(WFA_LIB): $(WFA_TARBALL)
 	mkdir -p $(WFA_DIR)
