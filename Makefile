@@ -37,12 +37,13 @@ WFA_TARBALL     := $(DEP_DIR)/WFA2-lib-$(WFA_VERSION).tar.gz
 # ================================================================
 # Compiler / linker flags
 # ================================================================
-CXX = g++
+CXX ?= g++
 
 # Build type: release (default) veya debug
 BUILD ?= release
 
-CXXFLAGS = -Wall -std=c++17 \
+CXXFLAGS ?=
+CXXFLAGS += -Wall -std=c++17 \
            -DSVARP_VERSION=\"$(SVARP_VERSION)\" \
            -DBUILD_DATE=\"$(BUILD_DATE)\" \
            -DSVARP_UPDATE=\"$(SVARP_UPDATE)\" \
@@ -52,7 +53,10 @@ CXXFLAGS = -Wall -std=c++17 \
 ifeq ($(BUILD),debug)
     CXXFLAGS += -O0 -g
 else
-    CXXFLAGS += -O3 -DNDEBUG
+    # Conda ortamında kendi optimizasyon bayraklarını kullanmasına izin ver
+    ifneq ($(USE_CONDA),1)
+        CXXFLAGS += -O3 -DNDEBUG
+    endif
 endif
 
 # ------------------------------------------------
@@ -74,14 +78,14 @@ ifeq ($(USE_CONDA),1)
     endif
 
     # Link conda kütüphaneleri (dosya yolu ile)
-    LDFLAGS  = -L$(PREFIX)/lib $(WFA2_LIB) -lhts -lz -lpthread
+    LDFLAGS  += -L$(PREFIX)/lib $(WFA2_LIB) -lhts -lz -lpthread
 
 else
 # ------------------------------------------------
 # Bare-metal modu (htslib + WFA2 + wtdbg2 local)
 # ------------------------------------------------
     CXXFLAGS += -I$(HTSLIB_DIR) -I$(WFA_DIR)
-    LDFLAGS  = $(HTSLIB_LIB) $(WFA_LIB) -lz -lpthread
+    LDFLAGS  += $(HTSLIB_LIB) $(WFA_LIB) -lz -lpthread
 endif
 
 
