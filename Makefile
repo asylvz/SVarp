@@ -40,6 +40,7 @@ HTSLIB_LIB      := $(HTSLIB_DIR)/libhts.a
 # Compiler / linker flags
 # ================================================================
 CXX ?= g++
+CC  ?= gcc
 
 BUILD ?= release
 
@@ -168,5 +169,8 @@ $(WFA_TARBALL):
 $(WTDBG2_BIN):
 	mkdir -p $(DEP_DIR)
 	test -d $(WTDBG2_DIR) || git clone https://github.com/ruanjue/wtdbg2 $(WTDBG2_DIR)
-	cd $(WTDBG2_DIR) && make
-
+	cd $(WTDBG2_DIR) && $(MAKE) \
+	    CC="$(CC)" \
+	    CFLAGS="$(CFLAGS)" \
+	    CPPFLAGS="$(CPPFLAGS)" \
+	    LDFLAGS="$(LDFLAGS)"
