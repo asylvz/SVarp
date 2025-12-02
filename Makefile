@@ -86,6 +86,7 @@ $(BUILD_DIR)/%.o: %.cpp
 
 # Önce libs, sonra objeler (race condition fix)
 $(OBJS): | libs
+
 # ================================================================
 # Clean targets
 # ================================================================
@@ -143,7 +144,7 @@ $(HTSLIB_TARBALL):
 $(WFA_LIB): $(WFA_TARBALL)
 	mkdir -p $(WFA_DIR)
 	tar -xzf $(WFA_TARBALL) -C $(WFA_DIR) --strip-components=1
-	cd $(WFA_DIR) && make clean all
+	cd $(WFA_DIR) && BUILD_TOOLS=0 BUILD_EXAMPLES=0 $(MAKE) -j1 clean setup lib_wfa
 
 $(WFA_TARBALL):
 	mkdir -p $(DEP_DIR)
