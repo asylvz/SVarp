@@ -1,45 +1,13 @@
 SVARP_VERSION := "1.0.1"
-SVARP_UPDATE  := "Nov 30, 2025"
+SVARP_UPDATE  := "Dec 02, 2025"
 SVARP_DEBUG   := 0
 BUILD_DATE    := "$(shell date)"
 
 # ================================================================
-# Mode switch (bare-metal vs conda-build)
-#   USE_CONDA = 0  -> HTSLIB + WFA2 + WTDGB2 local build (GitHub)
-#   USE_CONDA = 1  -> HTSLIB + WTDGB2 conda'dan, WFA2 her zaman bundled
-# ================================================================
-USE_CONDA ?= 0
-
-# ================================================================
-# Add build/ to PATH during make
-# (only affects child processes, not user shell)
-# ================================================================
-export PATH := $(PWD)/build:$(PATH)
-
-# ================================================================
-# Dependency directories
-# ================================================================
-DEP_DIR      := dep
-HTSLIB_DIR   := $(DEP_DIR)/htslib
-WFA_DIR      := $(DEP_DIR)/wfa
-WFA_LIB      := $(WFA_DIR)/lib/libwfacpp.a
-
-WTDBG2_DIR   := $(DEP_DIR)/wtdbg2
-WTDBG2_BIN   := $(WTDBG2_DIR)/wtdbg2
-
-HTSLIB_VERSION  := 1.17
-HTSLIB_TARBALL  := $(DEP_DIR)/htslib-$(HTSLIB_VERSION).tar.bz2
-HTSLIB_LIB      := $(HTSLIB_DIR)/libhts.a
-
-WFA_VERSION     := 2.3.4
-WFA_TARBALL     := $(DEP_DIR)/WFA2-lib-$(WFA_VERSION).tar.gz
-
-# ================================================================
-# Compiler / linker flags
+# Compiler / build type
 # ================================================================
 CXX ?= g++
 
-# Build type: release (default) veya debug
 BUILD ?= release
 
 CXXFLAGS ?=
@@ -49,58 +17,103 @@ CXXFLAGS += -Wall -std=c++17 \
            -DSVARP_UPDATE=\"$(SVARP_UPDATE)\" \
            -DSVAPR_DEBUG=$(SVARP_DEBUG)
 
-# Optimizasyon seviyeleri (build tipine göre)
 ifeq ($(BUILD),debug)
     CXXFLAGS += -O0 -g
 else
-    # Conda ortamında kendi optimizasyon bayraklarını kullanmasına izin ver
-    ifneq ($(USE_CONDA),1)
-        CXXFLAGS += -O3 -DNDEBUG
-    endif
+    CXXFLAGS += -O3 -DNDEBUG
 endif
 
-# ------------------------------------------------
-# Conda modu (HTSLIB + wtdbg2 conda'dan, WFA2 bundled)
-# ------------------------------------------------
-ifeq ($(USE_CONDA),1)
+# ================================================================
+# Dependencies (always bare-metal under dep/)
+# ================================================================
+DEP_DIR       := dep
 
-    # Header'lar: HTSLIB için conda, WFA2 için bundled
-    CXXFLAGS += -I$(PREFIX)/include -I$(WFA_DIR)
+# HTSLIB
+HTSLIB_VERSION := 1.17
+HTSLIB_TARBALL := $(DEP_DIR)/htslib-$(HTSLIB_VERSION).tar.bz2
+HTSLIB_DIR     := $(DEP_DIR)/htslib
+HTSLIB_LIB     := $(HTSLIB_DIR)/libhts.a
 
-    # HTSLIB conda'dan, WFA2 bundled, z/pthread sistem/conda
-    LDFLAGS  += -L$(PREFIX)/lib $(WFA_LIB) -lhts -lz -lpthread
+# WFA2-lib
+WFA_VERSION    := 2.3.4
+WFA_TARBALL    := $(DEP_DIR)/WFA2-lib-$(WFA_VERSION).tar.gz
+WFA_DIR        := $(DEP_DIR)/wfa
+WFA_LIB        := $(WFA_DIR)/lib/libwfacpp.a
+WFA_HEADERS    := $(WFA_DIR)/bindings/cpp/WFAligner.hpp
 
-else
-# ------------------------------------------------
-# Bare-metal modu (htslib + WFA2 + wtdbg2 local)
-# ------------------------------------------------
-    CXXFLAGS += -I$(HTSLIB_DIR) -I$(WFA_DIR)
-    LDFLAGS  += $(HTSLIB_LIB) $(WFA_LIB) -lz -lpthread
-endif
-
+# wtdbg2
+WTDBG2_DIR     := $(DEP_DIR)/wtdbg2
+WTDBG2_BIN     := $(WTDBG2_DIR)/wtdbg2
 
 # ================================================================
-# Build targets
+# Paths / flags
 # ================================================================
+# Include paths: local htslib + local WFA2
+CXXFLAGS += -I$(HTSLIB_DIR) -I$(WFA_DIR)
+
+# Link with local static libs
+LDFLAGS  += $(HTSLIB_LIB) $(WFA_LIB) -lz -lpthread
+
+# Build directory / sources
 TARGET_EXEC := svarp
-BUILD_DIR   := ./build
-SRC_DIRS    := ./src
+BUILD_DIR   := build
+SRC_DIRS    := src
 
 SRCS := $(shell find $(SRC_DIRS) -name '*.cpp')
 OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 
 .PHONY: all clean clean-libs libs post-build
 
-# Main target
+# ================================================================
+# Default target
+# ================================================================
 all: $(BUILD_DIR)/$(TARGET_EXEC) post-build
 
+# Link step
 $(BUILD_DIR)/$(TARGET_EXEC): libs $(OBJS)
 	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
 
 # C++ compile rule
-$(BUILD_DIR)/%.o: %.cpp
+# ÖNEMLİ: WFA_HEADERS dependency'si burada; önce WFA2 indir + derle + header'ları aç
+$(BUILD_DIR)/%.o: %.cpp $(WFA_HEADERS)
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+
+# ================================================================
+# Libraries (always local under dep/)
+# ================================================================
+libs: $(HTSLIB_LIB) $(WFA_LIB) $(WTDBG2_BIN)
+
+# ---------------- HTSLIB ----------------
+$(HTSLIB_LIB): $(HTSLIB_TARBALL)
+	mkdir -p $(HTSLIB_DIR)
+	tar -xvf $(HTSLIB_TARBALL) -C $(HTSLIB_DIR) --strip-components=1
+	cd $(HTSLIB_DIR) && ./configure --disable-lzma --disable-bz2 --disable-libcurl && $(MAKE)
+
+$(HTSLIB_TARBALL):
+	mkdir -p $(DEP_DIR)
+	wget https://github.com/samtools/htslib/releases/download/$(HTSLIB_VERSION)/htslib-$(HTSLIB_VERSION).tar.bz2 -O $(HTSLIB_TARBALL)
+
+# ---------------- WFA2-lib ----------------
+# Header dosyasını sentinel gibi kullanıyoruz:
+$(WFA_HEADERS): $(WFA_TARBALL)
+	mkdir -p $(WFA_DIR)
+	tar -xzf $(WFA_TARBALL) -C $(WFA_DIR) --strip-components=1
+	cd $(WFA_DIR) && $(MAKE) clean all
+
+$(WFA_LIB): $(WFA_HEADERS)
+	@# WFA2 build sonrası lib/libwfacpp.a oluşmuş olmalı
+	test -f $(WFA_LIB)
+
+$(WFA_TARBALL):
+	mkdir -p $(DEP_DIR)
+	wget https://github.com/smarco/WFA2-lib/archive/refs/tags/v$(WFA_VERSION).tar.gz -O $(WFA_TARBALL)
+
+# ---------------- wtdbg2 ----------------
+$(WTDBG2_BIN):
+	mkdir -p $(DEP_DIR)
+	test -d $(WTDBG2_DIR) || git clone https://github.com/ruanjue/wtdbg2 $(WTDBG2_DIR)
+	cd $(WTDBG2_DIR) && $(MAKE)
 
 # ================================================================
 # Clean targets
@@ -127,47 +140,4 @@ post-build:
 	@echo "   svarp"
 	@echo "======================================================"
 	@echo ""
-
-# ================================================================
-# libs target
-# ================================================================
-ifeq ($(USE_CONDA),1)
-# Conda modu: HTSLIB + wtdbg2 conda'dan; WFA2 her zaman bundled
-libs: $(WFA_LIB)
-	@echo "Using conda-provided HTSlib and wtdbg2; building bundled WFA2-lib."
-else
-libs: $(HTSLIB_LIB) $(WFA_LIB) $(WTDBG2_BIN)
-endif
-
-# ================================================================
-# HTSLIB (only bare-metal)
-# ================================================================
-$(HTSLIB_LIB): $(HTSLIB_TARBALL)
-	mkdir -p $(HTSLIB_DIR)
-	tar -xvf $(HTSLIB_TARBALL) -C $(HTSLIB_DIR) --strip-components=1
-	cd $(HTSLIB_DIR) && ./configure --disable-lzma --disable-bz2 --disable-libcurl && make
-
-$(HTSLIB_TARBALL):
-	mkdir -p $(DEP_DIR)
-	wget https://github.com/samtools/htslib/releases/download/$(HTSLIB_VERSION)/htslib-$(HTSLIB_VERSION).tar.bz2 -O $(HTSLIB_TARBALL)
-
-# ================================================================
-# WFA2-lib (bundled, both modes)
-# ================================================================
-$(WFA_LIB): $(WFA_TARBALL)
-	mkdir -p $(WFA_DIR)
-	tar -xzf $(WFA_TARBALL) -C $(WFA_DIR) --strip-components=1
-	cd $(WFA_DIR) && make clean all
-
-$(WFA_TARBALL):
-	mkdir -p $(DEP_DIR)
-	wget https://github.com/smarco/WFA2-lib/archive/refs/tags/v$(WFA_VERSION).tar.gz -O $(WFA_TARBALL)
-
-# ================================================================
-# wtdbg2 (bare-metal: dep/ altına git clone)
-# ================================================================
-$(WTDBG2_BIN):
-	mkdir -p $(DEP_DIR)
-	test -d $(WTDBG2_DIR) || git clone https://github.com/ruanjue/wtdbg2 $(WTDBG2_DIR)
-	cd $(WTDBG2_DIR) && make
 
