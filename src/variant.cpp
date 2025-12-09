@@ -61,7 +61,7 @@ int arrange_variants(std::map<std::string, Variant*>& vars, std::map<std::string
 
 int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<Variant*>>::iterator& vars_by_node ,std::vector<SVCluster*>& var_vector)
 {
-	SVCluster* svtig_tmp;
+	SVCluster* svtig_tmp = nullptr;
 	int start_pos = -1000;
 	bool first = true;
 	
@@ -115,19 +115,16 @@ int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& g
 		}	
 	}
 
-	//Add the last one as well
-	if(!first)
+	// Add the last one as well (if allocated)
+	if (svtig_tmp != nullptr && !first)
 		var_vector.push_back(svtig_tmp);
-	else
-		delete svtig_tmp;
 
 	return RETURN_SUCCESS;
 }
 
 
-int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<SVCluster*>> init_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing)
+int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<SVCluster*>> init_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& /*outgoing*/)
 {
-
 	std::map<std::string, std::vector<std::string>>::iterator it_nodes;
 	std::map<std::string, std::vector<SVCluster*>>::iterator it_neighbors;
 	for (auto &nd: init_svtigs)
@@ -310,12 +307,12 @@ int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map
 int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<std::string, Variant*>& variations_inter)
 {
 	bool skip_start = false, skip_end = false;
-	char *path_copy = strdup(line.path.c_str());
-	char *mytoken = strtok(path_copy,"><");
+	// parse path string safely: path format uses '>' or '<' before each node name
+	const std::string &path = line.path;
 	int inserted_var_cnt = 0;
 
-	//breakpoint1 is the position of the reads starting at that loci
-	int node_count = 0, offset = 0, br1_start, br2_end, node_map_size = 0;
+	// breakpoint1 is the position of the reads starting at that loci
+	int node_count = 0, offset = 0, br1_start = -1, br2_end = -1, node_map_size = 0;
 	
 	
 	if (line.query_start < MIN_READ_START_END_WINDOW)
@@ -326,16 +323,21 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 		return 0;
 			
 	std::string current_node, start_node, end_node;
-	
-	while(mytoken) 
+    
+	// iterate through path string, reading strand and node name
+	size_t p = 0;
+	while (p < path.size())
 	{
-		current_node = mytoken;
+		char strand = path[p];
+		++p;
+		size_t q = p;
+		while (q < path.size() && path[q] != '>' && path[q] != '<') ++q;
+		current_node = path.substr(p, q - p);
+		p = q;
 		node_count++;
-		char strand = line.path[offset];
-		offset += strlen(mytoken) + 1;
-		mytoken = strtok(NULL, "><");
+		offset += static_cast<int>(current_node.size()) + 1;
 		
-		if ((node_count == 1) && (!mytoken)) //means there is only a single node
+		if ((node_count == 1) && (p == path.size())) //means there is only a single node
 		{
 			if (!skip_start)
 			{
@@ -355,7 +357,7 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 				end_node = current_node;
 			}
 		}
-		else if((node_count == 1) && (mytoken)) //First node
+		else if((node_count == 1) && (p < path.size())) //First node
 		{
 			if (!skip_start)
 			{
@@ -368,7 +370,7 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 
 			node_map_size = gfa[current_node]->len;
 		}
-		else if(!mytoken) //Last node
+		else if(p == path.size()) //Last node
 		{
 			if (!skip_end)
 			{
@@ -438,7 +440,7 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 		}
 	}
 
-	free(path_copy);
+	// nothing to free (no strdup)
 	return inserted_var_cnt;
 }
 
@@ -447,26 +449,29 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 {
 	Variant *v = new Variant();
 
-	char *path_copy = strdup(line.path.c_str());
-	char *mytoken = strtok(path_copy,"><");
-	
+	const std::string &path = line.path;
+    
 	int path_start = line.path_start;
-	int offset = 0, node_count = 0, total_so_far = 0, node_map_size;
+	int offset = 0, node_count = 0, total_so_far = 0, node_map_size = 0;
 	v->phased = false;
-	v->type = INTRA;	
+	v->type = INTRA; 
 	int pos_in_cigar = base_pos;
-	bool del_incomplete = false;	
+	bool del_incomplete = false;
 
-	while(mytoken) 
+	// iterate through path string safely
+	size_t p = 0;
+	while (p < path.size()) 
 	{
-		v->node = mytoken;
-		char strand = line.path[offset];
-		//v->path += strand + mytoken;
+		char strand = path[p];
+		++p;
+		size_t q = p;
+		while (q < path.size() && path[q] != '>' && path[q] != '<') ++q;
+		v->node = path.substr(p, q - p);
+		p = q;
 		node_count++;
-		offset += strlen(mytoken) + 1;
-		mytoken = strtok(NULL, "><");
+		offset += static_cast<int>(v->node.size()) + 1;
 
-		if ((node_count == 1) && (!mytoken)) //means there is only a single node
+		if ((node_count == 1) && (p == path.size())) //means there is only a single node
 		{
 			int pos_in_node = path_start + pos_in_cigar;
 			if(strand == '>')
@@ -493,10 +498,10 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 				v->pos_in_node_end = v->pos_in_node + var_len;
 				v->sv_type = DELETION;			 
 			}
-			free(path_copy);
+			// nothing to free
 			return v;	
 		}
-		else if((node_count == 1) && (mytoken)) //First node
+		else if((node_count == 1) && (p < path.size())) //First node
 		{
 			node_map_size = gfa[v->node]->len - path_start;
 			
@@ -535,7 +540,7 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 					v->sv_type = DELETION;			 
 				}
 
-				free(path_copy);
+				// nothing to free
 				return v;	
 			}
 			else
@@ -548,7 +553,7 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 				}
 			}
 		}
-		else if(!mytoken) //Last node
+		else if(p == path.size()) //Last node
 		{
 			if ((sv_type != DELETION && pos_in_cigar >= node_map_size) || (del_incomplete && pos_in_cigar >= node_map_size) || (strand == '>' && pos_in_cigar >= node_map_size) || (strand == '<' && sv_type == DELETION && pos_in_cigar + var_len >= node_map_size && del_incomplete == false))
 			{
@@ -587,7 +592,7 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 					v->sv_type = DELETION;			 
 				}
 
-				free(path_copy);
+				// nothing to free
 				return v;	
 			}
 			else
@@ -637,8 +642,8 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 					v->sv_type = DELETION;			 
 				}
 
-				free(path_copy);
-				return v;	
+				// nothing to free
+				return v;    
 			}
 		 	else
 			{
@@ -652,7 +657,6 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 		}
 	}
 
-	free(path_copy);
 	return NULL;
 }
 

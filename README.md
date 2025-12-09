@@ -1,41 +1,87 @@
 # SVarp 
-***Pangenome-based structural variant discovery***
+**Pangenome-based structural variant discovery**
 
-The aim of SVarp is to discover haplotype resolved SVs on top of a pangenome graph reference using long sequencing reads. It outputs local assemblies of SV alleles, termed *svtigs*.
+SVarp discovers **haplotype-resolved structural variants (SVs)** on pangenome graphs using long-read sequencing data. It outputs **local assemblies** of SV alleles (*svtigs*).
 
-*Please open an issue for your questions or feel free to send me an e-mail (asoylev@gmail.com)*
+*For questions, please open an issue or feel free to send me an e-mail (asoylev@gmail.com)*
+
+---
 
 ## Quick Start
-	git clone https://github.com/asylvz/SVarp.git
-	cd svarp
-	make
-	build/svarp -a xxx.gaf -g xxx.gfa --fasta xxx.fasta.gz --phase read_tags.tsv -i SAMPLE_NAME -o OUTPUT_FOLDER
+
+### **Bioconda (recommended)**  
+```bash
+conda create -n svarp -c conda-forge -c bioconda svarp
+conda activate svarp
+svarp --help
+```
+>Note: SVarp currently supports 64-bit Linux only,
 
 
-## Requirements
+### **Building from source** 
+#### 1. Clone the repository
+
+
+```bash
+git clone https://github.com/asylvz/SVarp.git
+cd svarp
+```
+#### 2. Install third-party dependencies
+SVarp depends on:
+* **zlib** *(sudo apt-get install zlib1g-d)*
+* **GraphAligner** *(https://github.com/maickrau/GraphAligner)*
+* **Samtools** *(https://github.com/samtools/samtools)*
+* **HTSlib** *(https://github.com/samtools/htslib/)*
+* **WFA2-lib** *(https://github.com/smarco/WFA2-lib)*
+* **wtdbg2** *(https://github.com/ruanjue/wtdbg2)*
+* **Minimap2** *(https://github.com/lh3/minimap2)*
+
+You can download **HTSlib, WFA2-lib, wtdbg2, Minimap2** using:
+```bash
+make libs
+```
+#### 3.Build SVarp 
+```bash
+make
+```
+>Binary will be at **build/svarp**. 
+
+#### 4. Run
+```bash
+build/svarp \
+    --gaf sample.gaf \
+    --graph pangenome.gfa \
+    --fasta reads.fasta.gz \
+    --sample SAMPLE1 \
+    --out output_dir
+```
+
+## Input Requirements
 
 SVarp is developed and tested using Linux Ubuntu operating system
 
-* You need the FASTA of the reads **bgzipped** (i.e., bgzip NA12878.fasta)
-* GAF file needs to be in **unstable coordinate system**. (https://github.com/lh3/gfatools/blob/master/doc/rGFA.md)
-* Pangenome ref. needs to be in GFA format. We tested SVarp with **HPRC Minigraph pangenome** (https://zenodo.org/record/6983934)
+* Reads FASTA must be bgzipped (i.e., bgzip NA12878.fasta)
+* GAF must follow the unstable rGFA coordinate system (https://github.com/lh3/gfatools/blob/master/doc/rGFA.md)
+* Graph must be provided in GFA format. We tested SVarp with **HPRC Minigraph pangenome** (https://zenodo.org/record/6983934)
 	- GAF alignments must be generated using the same GFA file that you use as input
-* For **phased variants**, tags need to be generated in ".tsv" format using **whatshap haplotag** (https://whatshap.readthedocs.io/)
-	- E.g., *whatshap haplotag NA12878.vcf.gz NA12878.bam -o NA12878_phase --reference ref_genome.fasta --output-haplotag-list tags.tsv*
+* Phasing tags (optional) should be generated using WhatsHap: (https://whatshap.readthedocs.io/)
+```bash
+whatshap haplotag input.vcf.gz input.bam \
+    --reference ref.fasta \
+    --output-haplotag-list tags.tsv \
+    -o phased.bam
+```
 
-
-## Dependencies
-
-* **zlib**
-  	- sudo apt-get install zlib1g-d
-* **GraphAligner**
-  	- conda install -c bioconda graphaligner (https://github.com/maickrau/GraphAligner)
-* **Samtools**
-  	- https://github.com/samtools/samtools
-* **Minimap2**
-  	- git clone https://github.com/lh3/minimap2 && cd minimap2 && make
-* **HTSlib, WFA2-lib and wtdbg2**
-  	- You can run ***make libs*** to install HTSlib, WFA2-lib and wtdbg2
+#### Example Usage
+```bash
+build/svarp \
+    --gaf sample.gaf \
+    --graph pangenome.gfa \
+    --fasta reads.fasta.gz \
+    --phase read_tags.tsv \
+    --sample SAMPLE1 \
+    --out output_dir
+```
 
 ## All parameters
 

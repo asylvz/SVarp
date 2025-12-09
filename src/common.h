@@ -1,7 +1,9 @@
 #ifndef __COMMON
 #define __COMMON
 
-#include <fstream>
+#include <iosfwd>
+#include "logfile.h"
+#include <string>
 #include <vector>
 #include <map>
 
@@ -46,8 +48,8 @@ typedef struct _parameters
 	std::string vcf_path;
 	std::string log_path;
 	std::string sample_name;
-	std::ofstream fp_svtigs;
-	std::ofstream fp_logs;
+	LogFile fp_svtigs;
+	LogFile fp_logs;
 	int threads;
 	int support;
 	int dist_threshold;
@@ -124,17 +126,19 @@ public:
 	}
 
 };
-extern std::ofstream logFile; //Defined in svarp.c
+// External global logFile symbol is unused in the repo; remove to avoid exposing implementation details
+// extern std::ofstream logFile; //Defined in svarp.c
 
 unsigned hash(char *s);
 void init_params(parameters** params);
 void set_str(char **target, char *source);
-int decompose_cigars(std::string cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp);
-std::string exec(std::string command, bool return_out); 
+int decompose_cigars(const std::string& cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp);
+std::string exec(const std::string& command, bool return_out); 
 void error(const char* const msg);
 double overlap_ratio(int x_start, int x_end, int y_start, int y_end);
 int parse_gaf_line(std::string& line, Gaf& gafline);
-
+int run_and_log(const std::string& cmd, parameters& params, const std::string& label = "", int retries = 0, int backoff_seconds = 1, bool fatal = false);
+std::string find_executable(const std::string &progname, const std::vector<std::string> &extra_dirs = {});
 
 std::string& reverse_complement(std::string& seq);
 const std::vector<std::string>& find_prev_next_nodes(std::map <std::string, std::vector<std::string>> inout_nodes, std::string node);

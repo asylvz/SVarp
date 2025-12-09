@@ -1,10 +1,15 @@
 #include <iostream>
 #include <stdlib.h>
+#include <errno.h>
+#include <thread>
+#include <chrono>
+#include <sys/wait.h>
 #include <stdarg.h>
 #include <string.h>
 #include <algorithm>
 #include <sstream>
 #include "common.h"
+#include <filesystem>
 
 
 //Returns a vector of incoming or outgoing nodes based on the input map object
@@ -100,7 +105,7 @@ void error(const char* const msg)
     exit(EXIT_FAILURE);
 }
 
-std::string exec(std::string command, bool return_out) 
+std::string exec(const std::string& command, bool return_out) 
 {
 	FILE* pipe = popen(command.c_str(), "r");
 	if (!pipe)
@@ -120,6 +125,115 @@ std::string exec(std::string command, bool return_out)
 	return "Success";
 }
 
+
+int run_and_log(const std::string& cmd, parameters& params,
+                const std::string& label, int retries,
+                int backoff_seconds, bool fatal)
+{
+	if (params.debug && params.fp_logs.is_open()) {
+        params.fp_logs << "[run_and_log] " << label << " CMD: " << cmd << "\n";
+    }
+    int attempt = 0;
+
+    while (true) {
+        int rc = system(cmd.c_str());
+        if (rc == 0) return 0;
+
+        // Hatalar sadece log dosyasına yazılır, ekrana asla basılmaz
+        if (params.fp_logs.is_open()) {
+            if (rc == -1) {
+                params.fp_logs << "Failed to run '" << label << "' (" << cmd
+                               << ") system() error: " << strerror(errno) << "\n";
+            }
+#ifdef __unix__
+            else if (WIFEXITED(rc)) {
+                params.fp_logs << "Command '" << label << "' (" << cmd
+                               << ") exited with status " << WEXITSTATUS(rc) << "\n";
+            } else if (WIFSIGNALED(rc)) {
+                params.fp_logs << "Command '" << label << "' (" << cmd
+                               << ") terminated by signal " << WTERMSIG(rc) << "\n";
+            } else {
+                params.fp_logs << "Command '" << label << "' (" << cmd
+                               << ") returned " << rc << "\n";
+            }
+#else
+            else {
+                params.fp_logs << "Command '" << label << "' returned " << rc << "\n";
+            }
+#endif
+        }
+
+        if (attempt < retries) {
+            int sleep_seconds = backoff_seconds * (1 << attempt);
+            if (params.fp_logs.is_open())
+                params.fp_logs << "Retrying in " << sleep_seconds
+                               << " seconds... (attempt "
+                               << (attempt + 1) << ")\n";
+            std::this_thread::sleep_for(std::chrono::seconds(sleep_seconds));
+            attempt++;
+            continue;
+        }
+
+        if (fatal) {
+            if (params.fp_logs.is_open())
+                params.fp_logs << "Fatal: command '" << cmd
+                               << "' failed after " << (attempt + 1)
+                               << " attempts\n";
+            exit(EXIT_COMMON);
+        }
+
+        return rc;
+    }
+}
+
+// Helper: find an executable in extra dirs, current dir and PATH
+std::string find_executable(const std::string &progname,
+                            const std::vector<std::string> &extra_dirs)
+{
+    namespace fs = std::filesystem;
+
+    // 1) Absolute path ise ve çalıştırılabilir ise direkt kullan
+    if (!progname.empty() && progname[0] == '/') {
+        if (fs::exists(progname) && access(progname.c_str(), X_OK) == 0)
+            return progname;
+    }
+
+    // 2) Ek klasörler
+    for (const auto& d : extra_dirs) {
+        fs::path p = fs::path(d) / progname;
+        if (fs::exists(p) && access(p.c_str(), X_OK) == 0)
+            return p.string();
+    }
+
+    // 3) Çalışılan dizin ./progname
+    {
+        fs::path p = fs::current_path() / progname;
+        if (fs::exists(p) && access(p.c_str(), X_OK) == 0)
+            return p.string();
+    }
+
+    // 4) PATH içinde ara
+    const char* path_env = std::getenv("PATH");
+    if (path_env) {
+        std::string path(path_env);
+        std::string::size_type start = 0;
+        while (true) {
+            auto pos = path.find(':', start);
+            std::string dir = (pos == std::string::npos)
+                                  ? path.substr(start)
+                                  : path.substr(start, pos - start);
+            if (!dir.empty()) {
+                fs::path p = fs::path(dir) / progname;
+                if (fs::exists(p) && access(p.c_str(), X_OK) == 0)
+                    return p.string();
+            }
+            if (pos == std::string::npos) break;
+            start = pos + 1;
+        }
+    }
+
+    return ""; // bulunamadı
+}
 
 /* The codes for the dictionary is taken from The C Programming language 
  * 2nd edition - Brian Kernighan and Dennis Ritchie */
@@ -180,7 +294,7 @@ void print_error( char* msg)
 }
 
 
-int decompose_cigars(std::string cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp)
+int decompose_cigars(const std::string& cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp)
 {
 	size_t cigar_offset = 0, str_offset = 0, cigar_cnt = 0;
 	char* cigar_copy = (char*) cigar.c_str();	

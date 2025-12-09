@@ -11,22 +11,24 @@
 
 int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, Gaf& line)
 {
-	char *path_copy = strdup(line.path.c_str());
-	
-	char *mytoken = strtok(path_copy,"><");
+	const std::string &path = line.path;
 	
 	int node_count = 0, total_so_far = 0;
 	int path_start = line.path_start;
 	int path_end = line.path_end;
 	int total_path_length = path_end - path_start;
-	while(mytoken) 
+	
+	size_t p = 0;
+	while (p < path.size())
 	{
+		++p;  // skip strand char
+		size_t q = p;
+		while (q < path.size() && path[q] != '>' && path[q] != '<') ++q;
+		std::string node = path.substr(p, q - p);
+		p = q;
 		node_count += 1;
-		std::string node = mytoken;
-
-		mytoken = strtok(NULL, "><");
 		
-		if ((node_count == 1) && (!mytoken)) //the single node
+		if ((node_count == 1) && (p == path.size())) //the single node
 		{
 
 			std::string contig = gfa[node]->contig; 
@@ -36,10 +38,9 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 			ref["overall"]->mapped_reads++;	
 			ref["overall"]->mapped_bases += path_end - path_start;
 		
-			free(path_copy);
 			return path_end - path_start;
 		}
-		else if((node_count == 1) && (mytoken)) //first node
+		else if((node_count == 1) && (p < path.size())) //first node
 		{
 			std::string contig = gfa[node]->contig; 
 			ref[contig]->mapped_bases += gfa[node]->len - path_start;	
@@ -50,7 +51,7 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 			
 			total_so_far += gfa[node]->len - path_start;
 		}
-		else if(!mytoken) //Last node
+		else if(p == path.size()) //Last node
 		{
 			std::string contig = gfa[node]->contig; 
 			ref[contig]->mapped_bases += total_path_length - total_so_far;
@@ -59,7 +60,6 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 			ref["overall"]->mapped_reads++;	
 			ref["overall"]->mapped_bases += total_path_length - total_so_far;
 			
-			free(path_copy);
 			return total_path_length;
 		}
 		else //middle node
@@ -75,7 +75,6 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 		}
 	}
 	std::cout<<"Error in contig_coverage()\n";
-	free(path_copy);
 	return RETURN_ERROR;
 }
 
@@ -110,62 +109,54 @@ int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<
 		tokens.clear();
 		
 		while(getline(s, tmp_str, '\t'))
-        	tokens.push_back(tmp_str);
-			
+        		tokens.push_back(tmp_str);
+		
+		if (tokens.empty())
+			continue;
+		
 		if (tokens[0] != "S")
 		{
-			if (tokens[0] == "L")
+			if (tokens[0] == "L" && tokens.size() >= 4)
 			{
-				//std::cout<<tokens[1]<<" " << tokens[3]<<"\n";
-				//Add incoming	
-				it = incoming.find(tokens[3]);
-				if (it != incoming.end())
-				{	
-					//if(tokens[3] == "s99992")
-					//	std::cout<<tokens[1]<<"\n";
-					it->second.push_back(tokens[1]);
-				}
-				else
-				{
-					std::vector<std::string> v;
-					v.clear();
-					v.push_back(tokens[1]);
-					incoming.insert(std::pair<std::string, std::vector<std::string>>(tokens[3], v));
-				}
-				//Add outgoing	
-				it = outgoing.find(tokens[1]);
-				if (it != outgoing.end())
-					it->second.push_back(tokens[3]);
-				else
-				{
-					std::vector<std::string> v;
-					v.clear();
-					v.push_back(tokens[3]);
-					outgoing.insert(std::pair<std::string, std::vector<std::string>>(tokens[1], v));
-				}
+				// Add incoming: use insert with hint to avoid redundant lookups
+				auto [it_in, inserted_in] = incoming.insert({tokens[3], {}});
+				it_in->second.push_back(tokens[1]);
+				
+				// Add outgoing: same pattern
+				auto [it_out, inserted_out] = outgoing.insert({tokens[1], {}});
+				it_out->second.push_back(tokens[3]);
 			}
 			continue;
 		}
 		
+		if (tokens.size() < 6)
+			continue;  // Skip malformed S lines
+		
 		gfaNode *g = new gfaNode();
 		g->name = tokens[1];
 		g->sequence = tokens[2];
-		g->len = stoi(tokens[3].substr(5));
-		g->contig = tokens[4].substr(5);
-		g->offset = stoi(tokens[5].substr(5));	
-
-		std::map<std::string, Contig*>::iterator it = ref.find(g->contig);
-		if (it == ref.end())
-		{
-			Contig *c = new Contig();
-			ref.insert(std::pair<std::string, Contig*>(g->contig, c));
+		
+		try {
+			g->len = stoi(tokens[3].substr(5));
+			g->offset = stoi(tokens[5].substr(5));
+		} catch (const std::invalid_argument&) {
+			std::cerr << "[read_gfa] Invalid numeric value in GFA line: " << line << std::endl;
+			delete g;
+			continue;
 		}
 		
+		g->contig = tokens[4].substr(5);
+
+		// Insert Contig if not present, using insert return value
+		auto [it_contig, inserted] = ref.insert({g->contig, nullptr});
+		if (inserted)
+			it_contig->second = new Contig();
+		
 		//Find the length of each contig	
-		ref[g->contig]->contig_length += g->len;
+		it_contig->second->contig_length += g->len;
 		ref["overall"]->contig_length += g->len;
 
-		gfa.insert(std::pair<std::string, gfaNode*>(g->name, g));
+		gfa.insert({g->name, g});
 	}
 	return RETURN_SUCCESS;
 }

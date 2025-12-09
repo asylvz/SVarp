@@ -7,6 +7,7 @@
 #include <zlib.h>
 #include <chrono>
 #include "alignment.h"
+#include "variant.h"
 
 int primary_cnt = 0, secondary_cnt = 0, inter_cnt = 0, intra_cnt = 0, insertion_cnt = 0, deletion_cnt = 0, mismatch_cnt = 0;
 
@@ -147,7 +148,10 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 			Gaf g;
 			
 			if (parse_gaf_line(line, g) != RETURN_SUCCESS)
+			{
+				if (params.fp_logs.is_open()) params.fp_logs << "[read_gz] Failed to parse GAF line: " << line << std::endl;
 				continue;
+			}
 
 			if(is_alignment_valid(g) == RETURN_ERROR)
 				continue;
@@ -182,9 +186,11 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 	int line_count = 0;
 	gzrewind(myfile);
 	
+	// Reset buffer state for second pass
 	memset(buffer, '\0', sizeof(buffer));
 	offset = buffer;
 	bool tst = false;
+	
 	while(1)
 	{
 		int err, len = sizeof(buffer) - (offset - buffer);
@@ -208,7 +214,8 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 			line_count++;
 			
 			Gaf g;
-			parse_gaf_line(line, g);		
+			if (parse_gaf_line(line, g) != RETURN_SUCCESS)
+				continue;
 			
             find_var(ref, gfa, vars, g, read_freq, unmapped);
 			
@@ -260,7 +267,7 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 			Gaf g;		
 			if (parse_gaf_line(line, g) != RETURN_SUCCESS)
             {
-                std::cout<<"Fail";
+                if (params.fp_logs.is_open()) params.fp_logs << "[read_alignments] Failed to parse GAF line: " << line << std::endl;
 				continue;
             }
 			
@@ -337,17 +344,17 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 	std::cout<<"--->there are "<<inter_cnt + intra_cnt<<" SV signal (" <<inter_cnt<< " inter alignment and "<<intra_cnt<<" intra alignment)\n";
 	std::cout<<"--->there are "<<unmapped.size()<<" unmapped alignments\n";
 	
-	params.fp_logs<<"--->"<<primary_cnt<<" primary mappings and "<<insertion_cnt<<" insertion, "<<deletion_cnt<<" deletion loci in the cigar\n";
-	params.fp_logs<<"--->there are "<<inter_cnt + intra_cnt<<" SV signal (" <<inter_cnt<< " inter alignment and "<<intra_cnt<<" intra alignment)\n";
-	params.fp_logs<<"--->there are "<<unmapped.size()<<" unmapped alignments\n";
+	if (params.fp_logs.is_open()) { params.fp_logs << "--->" << primary_cnt << " primary mappings and " << insertion_cnt << " insertion, " << deletion_cnt << " deletion loci in the cigar\n"; }
+	if (params.fp_logs.is_open()) { params.fp_logs << "--->there are " << inter_cnt + intra_cnt << " SV signal (" << inter_cnt << " inter alignment and " << intra_cnt << " intra alignment)\n"; }
+	if (params.fp_logs.is_open()) { params.fp_logs << "--->there are " << unmapped.size() << " unmapped alignments\n"; }
 	
 	std::map<std::string, Contig*>::iterator it2;
 	
-	params.fp_logs<<"------->Contig coverage\n\n";
+	if (params.fp_logs.is_open()) { params.fp_logs << "------->Contig coverage\n\n"; }
 	for (it2=ref.begin(); it2 != ref.end(); ++it2)
 	{
 		it2->second->coverage = (double) it2->second->mapped_bases / it2->second->contig_length;	
-		params.fp_logs<< it2->first<<"---> LEN= "<<it2->second->contig_length<<" - Mapped bases= "<< it2->second->mapped_bases<<" - Mapped reads= "<<it2->second->mapped_reads << " - Cov= "<<it2->second->coverage <<std::endl;		
+		if (params.fp_logs.is_open()) { params.fp_logs << it2->first << "---> LEN= " << it2->second->contig_length << " - Mapped bases= " << it2->second->mapped_bases << " - Mapped reads= " << it2->second->mapped_reads << " - Cov= " << it2->second->coverage << std::endl; }
 	}			
 	
 	return RETURN_SUCCESS;

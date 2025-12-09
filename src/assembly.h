@@ -5,7 +5,9 @@
 #include "common.h"
 #include "reference.h"
 #include "variant.h"
-#include <htslib/faidx.h>
+// We forward-declare 'faidx_t' and include HTSlib headers only in the implementation (.cpp)
+// to keep the header lightweight and reduce transitive includes.
+struct faidx_t;
 
 int remap_assemblies(parameters& params);
 
@@ -24,7 +26,7 @@ public:
 
 		void run_assembly(parameters& params, std::map <std::string, Contig*>& depth, std::map<std::string, std::vector<SVCluster*>>& vars, std::set <std::string>& unmapped, std::map <std::string, SVtig*>& final_svtigs);
 		void generate_fasta_file(parameters& params, faidx_t*& fasta_index, std::set <std::string>& reads, std::string file_path);
-		int write_svtigs(std::string& f_path, const std::string& f_name, int pos, std::string& contig, int coverage, std::ofstream& fp_write);
+		int write_svtigs(std::string& f_path, const std::string& f_name, int pos, std::string& contig, int coverage, std::ostream& fp_write);
 		int merge_svtigs(parameters& params);
 		int final_assembly(parameters& params, faidx_t*& fasta_index, std::set <std::string>& read_set, std::string& svtig_name, double& contig_depth, SVCluster*& sv, std::map <std::string, SVtig*>& final_svtigs);
 		int assemble_clusters(parameters& params, faidx_t*& fasta_index, std::vector<SVCluster*>& sv_cluster, std::map <std::string, Contig*>& depth, std::map <std::string, SVtig*>& final_svtigs);

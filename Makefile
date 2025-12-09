@@ -1,12 +1,15 @@
-SVARP_VERSION := "1.0.1"
-SVARP_UPDATE  := "Dec 02, 2025"
+SVARP_VERSION := "1.1.0"
+SVARP_UPDATE  := "Dec 09, 2025"
 SVARP_DEBUG   := 0
 BUILD_DATE    := "$(shell date)"
 
 # ================================================================
 # Mode switch (bare-metal vs conda-build)
-#   USE_CONDA = 0  -> HTSLIB + WFA2 + WTDGB2 local build (dep/)
-#   USE_CONDA = 1  -> HTSLIB + WFA2 conda env'den, WTDGB2 dep/ altına conda CC ile
+#   USE_CONDA = 0  -> HTSLIB + WFA2 + WTDGB2 + (opsiyonel) minimap2 local build (dep/)
+#                     -> Hiçbir dependency otomatik kurulmaz, hepsi 'make libs' ile.
+#   USE_CONDA = 1  -> HTSLIB (ve diğer kütüphaneler) conda'dan,
+#                     WFA2 local build (dep/), WTDGB2 ise ortamdan (PATH) beklenir
+#                     -> 'make' çağrıldığında sadece WFA2 için libs çalışır.
 # ================================================================
 USE_CONDA ?= 0
 
@@ -22,6 +25,10 @@ WFA_LIB      := $(WFA_DIR)/lib/libwfacpp.a
 
 WTDBG2_DIR   := $(DEP_DIR)/wtdbg2
 WTDBG2_BIN   := $(WTDBG2_DIR)/wtdbg2
+
+# minimap2 (bare-metal'de dep/ altına kuracağız; conda modunda conda'dan gelir)
+MINIMAP2_DIR := $(DEP_DIR)/minimap2
+MINIMAP2_BIN := $(MINIMAP2_DIR)/minimap2
 
 HTSLIB_VERSION := 1.17
 HTSLIB_TARBALL := $(DEP_DIR)/htslib-$(HTSLIB_VERSION).tar.bz2
@@ -57,11 +64,11 @@ LDFLAGS ?=
 # Include / link flags (conda vs bare-metal)
 # ------------------------------------------------
 ifeq ($(USE_CONDA),1)
-    # conda build ortamı: htslib / wfa2-lib / zlib vs zaten PREFIX altında
+    # conda build ortamı: htslib / zlib / minimap2 vs PREFIX altında
     CXXFLAGS += -I$(PREFIX)/include -I$(PREFIX)/include/htslib -I$(DEP_DIR)/wfa
     LDFLAGS  += -L$(PREFIX)/lib -lhts -lz -lpthread $(WFA_LIB)
 else
-    # lokal derleme: htslib ve WFA2'yi dep/ altından derle
+    # lokal derleme: htslib ve WFA2'yi dep/ altından derle (veya kullanıcı kendisi ayarlasın)
     CXXFLAGS += -I$(HTSLIB_DIR) -I$(DEP_DIR)/wfa
     LDFLAGS  += $(HTSLIB_LIB) $(WFA_LIB) -lz -lpthread
 endif
@@ -72,8 +79,100 @@ OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 
 
 .PHONY: all clean clean-libs libs post-build
+.PHONY: test-all test
 
 all: $(BUILD_DIR)/$(TARGET_EXEC) post-build
+
+# ================ Tests
+test-logfile: build/test_logfile
+	./build/test_logfile
+
+build/test_logfile: src/logfile.cpp tests/logfile_test.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I. -Isrc -Idep/htslib -Idep/wfa src/logfile.cpp tests/logfile_test.cpp -o $@
+
+test-common: build/test_common_parse_gaf build/test_cigar build/test_common_utils build/test_run_and_log build/test_variant build/test_generate_sv_node build/test_merge_neighbor_nodes build/test_assembly build/test_remap build/test_alignment build/test_phasing build/test_variant_mapping build/test_alignment_read_gz
+	./build/test_common_parse_gaf
+	./build/test_cigar
+	./build/test_common_utils
+	./build/test_run_and_log
+	./build/test_variant
+	./build/test_generate_sv_node
+	./build/test_merge_neighbor_nodes
+	./build/test_assembly
+	./build/test_remap
+	./build/test_alignment
+	./build/test_phasing
+	./build/test_variant_mapping
+	./build/test_alignment_read_gz
+
+test-all: test-logfile test-common
+	@echo "=== All tests finished ==="
+
+test: test-all
+	@echo "Ran make test (alias to test-all)"
+
+build/test_common_parse_gaf: tests/common_parse_gaf_test.cpp src/common.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/common.cpp src/logfile.cpp tests/common_parse_gaf_test.cpp -o $@
+
+build/test_cigar: tests/cigar_test.cpp src/common.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/common.cpp src/logfile.cpp tests/cigar_test.cpp -o $@
+
+build/test_common_utils: tests/common_utils_test.cpp src/common.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/common.cpp src/logfile.cpp tests/common_utils_test.cpp -o $@
+
+build/test_run_and_log: tests/run_and_log_test.cpp src/common.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/common.cpp src/logfile.cpp tests/run_and_log_test.cpp -o $@
+
+
+build/test_variant: tests/variant_test.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/variant_test.cpp -o $@
+
+
+build/test_generate_sv_node: tests/generate_sv_node_test.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/generate_sv_node_test.cpp -o $@
+
+
+build/test_variant_mapping: tests/variant_mapping_test.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/variant_mapping_test.cpp -o $@
+
+
+build/test_merge_neighbor_nodes: tests/merge_neighbor_nodes_test.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/merge_neighbor_nodes_test.cpp -o $@
+
+
+build/test_assembly: tests/assembly_test.cpp src/assembly.cpp src/common.cpp src/reference.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/assembly.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/assembly_test.cpp -o $@ $(LDFLAGS)
+
+
+build/test_remap: tests/remap_test.cpp src/remap.cpp src/common.cpp src/reference.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/remap.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/remap_test.cpp -o $@ $(LDFLAGS)
+
+
+build/test_alignment: tests/alignment_test.cpp src/alignment.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/alignment.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/alignment_test.cpp -o $@ $(LDFLAGS)
+
+
+build/test_phasing: tests/phasing_test.cpp src/phasing.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/phasing.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/phasing_test.cpp -o $@ $(LDFLAGS)
+
+
+build/test_alignment_read_gz: tests/alignment_read_gz_test.cpp src/alignment.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/alignment.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/alignment_read_gz_test.cpp -o $@ $(LDFLAGS)
+
 
 # Asıl binary
 $(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
@@ -84,8 +183,13 @@ $(BUILD_DIR)/%.o: %.cpp
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-# Önce libs, sonra objeler (race condition fix)
+# ------------------------------------------------
+# Conda build'de: objelerden önce libs çalışsın
+# Bare metal'de: libs otomatik çağrılmasın (kullanıcı make libs desin)
+# ------------------------------------------------
+ifeq ($(USE_CONDA),1)
 $(OBJS): | libs
+endif
 
 # ================================================================
 # Clean targets
@@ -117,13 +221,14 @@ post-build:
 # libs target
 # ================================================================
 ifeq ($(USE_CONDA),1)
-# conda build'de: WFA2'yi yine dep/ altına indirip statik lib derliyoruz,
-# ama htslib'ı conda'dan kullanıyoruz. wtdbg2 her iki modda da dep/ altına.
-libs: $(WFA_LIB) $(WTDBG2_BIN)
-	@echo "Using conda HTSLIB (libhts) from PREFIX, WFA2 and wtdbg2 from dep/"
+# conda build'de: sadece WFA2 dep/ altına; htslib, wtdbg2, minimap2 conda env'den
+libs: $(WFA_LIB)
+	@echo "Using conda HTSLIB (libhts); WFA2 built under dep/."
+	@echo "NOTE: wtdbg2 and minimap2 must be installed in the conda environment (e.g. conda install -c bioconda wtdbg2 minimap2)."
 else
-# bare-metal: htslib + WFA2 + wtdbg2'yi dep/ altına full derle
-libs: $(HTSLIB_LIB) $(WFA_LIB) $(WTDBG2_BIN)
+# bare-metal: tüm dependency'ler sadece make libs ile
+libs: $(HTSLIB_LIB) $(WFA_LIB) $(WTDBG2_BIN) $(MINIMAP2_BIN)
+	@echo "Built HTSLIB, WFA2, wtdbg2 and minimap2 under dep/"
 endif
 
 # ================================================================
@@ -151,18 +256,24 @@ $(WFA_TARBALL):
 	wget https://github.com/smarco/WFA2-lib/archive/refs/tags/v$(WFA_VERSION).tar.gz -O $(WFA_TARBALL)
 
 # ================================================================
+# minimap2 (bare-metal: dep/ altına, PATH'te yoksa)
+# ================================================================
+$(MINIMAP2_BIN):
+	mkdir -p $(DEP_DIR)
+	@if command -v minimap2 >/dev/null 2>&1; then \
+	  echo "minimap2 found in PATH, skipping local build in dep/minimap2"; \
+	else \
+	  echo "minimap2 not found in PATH, building under dep/minimap2"; \
+	  test -d $(MINIMAP2_DIR) || git clone https://github.com/lh3/minimap2 $(MINIMAP2_DIR); \
+	  cd $(MINIMAP2_DIR) && $(MAKE); \
+	fi
+
+# ================================================================
 # wtdbg2 (dep/ altına, conda'da CC/LDFLAGS override ile)
 # ================================================================
+ifeq ($(USE_CONDA),0)
 $(WTDBG2_BIN):
 	mkdir -p $(DEP_DIR)
 	test -d $(WTDBG2_DIR) || git clone https://github.com/ruanjue/wtdbg2 $(WTDBG2_DIR)
-ifeq ($(USE_CONDA),1)
-	cd $(WTDBG2_DIR) && $(MAKE) \
-	    CC="$(BUILD_PREFIX)/bin/x86_64-conda-linux-gnu-cc" \
-	    CFLAGS="-march=nocona -mtune=haswell -ftree-vectorize -fPIC -fstack-protector-strong -fno-plt -O2 -ffunction-sections -pipe -isystem $(PREFIX)/include -fdebug-prefix-map=$(SRC_DIR)=/usr/local/src/conda/svarp-$(SVARP_VERSION) -fdebug-prefix-map=$(PREFIX)=/usr/local/src/conda-prefix" \
-	    CPPFLAGS="-DNDEBUG -D_FORTIFY_SOURCE=2 -O2 -isystem $(PREFIX)/include" \
-	    LDFLAGS="-Wl,-O2 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -Wl,--disable-new-dtags -Wl,--gc-sections -Wl,--allow-shlib-undefined -Wl,-rpath,$(PREFIX)/lib -Wl,-rpath-link,$(PREFIX)/lib -L$(PREFIX)/lib -L$(PREFIX)/lib -lhts -lz -lpthread $(WFA_LIB)"
-else
 	cd $(WTDBG2_DIR) && $(MAKE)
 endif
-

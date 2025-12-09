@@ -84,6 +84,7 @@ int parse_command_line(int argc, char** argv, parameters& params)
 				break;
 			case 't':
 				threads = optarg;
+				break;
 			case 'u':
 				params.debug = true;
 				break;
@@ -162,22 +163,50 @@ int parse_command_line(int argc, char** argv, parameters& params)
 	if(dist_threshold.empty())
 		params.dist_threshold = 100;
 	else
-		params.dist_threshold = stoi(dist_threshold);
+	{
+		try {
+			params.dist_threshold = stoi(dist_threshold);
+		} catch (const std::invalid_argument&) {
+			std::cerr << "[SVARP CMDLINE ERROR] dist_threshold must be an integer: " << dist_threshold << std::endl;
+			return RETURN_ERROR;
+		}
+	}
 	
 	if(as.empty())
 		params.min_alignment_score = 5000;
 	else
-		params.min_alignment_score = stoi(as);
-	
+	{
+		try {
+			params.min_alignment_score = stoi(as);
+		} catch (const std::invalid_argument&) {
+			std::cerr << "[SVARP CMDLINE ERROR] alignment_score must be an integer: " << as << std::endl;
+			return RETURN_ERROR;
+		}
+	}
+
 	if(pc.empty())
 		params.min_precise_clipping = 0.97;
 	else
-		params.min_precise_clipping = stod(pc);
+	{
+		try {
+			params.min_precise_clipping = stod(pc);
+		} catch (const std::invalid_argument&) {
+			std::cerr << "[SVARP CMDLINE ERROR] precise_clipping must be a float: " << pc << std::endl;
+			return RETURN_ERROR;
+		}
+	}
 
 	if(map_ratio.empty())
 		params.min_map_ratio = 0.90;
 	else
-		params.min_map_ratio = stod(map_ratio);
+	{
+		try {
+			params.min_map_ratio = stod(map_ratio);
+		} catch (const std::invalid_argument&) {
+			std::cerr << "[SVARP CMDLINE ERROR] map_ratio must be a float: " << map_ratio << std::endl;
+			return RETURN_ERROR;
+		}
+	}
 
 	if((params.phase_tags).empty())
 		std::cerr<<"No phase information provided (--phase). SVs will not be phased...\n";
@@ -185,7 +214,14 @@ int parse_command_line(int argc, char** argv, parameters& params)
 	if(support.empty())
 		params.support = 5;
 	else
-		params.support = stoi(support);
+	{
+		try {
+			params.support = stoi(support);
+		} catch (const std::invalid_argument&) {
+			std::cerr << "[SVARP CMDLINE ERROR] support must be an integer: " << support << std::endl;
+			return RETURN_ERROR;
+		}
+	}
 	
 	if(params.asm_mode)
 	{
@@ -201,9 +237,35 @@ int parse_command_line(int argc, char** argv, parameters& params)
 	}
 
 	if(threads.empty())
-		params.threads = 32;
+		params.threads = 16;
 	else
-		params.threads = stoi(threads);
+	{
+		try {
+			params.threads = stoi(threads);
+		} catch (const std::invalid_argument&) {
+			std::cerr << "[SVARP CMDLINE ERROR] threads must be an integer: " << threads << std::endl;
+			return RETURN_ERROR;
+		}
+	}
+
+	// Validate input files exist
+	if (!std::filesystem::exists(params.gaf))
+	{
+		std::cerr << "[SVARP CMDLINE ERROR] GAF file not found: " << params.gaf << std::endl;
+		return RETURN_ERROR;
+	}
+
+	if (!std::filesystem::exists(params.ref_graph))
+	{
+		std::cerr << "[SVARP CMDLINE ERROR] GFA file not found: " << params.ref_graph << std::endl;
+		return RETURN_ERROR;
+	}
+
+	if (!std::filesystem::exists(params.fasta))
+	{
+		std::cerr << "[SVARP CMDLINE ERROR] FASTA file not found: " << params.fasta << std::endl;
+		return RETURN_ERROR;
+	}
 
 	return RETURN_SUCCESS;
 }
@@ -216,30 +278,25 @@ void init_logs(parameters& params)
 	if(std::filesystem::exists(params.log_path))
 		std::filesystem::remove_all(params.log_path);
   	
-	if (!std::filesystem::create_directory(params.log_path))
-	{
-		std::cerr << "Error creating log folder" << std::endl;
-		exit(-1);
-  	}
-	if (params.debug)
-	{
-  		if (!std::filesystem::create_directory(params.log_path + "in/"))
+	try {
+		if (!std::filesystem::create_directory(params.log_path))
+			error("Error creating log folder");
+  	
+		if (params.debug)
 		{
-			std::cerr << "Error creating log/in/" << std::endl;
-			exit(-1);
-  		}
-  		if (!std::filesystem::create_directory(params.log_path + "out/"))
-		{
-			std::cerr << "Error creating log/out/" << std::endl;
-			exit(-1);
-  		}
-	}
+  			if (!std::filesystem::create_directory(params.log_path + "in/"))
+				error("Error creating log/in/ directory");
+  		
+  			if (!std::filesystem::create_directory(params.log_path + "out/"))
+				error("Error creating log/out/ directory");
+		}
 	
-  	if (!std::filesystem::create_directory(params.log_path + "tmp/"))
-	{
-		std::cerr << "Error creating log/tmp/" << std::endl;
-		exit(-1);
-  	}
+  		if (!std::filesystem::create_directory(params.log_path + "tmp/"))
+			error("Error creating log/tmp/ directory");
+	} catch (const std::filesystem::filesystem_error& e) {
+		std::string msg = std::string("Error creating log directories: ") + e.what();
+		error(msg.c_str());
+	}
 	params.fp_logs.open(params.log_path + params.sample_name + ".log");
 		
 	params.remap_gaf_path = params.log_path + params.sample_name + "_remap.gaf";
@@ -251,10 +308,12 @@ void init_logs(parameters& params)
 	std::cout<<"\nLog folder:\n\t"<<params.log_path<<std::endl;
 
 	
-	params.fp_logs<<"\nParameters:\n\tMinimum read support: "<<params.support<<"\n\tMinimum distance threshold: "<< params.dist_threshold<<"\n\n";
-	params.fp_logs<<"\tMinimum map ratio: "<<params.min_map_ratio<<"\n\tPrecise clipping (Graphaligner): "<< params.min_precise_clipping<<"\n\tAlignment score (Graphaligner): "<< params.min_alignment_score<<"\n\n";
-	params.fp_logs<<"\nInput files:\n\t"<<params.gaf<<"\n\t"<< params.ref_graph<<"\n\t"<<params.fasta<<"\n";
-	params.fp_logs<<"\nLog folder:\n\t"<<params.log_path<<"\n\n";
+	if (params.fp_logs.is_open()) {
+		params.fp_logs << "\nParameters:\n\tMinimum read support: " << params.support << "\n\tMinimum distance threshold: " << params.dist_threshold << "\n\n";
+		params.fp_logs << "\tMinimum map ratio: " << params.min_map_ratio << "\n\tPrecise clipping (Graphaligner): " << params.min_precise_clipping << "\n\tAlignment score (Graphaligner): " << params.min_alignment_score << "\n\n";
+		params.fp_logs << "\nInput files:\n\t" << params.gaf << "\n\t" << params.ref_graph << "\n\t" << params.fasta << "\n";
+		params.fp_logs << "\nLog folder:\n\t" << params.log_path << "\n\n";
+	}
 }
 
 
@@ -262,6 +321,12 @@ void print_help()
 {
 	std::cerr << std::endl;
 	std::cout << "SVarp: pangenome-based structural variation discovery" << std::endl;
+#ifndef SVARP_VERSION
+#define SVARP_VERSION "unknown"
+#endif
+#ifndef SVARP_UPDATE
+#define SVARP_UPDATE "unknown"
+#endif
 	std::cout<< "\tVersion "<<SVARP_VERSION<<", Last update: "<<SVARP_UPDATE<<"\n";
 	std::cerr << std::endl;
 	std::cerr << "Required arguments"<<std::endl;

@@ -36,7 +36,7 @@ public:
 	gfaNode()
 	{
 	}
-	gfaNode(std::string _name, std::string _sequence, int _len, std::string _contig, int _offset)
+	gfaNode(const std::string& _name, const std::string& _sequence, int _len, const std::string& _contig, int _offset)
 	{
 		name = _name;
 		sequence = _sequence;

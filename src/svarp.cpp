@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <map>
 #include "cmdline.h"
 #include "reference.h"
@@ -6,7 +7,6 @@
 #include "phasing.h"
 #include "remap.h"
 #include "assembly.h"
-//#include "asm.h"
 
 
 int main(int argc, char** argv)
@@ -48,7 +48,7 @@ int main(int argc, char** argv)
 	filter_svtigs(params, gfa, svtigs);
 	std::cout<<"\nThank you for using SVarp... Tschüs, güle güle, adios, bye...\n" <<std::endl;
 	
-	params.fp_logs.close();
+	if (params.fp_logs.is_open()) params.fp_logs.close();
 
 	return RETURN_SUCCESS;
 }

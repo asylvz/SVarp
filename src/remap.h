@@ -2,9 +2,10 @@
 #define __REMAP
 
 #include <map>
-#include "reference.h"
 #include "common.h"
-#include "variant.h"
+#include "reference.h"
+
+class SVtig;
 
 
 typedef struct _read

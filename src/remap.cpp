@@ -8,10 +8,16 @@
 #include <chrono>
 #include <algorithm>
 #include <htslib/faidx.h>
+#include <sys/wait.h>
+#include <unistd.h>   // access, X_OK
+#include <cstdlib>
 #include "common.h"
 #include "remap.h"
 #include "alignment.h"
+#include "variant.h"
+#include "reference.h"
 #include "bindings/cpp/WFAligner.hpp"
+
 
 
 inline bool cmp(Read* i1, Read* i2)
@@ -40,7 +46,7 @@ int get_middle_string(std::string& s)
 }
 
 
-int write_final_svtigs_fasta(faidx_t*& fasta_index, std::string& svtig_name, int pos, std::string& contig, int coverage, std::ofstream& fp_write)
+int write_final_svtigs_fasta(faidx_t*& fasta_index, std::string& svtig_name, int pos, std::string& contig, int coverage, std::ostream& fp_write)
 {
 	
 	int loc_length;
@@ -129,8 +135,8 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 			}
 			else
 			{
-				std::map<std::string, SVtig*>::iterator it_svtigs = final_svtigs.find(r->rname);
-				if (it_svtigs != final_svtigs.end())
+				std::map<std::string, SVtig*>::iterator it_dup = final_svtigs.find(r->rname);
+				if (it_dup != final_svtigs.end())
 					it_svtigs->second->output = true;
 				else
 					std::cout<<"Error - SVtig= "<<r->rname<<" not found...\n";
@@ -168,23 +174,24 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 
 void wfa_align(std::map<std::string, gfaNode*>& gfa, std::string& cigar, std::string &query_name, int query_start, int query_end, std::string path, int gfa_start, int gfa_end, wfa::WFAlignerGapAffine &aligner, faidx_t*& fasta_index)
 {
-	int offset = 0;
 	std::string ref_tmp = "";
-	char *path_copy = strdup(path.c_str());
-	char *mytoken = strtok(path_copy,"><");
 	
-	while(mytoken) 
+	size_t p = 0;
+	while (p < path.size())
 	{
-		char strand = path[offset];
+		char strand = path[p];
+		++p;
+		size_t q = p;
+		while (q < path.size() && path[q] != '>' && path[q] != '<') ++q;
+		std::string node_name = path.substr(p, q - p);
+		p = q;
+		
 		if (strand == '>')
-			ref_tmp += gfa[mytoken]->sequence;
+			ref_tmp += gfa[node_name]->sequence;
 		else if (strand == '<')
-			ref_tmp += reverse_complement(gfa[mytoken]->sequence);
+			ref_tmp += reverse_complement(gfa[node_name]->sequence);
 		else
-			std::cout<<"Strand resolution issue in wfa_align()\n";		
-	
-		offset += strlen(mytoken) + 1;
-		mytoken = strtok(NULL, "><");
+			std::cout<<"Strand resolution issue in wfa_align()\n";
 	}
 	
 	std::string ref = ref_tmp.substr(gfa_start, gfa_end - gfa_start + 1);
@@ -340,7 +347,7 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 }
 
 
-int write_final_svtigs(parameters& params, std::string file_path, faidx_t*& fasta_index, std::map <std::string, SVtig*>& final_svtigs, std::string& out_file, std::string haplotype)
+int write_final_svtigs(faidx_t*& fasta_index, std::map <std::string, SVtig*>& final_svtigs, std::string& out_file, std::string haplotype)
 {
 	int cnt = 0;
 	std::map<std::string, SVtig*>::iterator itr;
@@ -385,10 +392,32 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 	std::string svtigs_tmp_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
 
 	std::cout<<"--->remapping svtigs onto the graph using Graphaligner"<<std::endl;			
+
+	// GraphAligner PATH'te mi?
+	std::string graphaligner_bin = find_executable("GraphAligner");
+	if (graphaligner_bin.empty())
+	{
+		std::string msg = "[filter_svtigs] GraphAligner not found in PATH. "
+		                  "Please install GraphAligner or add it to your PATH.";
+		if (params.fp_logs.is_open())
+			params.fp_logs << msg << std::endl;
+		error(msg.c_str());
+	}
+
+	// Komutu GraphAligner binary'si ile kur, stdout/stderr sessiz
+	std::string graphaligner_cmd =
+		graphaligner_bin +
+		" -g " + params.ref_graph +
+		" -f " + svtigs_tmp_path +
+		" -a " + params.remap_gaf_path +
+		" -t " + std::to_string(params.threads) +
+		" -x vg"
+		" --precise-clipping " + std::to_string(params.min_precise_clipping) +
+		" --min-alignment-score " + std::to_string(params.min_alignment_score) +
+		" --multimap-score-fraction 0.9"
+		" >/dev/null 2>&1";
 		
-	std::string graphaligner_cmd = "GraphAligner -g " + params.ref_graph + " -f " + svtigs_tmp_path + " -a " + params.remap_gaf_path + " -t " + std::to_string(params.threads) + " -x vg --precise-clipping " + std::to_string(params.min_precise_clipping) + " --min-alignment-score " + std::to_string(params.min_alignment_score) + " --multimap-score-fraction 0.9 > /dev/null 2>&1";
-		
-	system(graphaligner_cmd.c_str());
+	run_and_log(graphaligner_cmd, params, "GraphAligner", 2, 2, true);
 		
 	if (std::filesystem::is_empty(params.remap_gaf_path))
 	{
@@ -399,6 +428,8 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 	
 	std::string file_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
 	faidx_t* fasta_index = fai_load((file_path).c_str());
+	if (!fasta_index)
+		error("Error loading FASTA index for remapping: file not found or corrupted");
 
 	//Now the ones that we want to output have final_svtigs->output = true	
 	read_remappings(params, gfa, final_svtigs, fasta_index);	
@@ -407,22 +438,22 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 	if ((params.phase_tags).empty())
 	{
 		svtigs_path = params.log_path + params.sample_name + "_svtigs.fa";
-		int h1 = write_final_svtigs(params, file_path, fasta_index, final_svtigs, svtigs_path, "None");
+		int h1 = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "None");
 
 		std::cout<<"--->there are "<<h1<<" svtigs"<<"\n";
 	}
 	else
 	{
 		svtigs_path = params.log_path + params.sample_name + "_svtigs_H1.fa";
-		int h1 = write_final_svtigs(params, file_path, fasta_index, final_svtigs, svtigs_path, "H1");
+		int h1 = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "H1");
 
 		svtigs_path = params.log_path + params.sample_name + "_svtigs_H2.fa";
-		int h2 = write_final_svtigs(params, file_path, fasta_index, final_svtigs, svtigs_path, "H2");
+		int h2 = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "H2");
 		
 		if (!params.skip_untagged)	
 		{
 			svtigs_path = params.log_path + params.sample_name + "_svtigs_untagged.fa";
-			int untagged = write_final_svtigs(params, file_path, fasta_index, final_svtigs, svtigs_path, "None");
+			int untagged = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "None");
 			
 			std::cout<<"--->there are "<<h1<<" haplotype 1, " <<h2<<" haplotype 2 and "<<untagged<<" untagged svtigs"<<"\n";
 		}

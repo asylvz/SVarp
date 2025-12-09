@@ -2,8 +2,9 @@
 #define __PHASING
 
 #include <map>
-#include "common.h" 
-#include "variant.h"
+#include "common.h"
+
+class SVCluster;
 
 typedef struct _phase
 {

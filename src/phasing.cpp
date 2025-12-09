@@ -4,6 +4,7 @@
 #include <sstream>
 #include <vector>
 #include "phasing.h"
+#include "variant.h"
 
 
 int read_phase_file(parameters& params, std::map<std::string, phase*>& phased_reads)
