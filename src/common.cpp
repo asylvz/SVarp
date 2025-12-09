@@ -10,6 +10,7 @@
 #include <sstream>
 #include "common.h"
 #include <filesystem>
+#include <unistd.h>
 
 
 //Returns a vector of incoming or outgoing nodes based on the input map object
