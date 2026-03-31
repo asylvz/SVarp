@@ -4,12 +4,11 @@ SVARP_DEBUG   := 0
 BUILD_DATE    := "$(shell date)"
 
 # ================================================================
-# Mode switch (bare-metal vs conda-build)
-#   USE_CONDA = 0  -> HTSLIB + WFA2 + WTDBG2 + (optional) minimap2 local build (dep/)
-#                     -> No dependency is built automatically; use 'make libs'.
-#   USE_CONDA = 1  -> HTSLIB (and other libs) from conda,
-#                     WFA2 local build (dep/), WTDBG2 expected in PATH
-#                     -> 'make' only builds WFA2 via libs target.
+# Build mode
+#   USE_CONDA = 0  (default) Build all dependencies from source under dep/.
+#                   Run 'make libs' first, then 'make'.
+#   USE_CONDA = 1  Use htslib and tools from the conda environment.
+#                   Only WFA2 is built locally; 'make' handles it automatically.
 # ================================================================
 USE_CONDA ?= 0
 
@@ -26,7 +25,7 @@ WFA_LIB      := $(WFA_DIR)/lib/libwfacpp.a
 WTDBG2_DIR   := $(DEP_DIR)/wtdbg2
 WTDBG2_BIN   := $(WTDBG2_DIR)/wtdbg2
 
-# minimap2 (bare-metal: built under dep/; conda: provided by the environment)
+# minimap2 (from source: built under dep/; conda: provided by the environment)
 MINIMAP2_DIR := $(DEP_DIR)/minimap2
 MINIMAP2_BIN := $(MINIMAP2_DIR)/minimap2
 
@@ -59,14 +58,12 @@ endif
 LDFLAGS ?=
 
 # ------------------------------------------------
-# Include / link flags (conda vs bare-metal)
+# Include / link paths
 # ------------------------------------------------
 ifeq ($(USE_CONDA),1)
-    # conda build: htslib / zlib / minimap2 etc. from PREFIX
     CXXFLAGS += -I$(PREFIX)/include -I$(PREFIX)/include/htslib -I$(DEP_DIR)/wfa
     LDFLAGS  += -L$(PREFIX)/lib -lhts -lz -lpthread $(WFA_LIB)
 else
-    # bare-metal: htslib and WFA2 built from dep/
     CXXFLAGS += -I$(HTSLIB_DIR) -I$(DEP_DIR)/wfa
     LDFLAGS  += $(HTSLIB_LIB) $(WFA_LIB) -lz -lpthread
 endif
@@ -181,10 +178,8 @@ $(BUILD_DIR)/%.o: %.cpp
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-# ------------------------------------------------
-# In conda mode: ensure libs are built before objects
-# In bare-metal mode: user must run 'make libs' manually
-# ------------------------------------------------
+# In conda mode, libs are built automatically before objects.
+# Otherwise, run 'make libs' manually first.
 ifeq ($(USE_CONDA),1)
 $(OBJS): | libs
 endif
@@ -219,18 +214,18 @@ post-build:
 # libs target
 # ================================================================
 ifeq ($(USE_CONDA),1)
-# conda: only WFA2 built under dep/; htslib, wtdbg2, minimap2 from conda env
+# Conda: only WFA2 is built locally
 libs: $(WFA_LIB)
 	@echo "Using conda HTSLIB (libhts); WFA2 built under dep/."
 	@echo "NOTE: wtdbg2 and minimap2 must be installed in the conda environment (e.g. conda install -c bioconda wtdbg2 minimap2)."
 else
-# bare-metal: all dependencies built via make libs
+# From source: all dependencies built locally
 libs: $(HTSLIB_LIB) $(WFA_LIB) $(WTDBG2_BIN) $(MINIMAP2_BIN)
 	@echo "Built HTSLIB, WFA2, wtdbg2 and minimap2 under dep/"
 endif
 
 # ================================================================
-# HTSLIB (bare-metal only)
+# HTSLIB
 # ================================================================
 $(HTSLIB_LIB): $(HTSLIB_TARBALL)
 	mkdir -p $(HTSLIB_DIR)
@@ -247,6 +242,10 @@ $(HTSLIB_TARBALL):
 $(WFA_LIB): $(WFA_TARBALL)
 	mkdir -p $(WFA_DIR)
 	tar -xzf $(WFA_TARBALL) -C $(WFA_DIR) --strip-components=1
+ifeq ($(shell uname -s),Darwin)
+	@echo "Patching WFA2 endian.h for macOS..."
+	find $(WFA_DIR) -name '*.c' -o -name '*.h' | xargs sed -i '' 's|#include <endian.h>|#ifdef __APPLE__\n#include <machine/endian.h>\n#else\n#include <endian.h>\n#endif|g'
+endif
 	cd $(WFA_DIR) && BUILD_TOOLS=0 BUILD_EXAMPLES=0 $(MAKE) -j1 clean setup lib_wfa
 
 $(WFA_TARBALL):
@@ -254,7 +253,7 @@ $(WFA_TARBALL):
 	wget https://github.com/smarco/WFA2-lib/archive/refs/tags/v$(WFA_VERSION).tar.gz -O $(WFA_TARBALL)
 
 # ================================================================
-# minimap2 (bare-metal: built under dep/ if not found in PATH)
+# minimap2 (skipped if already in PATH)
 # ================================================================
 $(MINIMAP2_BIN):
 	mkdir -p $(DEP_DIR)
