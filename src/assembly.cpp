@@ -161,7 +161,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     int var_size = 4;
 
     // wtdbg2 -> wtpoa-cns (raw) -> minimap2 | samtools sort -> wtpoa-cns (polish)
-    std::vector<std::string> extra_dirs = {"dep/wtdbg2"};
+    std::vector<std::string> extra_dirs = {"third_party/wtdbg2", "dep/wtdbg2"};
 
     std::string wtdbg2_bin = find_executable("wtdbg2");
     if (wtdbg2_bin.empty())

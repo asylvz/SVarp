@@ -22,7 +22,7 @@ HTSLIB_DIR   := $(DEP_DIR)/htslib
 WFA_DIR      := $(DEP_DIR)/wfa
 WFA_LIB      := $(WFA_DIR)/lib/libwfacpp.a
 
-WTDBG2_DIR   := $(DEP_DIR)/wtdbg2
+WTDBG2_DIR   := third_party/wtdbg2
 WTDBG2_BIN   := $(WTDBG2_DIR)/wtdbg2
 
 # minimap2 (from source: built under dep/; conda: provided by the environment)
@@ -62,7 +62,7 @@ LDFLAGS ?=
 # ------------------------------------------------
 ifeq ($(USE_CONDA),1)
     CXXFLAGS += -I$(PREFIX)/include -I$(PREFIX)/include/htslib -I$(DEP_DIR)/wfa
-    LDFLAGS  += -L$(PREFIX)/lib -lhts -lz -lpthread $(WFA_LIB)
+    LDFLAGS  += -L$(PREFIX)/lib -Wl,-rpath,$(PREFIX)/lib -lhts -lz -lpthread $(WFA_LIB)
 else
     CXXFLAGS += -I$(HTSLIB_DIR) -I$(DEP_DIR)/wfa
     LDFLAGS  += $(HTSLIB_LIB) $(WFA_LIB) -lz -lpthread
@@ -214,10 +214,10 @@ post-build:
 # libs target
 # ================================================================
 ifeq ($(USE_CONDA),1)
-# Conda: only WFA2 is built locally
-libs: $(WFA_LIB)
-	@echo "Using conda HTSLIB (libhts); WFA2 built under dep/."
-	@echo "NOTE: wtdbg2 and minimap2 must be installed in the conda environment (e.g. conda install -c bioconda wtdbg2 minimap2)."
+# Conda: WFA2 and wtdbg2 built locally; htslib and minimap2 from conda
+libs: $(WFA_LIB) $(WTDBG2_BIN)
+	@echo "Using conda htslib; WFA2 and wtdbg2 built locally."
+	@echo "NOTE: minimap2 and samtools must be available in the conda environment."
 else
 # From source: all dependencies built locally
 libs: $(HTSLIB_LIB) $(WFA_LIB) $(WTDBG2_BIN) $(MINIMAP2_BIN)
@@ -266,11 +266,12 @@ $(MINIMAP2_BIN):
 	fi
 
 # ================================================================
-# wtdbg2 (built under dep/)
+# wtdbg2 (bundled in third_party/, requires gcc on macOS)
 # ================================================================
-ifeq ($(USE_CONDA),0)
-$(WTDBG2_BIN):
-	mkdir -p $(DEP_DIR)
-	test -d $(WTDBG2_DIR) || git clone https://github.com/ruanjue/wtdbg2 $(WTDBG2_DIR)
-	cd $(WTDBG2_DIR) && $(MAKE)
+WTDBG2_CC := $(CC)
+ifeq ($(shell uname -s),Darwin)
+  WTDBG2_CC := $(shell command -v gcc-15 2>/dev/null || command -v gcc-14 2>/dev/null || command -v gcc-13 2>/dev/null || echo gcc)
 endif
+
+$(WTDBG2_BIN):
+	cd $(WTDBG2_DIR) && $(MAKE) CC=$(WTDBG2_CC)

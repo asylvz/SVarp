@@ -1,0 +1,9 @@
+*.o
+*.a
+.*.swp
+*.dSYM
+kbm2
+wtdbg2
+wtdbg-cns
+wtpoa-cns
+pgzf
