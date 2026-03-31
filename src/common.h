@@ -13,7 +13,6 @@
 #define RETURN_SUCCESS 0
 #define RETURN_ERROR -1
 
-#define HASHSIZE 1001
 #define MINSVSIZE 50
 
 #define MINMAPQ 5
@@ -22,6 +21,7 @@
 #define MAX_FETCH_LEN 1000000
 #define MIN_READ_START_END_WINDOW 200
 #define MAX_CONTIG_DEPTH 100 //>100X coverage for a contig is unexpected (e.g., MT)
+#define MIN_DUP_OVERLAP 0.9
 
 #define BUFLEN 262144 //2^18
 #define DELETION 'D'
@@ -126,12 +126,7 @@ public:
 	}
 
 };
-// External global logFile symbol is unused in the repo; remove to avoid exposing implementation details
-// extern std::ofstream logFile; //Defined in svarp.c
 
-unsigned hash(char *s);
-void init_params(parameters** params);
-void set_str(char **target, char *source);
 int decompose_cigars(const std::string& cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp);
 std::string exec(const std::string& command, bool return_out); 
 void error(const char* const msg);
@@ -141,5 +136,4 @@ int run_and_log(const std::string& cmd, parameters& params, const std::string& l
 std::string find_executable(const std::string &progname, const std::vector<std::string> &extra_dirs = {});
 
 std::string& reverse_complement(std::string& seq);
-const std::vector<std::string>& find_prev_next_nodes(std::map <std::string, std::vector<std::string>> inout_nodes, std::string node);
 #endif

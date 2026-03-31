@@ -96,12 +96,12 @@ int find_var(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode
 		if (cigarOp[c] == INSERTION && cigarLen[c] >= MINSVSIZE)
 		{
 			if (add_variant(gfa, vars, line, base_pos, INSERTION, cigarLen[c]) == RETURN_ERROR)
-				std::cout<<"RETURNED NULL\n";
+				std::cerr<<"RETURNED NULL\n";
 		}
 		else if (cigarOp[c] == DELETION && cigarLen[c] >= MINSVSIZE)
 		{
 			if (add_variant(gfa, vars, line, base_pos, DELETION, cigarLen[c]) == RETURN_ERROR)
-				std::cout<<"RETURNED NULL\n";
+				std::cerr<<"RETURNED NULL\n";
 		}
 
 		if (cigarOp[c] != 'I')
@@ -130,14 +130,21 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 	while(1)
 	{
 		int err, len = sizeof(buffer) - (offset - buffer);
-		if (len == 0) 
+		if (len == 0)
+		{
+			gzclose(myfile);
 			error("Error: Buffer too small");
+		}
 
 		len	= gzread(myfile, offset, len);
-		if (len == 0) 
-			break;   
-    	if (len < 0) 
-			error(gzerror(myfile, &err));
+		if (len == 0)
+			break;
+    	if (len < 0)
+		{
+			const char* msg = gzerror(myfile, &err);
+			gzclose(myfile);
+			error(msg);
+		}
 		
 		char* cur = buffer;
     	char* end = offset + len;	
@@ -169,18 +176,11 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
     	offset = std::copy(cur, end, buffer);
 	}
 
-	int cnt_multiple = 0, cnt_single = 0;	
 	for (it=read_freq_tmp.begin(); it != read_freq_tmp.end(); ++it)
 	{
 		if (it->second > 1)
-		{
-			cnt_multiple++;
 			read_freq.insert(std::pair<std::string, int>(it->first, it->second));
-		}
-		else
-			cnt_single++;
 	}
-	//std::cout<<"Single: "<<cnt_single<<" Multiple: "<<cnt_multiple<<"\n";
 	read_freq_tmp.clear();
 
 	int line_count = 0;
@@ -194,16 +194,22 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 	while(1)
 	{
 		int err, len = sizeof(buffer) - (offset - buffer);
-		if (len == 0) 
+		if (len == 0)
 		{
 			std::cout<<"Line = "<< line_count<<"\n";
+			gzclose(myfile);
 			error("Error: Buffer too small");
 		}
 
 		len	= gzread(myfile, offset, len);
 
-		if (len == 0) break;   
-    	if (len < 0) error(gzerror(myfile, &err));
+		if (len == 0) break;
+    	if (len < 0)
+		{
+			const char* msg = gzerror(myfile, &err);
+			gzclose(myfile);
+			error(msg);
+		}
 		
 		char* cur = buffer;
     	char* end = offset + len;	
@@ -284,25 +290,13 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 				read_freq_tmp.insert(std::pair<std::string, int>(g.query_name, 1));
 		}
 		
-        int cnt_multiple = 0, cnt_single = 0;	
 		for (it=read_freq_tmp.begin(); it != read_freq_tmp.end(); ++it)
 		{
 			if (it->second > 1)
-			{
-				cnt_multiple++;
 				read_freq.insert(std::pair<std::string, int>(it->first, it->second));
-			}
-			else
-				cnt_single++;
-
 		}
 		read_freq_tmp.clear();
 
-		/*for (it=read_freq.begin(); it != read_freq.end(); ++it)
-			std::cout<<it->first<<"\t"<<it->second<<"\n";	
-		
-		std::cout<<"Single: "<<cnt_single<<" Multiple: "<<cnt_multiple<<"\n";
-		*/
 		int line_count = 0;
 
 		fp.clear() ; // clear the failed state of the stream
@@ -321,22 +315,7 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 				break;
 		}
 
-        //std::cout<<"Line count: "<<line_count<<"\n";
-	}	
-	
-	/*for (auto &a: vars)
-	
-		if (a.second->type == INTRA && a.second->sv_type == DELETION)
-			std::cout<<"INTRAA DEL -----------"<<a.second->contig<<"\t"<<a.second->pos_in_ref<<"\t"<<a.second->sv_size<<"\t"<<a.second->reads_untagged.size()<<"\n";
-		else if (a.second->type == INTRA && a.second->sv_type == INSERTION)
-			std::cout<<"INTRAA INS -----------"<<a.second->contig<<"\t"<<a.second->pos_in_ref<<"\t"<<a.second->sv_size<<"\t"<<a.second->reads_untagged.size()<<"\n";
-		else if (a.second->reads_untagged.size() > 1 && a.second->type == INTER)
-		{
-			std::cout<<"INTER -------------"<<a.first<<"\n"<< a.second->reads_untagged.size()<<"\n\n";
-			for(auto &b: a.second->reads_untagged)
-				std::cout<<b<<"\n";
-		}
-	}*/
+	}
 	auto t2 = std::chrono::steady_clock::now();
 
 	std::cout<<"--->execution time: "<<std::chrono::duration<double> (t2 - t1).count()<<"sec.\n";
@@ -353,7 +332,7 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 	if (params.fp_logs.is_open()) { params.fp_logs << "------->Contig coverage\n\n"; }
 	for (it2=ref.begin(); it2 != ref.end(); ++it2)
 	{
-		it2->second->coverage = (double) it2->second->mapped_bases / it2->second->contig_length;	
+		it2->second->coverage = (it2->second->contig_length > 0) ? (double) it2->second->mapped_bases / it2->second->contig_length : 0.0;
 		if (params.fp_logs.is_open()) { params.fp_logs << it2->first << "---> LEN= " << it2->second->contig_length << " - Mapped bases= " << it2->second->mapped_bases << " - Mapped reads= " << it2->second->mapped_reads << " - Cov= " << it2->second->coverage << std::endl; }
 	}			
 	

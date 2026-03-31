@@ -5,11 +5,11 @@ BUILD_DATE    := "$(shell date)"
 
 # ================================================================
 # Mode switch (bare-metal vs conda-build)
-#   USE_CONDA = 0  -> HTSLIB + WFA2 + WTDGB2 + (opsiyonel) minimap2 local build (dep/)
-#                     -> Hiçbir dependency otomatik kurulmaz, hepsi 'make libs' ile.
-#   USE_CONDA = 1  -> HTSLIB (ve diğer kütüphaneler) conda'dan,
-#                     WFA2 local build (dep/), WTDGB2 ise ortamdan (PATH) beklenir
-#                     -> 'make' çağrıldığında sadece WFA2 için libs çalışır.
+#   USE_CONDA = 0  -> HTSLIB + WFA2 + WTDBG2 + (optional) minimap2 local build (dep/)
+#                     -> No dependency is built automatically; use 'make libs'.
+#   USE_CONDA = 1  -> HTSLIB (and other libs) from conda,
+#                     WFA2 local build (dep/), WTDBG2 expected in PATH
+#                     -> 'make' only builds WFA2 via libs target.
 # ================================================================
 USE_CONDA ?= 0
 
@@ -26,7 +26,7 @@ WFA_LIB      := $(WFA_DIR)/lib/libwfacpp.a
 WTDBG2_DIR   := $(DEP_DIR)/wtdbg2
 WTDBG2_BIN   := $(WTDBG2_DIR)/wtdbg2
 
-# minimap2 (bare-metal'de dep/ altına kuracağız; conda modunda conda'dan gelir)
+# minimap2 (bare-metal: built under dep/; conda: provided by the environment)
 MINIMAP2_DIR := $(DEP_DIR)/minimap2
 MINIMAP2_BIN := $(MINIMAP2_DIR)/minimap2
 
@@ -48,14 +48,12 @@ CXXFLAGS += -Wall -std=c++17 \
            -DSVARP_VERSION=\"$(SVARP_VERSION)\" \
            -DBUILD_DATE=\"$(BUILD_DATE)\" \
            -DSVARP_UPDATE=\"$(SVARP_UPDATE)\" \
-           -DSVAPR_DEBUG=$(SVARP_DEBUG)
+           -DSVARP_DEBUG=$(SVARP_DEBUG)
 
 ifeq ($(BUILD),debug)
     CXXFLAGS += -O0 -g
 else
-    ifneq ($(USE_CONDA),1)
-        CXXFLAGS += -O3 -DNDEBUG
-    endif
+    CXXFLAGS += -O3 -DNDEBUG
 endif
 
 LDFLAGS ?=
@@ -64,16 +62,16 @@ LDFLAGS ?=
 # Include / link flags (conda vs bare-metal)
 # ------------------------------------------------
 ifeq ($(USE_CONDA),1)
-    # conda build ortamı: htslib / zlib / minimap2 vs PREFIX altında
+    # conda build: htslib / zlib / minimap2 etc. from PREFIX
     CXXFLAGS += -I$(PREFIX)/include -I$(PREFIX)/include/htslib -I$(DEP_DIR)/wfa
     LDFLAGS  += -L$(PREFIX)/lib -lhts -lz -lpthread $(WFA_LIB)
 else
-    # lokal derleme: htslib ve WFA2'yi dep/ altından derle (veya kullanıcı kendisi ayarlasın)
+    # bare-metal: htslib and WFA2 built from dep/
     CXXFLAGS += -I$(HTSLIB_DIR) -I$(DEP_DIR)/wfa
     LDFLAGS  += $(HTSLIB_LIB) $(WFA_LIB) -lz -lpthread
 endif
 
-# Kaynak ve obje dosyaları
+# Sources and objects
 SRCS := $(shell find $(SRC_DIRS) -name '*.cpp')
 OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 
@@ -174,18 +172,18 @@ build/test_alignment_read_gz: tests/alignment_read_gz_test.cpp src/alignment.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/alignment.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/alignment_read_gz_test.cpp -o $@ $(LDFLAGS)
 
 
-# Asıl binary
+# Main binary
 $(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
 	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
 
-# Obje derleme kuralı
+# Object compilation rule
 $(BUILD_DIR)/%.o: %.cpp
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
 # ------------------------------------------------
-# Conda build'de: objelerden önce libs çalışsın
-# Bare metal'de: libs otomatik çağrılmasın (kullanıcı make libs desin)
+# In conda mode: ensure libs are built before objects
+# In bare-metal mode: user must run 'make libs' manually
 # ------------------------------------------------
 ifeq ($(USE_CONDA),1)
 $(OBJS): | libs
@@ -221,12 +219,12 @@ post-build:
 # libs target
 # ================================================================
 ifeq ($(USE_CONDA),1)
-# conda build'de: sadece WFA2 dep/ altına; htslib, wtdbg2, minimap2 conda env'den
+# conda: only WFA2 built under dep/; htslib, wtdbg2, minimap2 from conda env
 libs: $(WFA_LIB)
 	@echo "Using conda HTSLIB (libhts); WFA2 built under dep/."
 	@echo "NOTE: wtdbg2 and minimap2 must be installed in the conda environment (e.g. conda install -c bioconda wtdbg2 minimap2)."
 else
-# bare-metal: tüm dependency'ler sadece make libs ile
+# bare-metal: all dependencies built via make libs
 libs: $(HTSLIB_LIB) $(WFA_LIB) $(WTDBG2_BIN) $(MINIMAP2_BIN)
 	@echo "Built HTSLIB, WFA2, wtdbg2 and minimap2 under dep/"
 endif
@@ -244,7 +242,7 @@ $(HTSLIB_TARBALL):
 	wget https://github.com/samtools/htslib/releases/download/$(HTSLIB_VERSION)/htslib-$(HTSLIB_VERSION).tar.bz2 -O $(HTSLIB_TARBALL)
 
 # ================================================================
-# WFA2-lib (her iki modda da dep/ altına)
+# WFA2-lib (built under dep/ in both modes)
 # ================================================================
 $(WFA_LIB): $(WFA_TARBALL)
 	mkdir -p $(WFA_DIR)
@@ -256,7 +254,7 @@ $(WFA_TARBALL):
 	wget https://github.com/smarco/WFA2-lib/archive/refs/tags/v$(WFA_VERSION).tar.gz -O $(WFA_TARBALL)
 
 # ================================================================
-# minimap2 (bare-metal: dep/ altına, PATH'te yoksa)
+# minimap2 (bare-metal: built under dep/ if not found in PATH)
 # ================================================================
 $(MINIMAP2_BIN):
 	mkdir -p $(DEP_DIR)
@@ -269,7 +267,7 @@ $(MINIMAP2_BIN):
 	fi
 
 # ================================================================
-# wtdbg2 (dep/ altına, conda'da CC/LDFLAGS override ile)
+# wtdbg2 (built under dep/)
 # ================================================================
 ifeq ($(USE_CONDA),0)
 $(WTDBG2_BIN):

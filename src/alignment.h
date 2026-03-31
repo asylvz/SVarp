@@ -5,7 +5,6 @@
 #include <map>
 #include "common.h"
 #include "reference.h"
-// Forward declare Variant only - Contig and gfaNode are defined in reference.h
 class Variant;
 
 

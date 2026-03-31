@@ -24,7 +24,9 @@ int arrange_variants(std::map<std::string, Variant*>& vars, std::map<std::string
 	for (itr=vars.begin(); itr != vars.end(); ++itr)
 	{
 		//std::cout<<itr->first<<"\n";
-		int pos = (itr->first).find(':');
+		auto pos = (itr->first).find(':');
+		if (pos == std::string::npos)
+			continue;
 		std::string node_name = itr->first.substr(0, pos);
 
 		it = vars_by_node.find(node_name);
@@ -42,29 +44,19 @@ int arrange_variants(std::map<std::string, Variant*>& vars, std::map<std::string
 	for (it=vars_by_node.begin(); it != vars_by_node.end(); ++it)
 		std::sort((it->second).begin(), (it->second).end(), cmp);
 	
-	/*int cnt = 0;
-	for (it=vars_by_node.begin(); it != vars_by_node.end(); ++it)
-	{
-		cnt++;
-		if (it->first == "s105205" || it->first == "s105207")
-		{
-			std::cout<<"\n\n"<<it->first<<"("<<cnt<<")\n";
-			for (auto &sv : it->second) 
-				std::cout<<sv->pos_in_node<<"\t";
-		}
-	}*/
-	//exit(1);
-	
 	return RETURN_SUCCESS;
 }
 
 
 int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<Variant*>>::iterator& vars_by_node ,std::vector<SVCluster*>& var_vector)
 {
+	if (gfa.count(vars_by_node->first) == 0)
+		return RETURN_ERROR;
+
 	SVCluster* svtig_tmp = nullptr;
 	int start_pos = -1000;
 	bool first = true;
-	
+
 	std::set <std::string> sets_intersect;
 
 	for (auto &sv : vars_by_node->second) 
@@ -152,7 +144,9 @@ int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gf
 					if(it_neighbors != init_svtigs.end())
 					{
 						SVCluster* svtig_incoming = it_neighbors->second.back();
-						
+
+						if (gfa.count(incoming_node) == 0)
+							continue;
 						int node_len = gfa[incoming_node]->len;
 						if ((node_len - svtig_incoming->start_pos + svtig_front->start_pos) < params.dist_threshold)
 						{
@@ -170,39 +164,6 @@ int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gf
 		//Omitted this because if there is an incoming svtig X to Y, we don't need to check Y to Z because when we process Z, we still merge Y with Z
 		//Only missing check is the first and last nodes. To be added...
 
-		/*
-		int node_len = gfa[nd.first]->len;
-		if (svtig_back->start_pos > node_len - MIN_SV_DISTANCE)
-		{
-			it_nodes = outgoing.find(nd.first);
-			if (it_nodes != outgoing.end())
-			{
-				for(auto &outgoing_node: it_nodes->second)
-				{
-					it_neighbors = init_svtigs.find(outgoing_node);
-					if(it_neighbors != init_svtigs.end())
-					{
-						SVCluster* svtig_outgoing = it_neighbors->second.front();
-						//If we added the reads of this svtig to the next one in the above step, skip.
-						if (svtig_outgoing->filter == true)
-							continue;
-					
-						if ((node_len + svtig_outgoing->start_pos - svtig_back->start_pos) < MIN_SV_DISTANCE)
-						{
-							(svtig_back->reads_untagged).insert((svtig_outgoing->reads_untagged).begin(), (svtig_outgoing->reads_untagged).end());	
-							std::string svtig_added = outgoing_node + ":" + std::to_string(svtig_outgoing->start_pos);
-							std::string svtig_name = nd.first + ":" + std::to_string(svtig_back->start_pos);
-							svtig_front->name = svtig_name;
-							svtig_outgoing->filter = true;
-							//std::cout<<"(BACK) Adding "<<svtig_added<< " to "<< svtig_name<<" (node-len = "<<node_len<<")\n";
-							//std::cout<<"Adding "<< svtig_outgoing->reads_h1.size() <<" reads to "<< svtig_back->reads_h1.size() <<"\n\n";
-							std::cout<<"(BACK) Adding "<<svtig_outgoing->start_pos <<" (node-len = "<<node_len<< ") to "<< svtig_name<<"\n";
-							std::cout<<"Adding "<< svtig_outgoing->reads_untagged.size() <<" reads to "<< svtig_back->reads_untagged.size() <<"\n\n";
-						}
-					}
-				}
-			}
-		}*/
 	}
 
 	return RETURN_SUCCESS;
@@ -276,27 +237,6 @@ int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map
 	merge_neighbor_nodes(params, gfa, init_svtigs, incoming, outgoing);
 	find_final_svtigs(params, init_svtigs, final_svtigs, svtig_cnt_rp_filtered);
 		
-	/*for(auto &a: final_svtigs)
-	{
-		//if (a.first == "s105205" || a.first == "s105207")
-		//{
-			//std::cout<<a.first<<" "<< "--->\n";
-			for (auto &tmp: a.second)
-				std::cout<<tmp->node<< " " <<tmp->start_pos << "\t"<<tmp->reads_untagged.size() <<"\t"<< tmp->contig<<"\n";
-			std::cout<<"\n";
-		//}
-	}*/
-
-	/*for(auto &a: final_svtigs)
-	{
-		for (auto &tmp: a.second)
-			if(tmp->reads_untagged.size() > 10)
-			{
-				std::cout<<tmp->node<< " " <<tmp->start_pos << "\t"<<tmp->reads_untagged.size() <<"\t"<< tmp->contig<<"\n";
-				poa(tmp->reads_untagged);
-			}
-	}
-	*/
 	std::cout<<"--->"<<svtig_cnt<<" read clusters (putative svtigs) after merging and\n";
 	std::cout<<"--->"<<svtig_cnt_rp_filtered<<" read clusters after filtering based on minimum read support\n\n";
 
@@ -307,12 +247,11 @@ int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map
 int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<std::string, Variant*>& variations_inter)
 {
 	bool skip_start = false, skip_end = false;
-	// parse path string safely: path format uses '>' or '<' before each node name
 	const std::string &path = line.path;
 	int inserted_var_cnt = 0;
 
 	// breakpoint1 is the position of the reads starting at that loci
-	int node_count = 0, offset = 0, br1_start = -1, br2_end = -1, node_map_size = 0;
+	int node_count = 0, br1_start = -1, br2_end = -1, node_map_size = 0;
 	
 	
 	if (line.query_start < MIN_READ_START_END_WINDOW)
@@ -335,8 +274,10 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 		current_node = path.substr(p, q - p);
 		p = q;
 		node_count++;
-		offset += static_cast<int>(current_node.size()) + 1;
-		
+
+		if (gfa.count(current_node) == 0)
+			continue;
+
 		if ((node_count == 1) && (p == path.size())) //means there is only a single node
 		{
 			if (!skip_start)
@@ -404,20 +345,15 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 			v->type = INTER;
 			variations_inter.insert(std::pair<std::string, Variant*>(var_name, v));
 			inserted_var_cnt++;
-			/*if(line.query_name =="1ba13b99-0167-4631-80c9-59bd7c8945fa")
-			{
-				std::cout<<"HEREEE\n";
-				std::cout<<v->contig<<" - "<< v->pos_in_ref<<" - "<<v->node <<"\n";
-			}*/
 		}
 
 	}
 	if (!skip_end)
 	{
 		std::string var_name = end_node + ":" + std::to_string(br2_end);
-		
+
 		std::map<std::string, Variant*>::iterator it = variations_inter.find(var_name);
-						
+
 		if (it != variations_inter.end())
 			it->second->reads_untagged.insert(line.query_name);
 		else
@@ -429,18 +365,12 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 			v->contig = gfa[end_node]->contig;
 			v->node = end_node;
 			v->pos_in_ref = gfa[v->node]->offset + v->pos_in_node;
-			v->type = INTER;	
+			v->type = INTER;
 			variations_inter.insert(std::pair<std::string, Variant*>(var_name, v));
 			inserted_var_cnt++;
-			/*if(line.query_name =="1ba13b99-0167-4631-80c9-59bd7c8945fa")
-			{
-				std::cout<<"HEREEE\n";
-				std::cout<<v->contig<<" - "<< v->pos_in_ref<<" - "<<v->node <<"\n";
-			}*/
 		}
 	}
 
-	// nothing to free (no strdup)
 	return inserted_var_cnt;
 }
 
@@ -452,13 +382,12 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 	const std::string &path = line.path;
     
 	int path_start = line.path_start;
-	int offset = 0, node_count = 0, total_so_far = 0, node_map_size = 0;
+	int node_count = 0, total_so_far = 0, node_map_size = 0;
 	v->phased = false;
 	v->type = INTRA; 
 	int pos_in_cigar = base_pos;
 	bool del_incomplete = false;
 
-	// iterate through path string safely
 	size_t p = 0;
 	while (p < path.size()) 
 	{
@@ -469,7 +398,9 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 		v->node = path.substr(p, q - p);
 		p = q;
 		node_count++;
-		offset += static_cast<int>(v->node.size()) + 1;
+
+		if (gfa.count(v->node) == 0)
+			continue;
 
 		if ((node_count == 1) && (p == path.size())) //means there is only a single node
 		{
@@ -498,7 +429,6 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 				v->pos_in_node_end = v->pos_in_node + var_len;
 				v->sv_type = DELETION;			 
 			}
-			// nothing to free
 			return v;	
 		}
 		else if((node_count == 1) && (p < path.size())) //First node
@@ -521,7 +451,7 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 				
 				if (v->pos_in_node < 0)
 				{
-					std::cout<<"ERROR (first node) in addition of SV signal loci "<<v->node <<"\n";
+					std::cerr<<"ERROR (first node) in addition of SV signal loci "<<v->node <<"\n";
 					std::cout<<"v->pos_in_node = "<< v->pos_in_node<< " node len = "<<gfa[v->node]->len << " path_start = "<<path_start<< " pos_in_cigar = "<<pos_in_cigar<<" var_len = "<<var_len<<" sv_type = "<<sv_type<< " pos_in_node = "<<pos_in_node <<"\n";
 					std::cout <<line.path<<"\t" <<line.path_length<<"\t"<<line.path_start<<"\t"<<line.path_end<<"\n";
 				}
@@ -540,8 +470,7 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 					v->sv_type = DELETION;			 
 				}
 
-				// nothing to free
-				return v;	
+					return v;	
 			}
 			else
 			{	
@@ -573,7 +502,7 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 				}
 				if (v->pos_in_node < 0)
 				{
-					std::cout<<"ERROR (last node) in addition of SV signal loci "<<v->node <<"\n";
+					std::cerr<<"ERROR (last node) in addition of SV signal loci "<<v->node <<"\n";
 					std::cout<<"v->pos_in_node = "<< v->pos_in_node<< "node len = "<<gfa[v->node]->len << " path_start = "<<path_start<< " pos_in_cigar = "<<pos_in_cigar<<" var_len = "<<var_len<<" sv_type = "<<sv_type<< " pos_in_node = "<<pos_in_node <<"\n";
 					std::cout <<line.path<<"\t" <<line.path_length<<"\t"<<line.path_start<<"\t"<<line.path_end<<"\n";
 				}
@@ -592,8 +521,7 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 					v->sv_type = DELETION;			 
 				}
 
-				// nothing to free
-				return v;	
+					return v;	
 			}
 			else
 				std::cout<<"Size problem in adding SV"<<std::endl;
@@ -642,8 +570,7 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 					v->sv_type = DELETION;			 
 				}
 
-				// nothing to free
-				return v;    
+					return v;    
 			}
 		 	else
 			{
@@ -657,7 +584,7 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 		}
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 

@@ -53,8 +53,11 @@ int write_final_svtigs_fasta(faidx_t*& fasta_index, std::string& svtig_name, int
 	std::string line;	
 	const size_t line_len = 60;
 
-	std::string seq = faidx_fetch_seq(fasta_index, svtig_name.c_str(), 0, MAX_FETCH_LEN, &loc_length);
-	//int new_pos = get_middle_string(seq);
+	char *tmp_seq = faidx_fetch_seq(fasta_index, svtig_name.c_str(), 0, MAX_FETCH_LEN, &loc_length);
+	if (tmp_seq == nullptr)
+		return RETURN_ERROR;
+	std::string seq(tmp_seq);
+	free(tmp_seq);
 	fp_write<< ">"<<svtig_name<<" contig="<<contig<<" pos="<<pos<<" support="<<coverage<< std::endl;
 
 	for (unsigned int i = 0; i < seq.size(); i += line_len)
@@ -89,7 +92,7 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 			
 			double overlap = overlap_ratio(tmp_svtig[i]->start, tmp_svtig[i]->end, tmp_svtig[j]->start, tmp_svtig[j]->end);
 			
-			if (overlap > 0.9)
+			if (overlap > MIN_DUP_OVERLAP)
 			{
 				if(tmp_svtig[i]->svtig_size >= tmp_svtig[j]->svtig_size)
 				{
@@ -131,15 +134,15 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 					extra_added++;
 				}
 				else
-					std::cout<<"Error - SVtig= "<<r->rname<<" not found (multiple contig)...\n";
+					std::cerr<<"Error - SVtig= "<<r->rname<<" not found (multiple contig)...\n";
 			}
 			else
 			{
 				std::map<std::string, SVtig*>::iterator it_dup = final_svtigs.find(r->rname);
 				if (it_dup != final_svtigs.end())
-					it_svtigs->second->output = true;
+					it_dup->second->output = true;
 				else
-					std::cout<<"Error - SVtig= "<<r->rname<<" not found...\n";
+					std::cerr<<"Error - SVtig= "<<r->rname<<" not found...\n";
 			}
 			dup_legit.second++;
 			//std::cout<<"Legit, added\n";
@@ -147,27 +150,6 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 	}
 	//Add the unmapped reads as well
 	
-	/*bool is_aligned = false;
-	for (it_svtigs=final_svtigs.begin(); it_svtigs != final_svtigs.end(); ++it_svtigs)
-	{
-		std::cout<<"Checking "<<it_svtigs->first<<"\t";
-		is_aligned = false;
-		for (auto & element : tmp_svtig)
-		{
-			if (it_svtigs->first == element->rname)
-			{
-				std::cout<<"Aligned\n";
-				is_aligned = true;
-				break;
-			}	
-		}
-		if (!is_aligned)
-		{
-			std::cout<<"Unmapped\n";
-			it_svtigs->second->output = true;
-		}
-	}*/
-
 	return dup_legit;
 }
 
@@ -185,20 +167,27 @@ void wfa_align(std::map<std::string, gfaNode*>& gfa, std::string& cigar, std::st
 		while (q < path.size() && path[q] != '>' && path[q] != '<') ++q;
 		std::string node_name = path.substr(p, q - p);
 		p = q;
-		
+
+		if (gfa.count(node_name) == 0)
+			continue;
+
 		if (strand == '>')
 			ref_tmp += gfa[node_name]->sequence;
 		else if (strand == '<')
 			ref_tmp += reverse_complement(gfa[node_name]->sequence);
 		else
-			std::cout<<"Strand resolution issue in wfa_align()\n";
+			std::cerr<<"Strand resolution issue in wfa_align()\n";
 	}
 	
 	std::string ref = ref_tmp.substr(gfa_start, gfa_end - gfa_start + 1);
 
 	int loc_length;	
-	std::string query = faidx_fetch_seq(fasta_index, query_name.c_str(), query_start, query_end, &loc_length);
-	
+	char *tmp_query = faidx_fetch_seq(fasta_index, query_name.c_str(), query_start, query_end, &loc_length);
+	if (tmp_query == nullptr)
+		return;
+	std::string query(tmp_query);
+	free(tmp_query);
+
 	aligner.alignEnd2End(query, ref); // Align
 	cigar = aligner.getCIGAR(true);
 }
@@ -343,6 +332,9 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 	std::cout<<"--->"<< filtered << " filtered - " << dup_legit.first<<" duplicate\n";
 	std::cout<<"--->"<< primary<<" primary, "<<secondary<<" secondary mappings, "<<lowmq<<" low MAPQ(<"<<MINMAPQREMAP<<")" <<"; svtigs from multiple contig assemblies = "<<extra_added<<"\n";
 
+	for (auto& p : reads)
+		delete p.second;
+
 	return RETURN_SUCCESS;
 }
 
@@ -404,7 +396,6 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 		error(msg.c_str());
 	}
 
-	// Komutu GraphAligner binary'si ile kur, stdout/stderr sessiz
 	std::string graphaligner_cmd =
 		graphaligner_bin +
 		" -g " + params.ref_graph +
@@ -421,8 +412,8 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 		
 	if (std::filesystem::is_empty(params.remap_gaf_path))
 	{
-		std::cout<< "Error: Graphaligner did not run successfully..."<< "\n";
-		std::cout<< "--->Command: " << graphaligner_cmd << "\n";
+		std::cerr<< "Error: Graphaligner did not run successfully..."<< "\n";
+		std::cerr<< "--->Command: " << graphaligner_cmd << "\n";
 		exit(0);
 	}
 	

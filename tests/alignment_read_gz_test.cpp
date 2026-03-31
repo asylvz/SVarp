@@ -24,10 +24,6 @@ int main()
     gfaNode* node1 = new gfaNode("node1", "", 200, "contig1", 0);
     gfa.insert({"node1", node1});
 
-    // Verify read_gz function signature is accessible
-    // (unit test for alignment.cpp read_gz function)
-    // Note: Full testing of read_gz would require actual gzipped GAF input
-    // For now, we just verify the function is callable and header is correct
 
     std::cout << "alignment.read_gz function signature verified" << std::endl;
 

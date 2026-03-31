@@ -27,7 +27,10 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 		std::string node = path.substr(p, q - p);
 		p = q;
 		node_count += 1;
-		
+
+		if (gfa.count(node) == 0)
+			continue;
+
 		if ((node_count == 1) && (p == path.size())) //the single node
 		{
 
@@ -74,7 +77,7 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 			total_so_far += gfa[node]->len;
 		}
 	}
-	std::cout<<"Error in contig_coverage()\n";
+	std::cerr<<"Error in contig_coverage()\n";
 	return RETURN_ERROR;
 }
 

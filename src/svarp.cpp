@@ -50,6 +50,21 @@ int main(int argc, char** argv)
 	
 	if (params.fp_logs.is_open()) params.fp_logs.close();
 
+	// Cleanup heap-allocated objects
+	for (auto& p : tmp_var)
+		delete p.second;
+	for (auto& p : gfa)
+		delete p.second;
+	for (auto& p : phased_reads)
+		delete p.second;
+	for (auto& p : vars)
+		for (auto* sv : p.second)
+			delete sv;
+	for (auto& p : depth)
+		delete p.second;
+	for (auto& p : svtigs)
+		delete p.second;
+
 	return RETURN_SUCCESS;
 }
 

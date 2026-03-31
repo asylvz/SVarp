@@ -5,8 +5,6 @@
 #include "common.h"
 #include "reference.h"
 #include "variant.h"
-// We forward-declare 'faidx_t' and include HTSlib headers only in the implementation (.cpp)
-// to keep the header lightweight and reduce transitive includes.
 struct faidx_t;
 
 int remap_assemblies(parameters& params);

@@ -25,17 +25,18 @@ void Assembly::generate_fasta_file(parameters &params, faidx_t *&fasta_index, st
 	for (auto &read : reads)
 	{
 		char *tmp = faidx_fetch_seq(fasta_index, read.c_str(), 0, MAX_FETCH_LEN, &loc_length);
-		if (tmp == NULL)
+		if (tmp == nullptr)
 			continue;
 
 		std::string seq(tmp);
+		free(tmp);
 
 		fp_write << ">" << read << std::endl;
 
 		for (unsigned int i = 0; i < seq.size(); i += line_len)
 		{
-			std::string tmp = (seq.substr(i, line_len));
-			fp_write << tmp << std::endl;
+			std::string sub = (seq.substr(i, line_len));
+			fp_write << sub << std::endl;
 		}
 		read_seqs.insert(seq);
 	}
@@ -157,17 +158,11 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
 
     generate_fasta_file(params, fasta_index, read_set, file_path);
 
-    int var_size = 4; // genome size (Mb) tahmini, daha önceki sabit
+    int var_size = 4;
 
-    // ------------------------------------------------------------------
-    // wtdbg2.pl benzeri pipeline:
-    //   wtdbg2 -> wtpoa-cns (raw) ->
-    //   minimap2 | samtools sort ->
-    //   samtools view | wtpoa-cns (polish)
-    // ------------------------------------------------------------------
+    // wtdbg2 -> wtpoa-cns (raw) -> minimap2 | samtools sort -> wtpoa-cns (polish)
     std::vector<std::string> extra_dirs = {"dep/wtdbg2"};
 
-    // Önce PATH'te ara, yoksa dep/wtdbg2'ye bak
     std::string wtdbg2_bin = find_executable("wtdbg2");
     if (wtdbg2_bin.empty())
         wtdbg2_bin = find_executable("wtdbg2", extra_dirs);
@@ -205,11 +200,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     std::string bam_path  = output_path + ".bam";
     std::string cns_fa    = output_path + ".cns.fa";
 
-    // ------------------------------------------------------------------
     // 1) wtdbg2 assembler
-    // wtdbg2 -t T -x ont -g Xm -fo PREFIX -i reads.fa
-    // Tamamen sessiz: >/dev/null 2>&1
-    // ------------------------------------------------------------------
     std::string asm_cmd = wtdbg2_bin +
         std::string(" -t ") + std::to_string(threads) +
         " -x ont" +
@@ -229,10 +220,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         return 0;
     }
 
-    // ------------------------------------------------------------------
-    // 2) raw consensus:
-    // wtpoa-cns -t T -i PREFIX.ctg.lay.gz -fo PREFIX.raw.fa
-    // ------------------------------------------------------------------
+    // 2) raw consensus
     std::string cns_raw_cmd = wtpoa_bin +
         std::string(" -t ") + std::to_string(threads) +
         " -i " + layout_gz +
@@ -250,11 +238,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         return 0;
     }
 
-    // ------------------------------------------------------------------
-    // 3) minimap2 + samtools sort (tamamen sessiz):
-    //
-    // (minimap2 ... 2>/dev/null | samtools sort ... 2>/dev/null) >/dev/null 2>&1
-    // ------------------------------------------------------------------
+    // 3) minimap2 + samtools sort
     std::string map_sort_cmd =
         "(" +
         minimap2_bin +
@@ -280,11 +264,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         return 0;
     }
 
-    // ------------------------------------------------------------------
-    // 4) polishing consensus (samtools view | wtpoa-cns, yine tam sessiz):
-    //
-    // (samtools view ... 2>/dev/null | wtpoa-cns ... 2>/dev/null) >/dev/null 2>&1
-    // ------------------------------------------------------------------
+    // 4) polishing consensus
     std::string polish_cmd =
         "(" +
         samtools_bin +
@@ -300,7 +280,6 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
 
     rc = run_and_log(polish_cmd, params, "wtpoa_cns_polish", 0, 1, false);
 
-    // Final output: .cns.fa
     if (rc != 0 || !std::filesystem::exists(cns_fa))
     {
         if (params.fp_logs.is_open()) 
