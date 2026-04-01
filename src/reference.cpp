@@ -104,12 +104,16 @@ int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<
 	Contig *c = new Contig();
 	ref.insert(std::pair<std::string, Contig*>("overall", c));
 
-	char buf[1048576];
-	while(gzgets(fp, buf, sizeof(buf)) != nullptr)
+	const int CHUNK = 1048576;
+	char buf[CHUNK];
+	line.clear();
+	while(gzgets(fp, buf, CHUNK) != nullptr)
 	{
-		line = buf;
-		if (!line.empty() && line.back() == '\n')
-			line.pop_back();
+		line.append(buf);
+		// If line doesn't end with newline, gzgets hit the buffer limit — keep reading
+		if (line.empty() || (line.back() != '\n'))
+			continue;
+		line.pop_back();
 		
 		std::string tmp_str;
 		std::stringstream s(line);
@@ -119,8 +123,11 @@ int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<
         		tokens.push_back(tmp_str);
 		
 		if (tokens.empty())
+		{
+			line.clear();
 			continue;
-		
+		}
+
 		if (tokens[0] != "S")
 		{
 			if (tokens[0] == "L" && tokens.size() >= 4)
@@ -128,42 +135,48 @@ int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<
 				// Add incoming: use insert with hint to avoid redundant lookups
 				auto [it_in, inserted_in] = incoming.insert({tokens[3], {}});
 				it_in->second.push_back(tokens[1]);
-				
+
 				// Add outgoing: same pattern
 				auto [it_out, inserted_out] = outgoing.insert({tokens[1], {}});
 				it_out->second.push_back(tokens[3]);
 			}
+			line.clear();
 			continue;
 		}
-		
+
 		if (tokens.size() < 6)
-			continue;  // Skip malformed S lines
-		
+		{
+			line.clear();
+			continue;
+		}
+
 		gfaNode *g = new gfaNode();
 		g->name = tokens[1];
 		g->sequence = tokens[2];
-		
+
 		try {
 			g->len = stoi(tokens[3].substr(5));
 			g->offset = stoi(tokens[5].substr(5));
 		} catch (const std::invalid_argument&) {
 			std::cerr << "[read_gfa] Invalid numeric value in GFA line: " << line << std::endl;
 			delete g;
+			line.clear();
 			continue;
 		}
-		
+
 		g->contig = tokens[4].substr(5);
 
 		// Insert Contig if not present, using insert return value
 		auto [it_contig, inserted] = ref.insert({g->contig, nullptr});
 		if (inserted)
 			it_contig->second = new Contig();
-		
-		//Find the length of each contig	
+
+		//Find the length of each contig
 		it_contig->second->contig_length += g->len;
 		ref["overall"]->contig_length += g->len;
 
 		gfa.insert({g->name, g});
+		line.clear();
 	}
 	gzclose(fp);
 	return RETURN_SUCCESS;
