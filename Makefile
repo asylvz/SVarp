@@ -126,22 +126,22 @@ build/test_run_and_log: tests/run_and_log_test.cpp src/common.cpp src/logfile.cp
 
 build/test_variant: tests/variant_test.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
 	mkdir -p build
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/variant_test.cpp -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/variant_test.cpp -o $@ -lz
 
 
 build/test_generate_sv_node: tests/generate_sv_node_test.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
 	mkdir -p build
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/generate_sv_node_test.cpp -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/generate_sv_node_test.cpp -o $@ -lz
 
 
 build/test_variant_mapping: tests/variant_mapping_test.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
 	mkdir -p build
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/variant_mapping_test.cpp -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/variant_mapping_test.cpp -o $@ -lz
 
 
 build/test_merge_neighbor_nodes: tests/merge_neighbor_nodes_test.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
 	mkdir -p build
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/merge_neighbor_nodes_test.cpp -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/merge_neighbor_nodes_test.cpp -o $@ -lz
 
 
 build/test_assembly: tests/assembly_test.cpp src/assembly.cpp src/common.cpp src/reference.cpp src/logfile.cpp

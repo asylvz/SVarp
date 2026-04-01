@@ -5,6 +5,7 @@
 #include <sstream>
 #include <map>
 #include <iterator>
+#include <zlib.h>
 #include "reference.h"
 #include "common.h"
 
@@ -87,25 +88,28 @@ int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<
 	// Read the S lines in the GFA file
 	std::cout << "\nReading the GFA file"<< std::endl;
 	
-	std::string line;	
-	std::vector <std::string> tokens;	
-	
-	std::ifstream fp(params.ref_graph);
-	if(!fp.good())
+	std::string line;
+	std::vector <std::string> tokens;
+
+	gzFile fp = gzopen(params.ref_graph.c_str(), "rb");
+	if(!fp)
 	{
         std::cerr << "Error opening '"<<params.ref_graph<< std::endl;
         return RETURN_ERROR;
     }
 
 	std::map<std::string, std::vector<std::string>>::iterator it;
-	
+
 	//For overall coverage
 	Contig *c = new Contig();
 	ref.insert(std::pair<std::string, Contig*>("overall", c));
-	
-	while(fp)
+
+	char buf[1048576];
+	while(gzgets(fp, buf, sizeof(buf)) != nullptr)
 	{
-		getline(fp, line);
+		line = buf;
+		if (!line.empty() && line.back() == '\n')
+			line.pop_back();
 		
 		std::string tmp_str;
 		std::stringstream s(line);
@@ -161,6 +165,7 @@ int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<
 
 		gfa.insert({g->name, g});
 	}
+	gzclose(fp);
 	return RETURN_SUCCESS;
 }
 
