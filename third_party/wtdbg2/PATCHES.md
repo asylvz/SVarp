@@ -12,12 +12,17 @@ The original code is licensed under GPL-3.0 (see LICENSE.txt).
   `#ifdef __aarch64__` guards to use `sse2neon.h` on ARM platforms.
 - **sse2neon.h**: Added from https://github.com/DLTcollab/sse2neon (MIT licensed).
 
-### 2. Bug fix: undefined identifier on macOS
+### 2. POSIX regex compatibility fix
+- **kbm.c, wtdbg.c**: Changed `(.+?)` to `(.+)` in `regcomp()` calls.
+  The non-greedy quantifier `?` is not supported by macOS POSIX `REG_EXTENDED`
+  regex, causing `REGCOMP: repetition-o` error and all assemblies to fail.
+
+### 3. Bug fix: undefined identifier on macOS (original)
 - **kbm.c:326**: Changed `_proc_deamon->ncpu` to `_sig_proc_deamon->ncpu`.
   The variable `_proc_deamon` is only defined inside the thread function scope;
   the file-scope pointer is `_sig_proc_deamon`.
 
-### 3. Makefile: cross-platform support
+### 4. Makefile: cross-platform support
 - Removed x86-only flags (`-mpopcnt`, `-msse4.2`) on non-x86 platforms.
 - Removed `-lrt` on macOS (not available on Darwin).
 - Changed `-O4` to `-O3` and `-g3` to `-g` for compiler compatibility.

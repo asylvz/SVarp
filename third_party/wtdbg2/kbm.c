@@ -405,7 +405,7 @@ int kbm_main(int argc, char **argv){
 		regex_t reg;
 		regmatch_t mats[3];
 		int z, tag_size, len;
-		z = regcomp(&reg, "^(.+?)/[0-9]+_[0-9]+$", REG_EXTENDED);
+		z = regcomp(&reg, "^(.+)/[0-9]+_[0-9]+$", REG_EXTENDED);
 		if(z){
 			regerror(z, &reg, regtag, 13);
 			fprintf(stderr, " -- REGCOMP: %s --\n", regtag); fflush(stderr);
