@@ -29,12 +29,30 @@ WTDBG2_BIN   := $(WTDBG2_DIR)/wtdbg2
 MINIMAP2_DIR := $(DEP_DIR)/minimap2
 MINIMAP2_BIN := $(MINIMAP2_DIR)/minimap2
 
+# samtools (from source: built under dep/; conda: provided by the environment)
+SAMTOOLS_VERSION := 1.17
+SAMTOOLS_DIR     := $(DEP_DIR)/samtools
+SAMTOOLS_BIN     := $(SAMTOOLS_DIR)/samtools
+SAMTOOLS_TARBALL := $(DEP_DIR)/samtools-$(SAMTOOLS_VERSION).tar.bz2
+
 HTSLIB_VERSION := 1.17
 HTSLIB_TARBALL := $(DEP_DIR)/htslib-$(HTSLIB_VERSION).tar.bz2
 HTSLIB_LIB     := $(HTSLIB_DIR)/libhts.a
 
 WFA_VERSION     := 2.3.4
 WFA_TARBALL     := $(DEP_DIR)/WFA2-lib-$(WFA_VERSION).tar.gz
+
+# Download helper: prefer curl, fall back to wget
+# Usage: $(call download,URL,OUTPUT)
+define download
+	@if command -v curl >/dev/null 2>&1; then \
+	  curl -L -o $(2) $(1); \
+	elif command -v wget >/dev/null 2>&1; then \
+	  wget -O $(2) $(1); \
+	else \
+	  echo "Error: neither curl nor wget found. Please install one of them." && exit 1; \
+	fi
+endef
 
 # ------------------------------------------------
 # Compiler / flags
@@ -225,8 +243,8 @@ libs: $(WFA_LIB) $(WTDBG2_BIN)
 	@echo "NOTE: minimap2 and samtools must be available in the conda environment."
 else
 # From source: all dependencies built locally
-libs: $(HTSLIB_LIB) $(WFA_LIB) $(WTDBG2_BIN) $(MINIMAP2_BIN)
-	@echo "Built HTSLIB, WFA2, wtdbg2 and minimap2 under dep/"
+libs: $(HTSLIB_LIB) $(WFA_LIB) $(WTDBG2_BIN) $(MINIMAP2_BIN) $(SAMTOOLS_BIN)
+	@echo "Built HTSLIB, WFA2, wtdbg2, minimap2 and samtools under dep/"
 endif
 
 # ================================================================
@@ -239,7 +257,7 @@ $(HTSLIB_LIB): $(HTSLIB_TARBALL)
 
 $(HTSLIB_TARBALL):
 	mkdir -p $(DEP_DIR)
-	wget https://github.com/samtools/htslib/releases/download/$(HTSLIB_VERSION)/htslib-$(HTSLIB_VERSION).tar.bz2 -O $(HTSLIB_TARBALL)
+	$(call download,https://github.com/samtools/htslib/releases/download/$(HTSLIB_VERSION)/htslib-$(HTSLIB_VERSION).tar.bz2,$(HTSLIB_TARBALL))
 
 # ================================================================
 # WFA2-lib (built under dep/ in both modes)
@@ -255,11 +273,19 @@ endif
 
 $(WFA_TARBALL):
 	mkdir -p $(DEP_DIR)
-	wget https://github.com/smarco/WFA2-lib/archive/refs/tags/v$(WFA_VERSION).tar.gz -O $(WFA_TARBALL)
+	$(call download,https://github.com/smarco/WFA2-lib/archive/refs/tags/v$(WFA_VERSION).tar.gz,$(WFA_TARBALL))
 
 # ================================================================
 # minimap2 (skipped if already in PATH)
 # ================================================================
+MINIMAP2_EXTRA :=
+ifeq ($(shell uname -m),arm64)
+  MINIMAP2_EXTRA := arm_neon=1 aarch64=1
+endif
+ifeq ($(shell uname -m),aarch64)
+  MINIMAP2_EXTRA := arm_neon=1 aarch64=1
+endif
+
 $(MINIMAP2_BIN):
 	mkdir -p $(DEP_DIR)
 	@if command -v minimap2 >/dev/null 2>&1; then \
@@ -267,7 +293,30 @@ $(MINIMAP2_BIN):
 	else \
 	  echo "minimap2 not found in PATH, building under dep/minimap2"; \
 	  test -d $(MINIMAP2_DIR) || git clone https://github.com/lh3/minimap2 $(MINIMAP2_DIR); \
-	  cd $(MINIMAP2_DIR) && $(MAKE); \
+	  cd $(MINIMAP2_DIR) && $(MAKE) $(MINIMAP2_EXTRA); \
+	fi
+
+# ================================================================
+# samtools (skipped if already in PATH)
+# ================================================================
+$(SAMTOOLS_BIN): $(HTSLIB_LIB)
+	mkdir -p $(DEP_DIR)
+	@if command -v samtools >/dev/null 2>&1; then \
+	  echo "samtools found in PATH, skipping local build in dep/samtools"; \
+	else \
+	  echo "samtools not found in PATH, building under dep/samtools"; \
+	  if [ ! -f $(SAMTOOLS_TARBALL) ]; then \
+	    if command -v curl >/dev/null 2>&1; then \
+	      curl -L -o $(SAMTOOLS_TARBALL) https://github.com/samtools/samtools/releases/download/$(SAMTOOLS_VERSION)/samtools-$(SAMTOOLS_VERSION).tar.bz2; \
+	    elif command -v wget >/dev/null 2>&1; then \
+	      wget -O $(SAMTOOLS_TARBALL) https://github.com/samtools/samtools/releases/download/$(SAMTOOLS_VERSION)/samtools-$(SAMTOOLS_VERSION).tar.bz2; \
+	    else \
+	      echo "Error: neither curl nor wget found." && exit 1; \
+	    fi; \
+	  fi; \
+	  mkdir -p $(SAMTOOLS_DIR); \
+	  tar -xjf $(SAMTOOLS_TARBALL) -C $(SAMTOOLS_DIR) --strip-components=1; \
+	  cd $(SAMTOOLS_DIR) && ./configure --without-curses --with-htslib=$(PWD)/$(HTSLIB_DIR) && $(MAKE); \
 	fi
 
 # ================================================================

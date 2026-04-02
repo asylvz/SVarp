@@ -73,83 +73,87 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 {
 	std::pair<int, int> dup_legit(0,0);
 	std::map<std::string, SVtig*>::iterator it_svtigs;
-	std::sort(tmp_svtig.begin(), tmp_svtig.end(), cmp);
-	
-	for(unsigned int i = 0; i < tmp_svtig.size(); i++)
+
+	// Sort by node first, then by svtig_size descending (greedy: largest first)
+	std::sort(tmp_svtig.begin(), tmp_svtig.end(), [](const Read* a, const Read* b) {
+		if (a->node != b->node)
+			return a->node < b->node;
+		return a->svtig_size > b->svtig_size; // descending by size
+	});
+
+	// Process each node group independently
+	unsigned int i = 0;
+	while (i < tmp_svtig.size())
 	{
-		bool toAdd = true;
-		Read *r = tmp_svtig[i];
-		if(r->duplicate)
-			continue;
+		// Find the range [i, group_end) for the current node
+		unsigned int group_end = i + 1;
+		while (group_end < tmp_svtig.size() && tmp_svtig[group_end]->node == tmp_svtig[i]->node)
+			group_end++;
 
-		for(unsigned int j = 0; j < tmp_svtig.size(); j++)
+		// Greedy: iterate from largest svtig_size to smallest
+		// Each candidate is compared only against previously kept entries
+		std::vector<unsigned int> kept_indices;
+
+		for (unsigned int k = i; k < group_end; k++)
 		{
-			if(tmp_svtig[i]->node != tmp_svtig[j]->node)
+			Read *r = tmp_svtig[k];
+			if (r->duplicate)
 				continue;
 
-			if(tmp_svtig[j]->duplicate || i == j)
-				continue;
-			
-			double overlap = overlap_ratio(tmp_svtig[i]->start, tmp_svtig[i]->end, tmp_svtig[j]->start, tmp_svtig[j]->end);
-			
-			if (overlap > MIN_DUP_OVERLAP)
+			bool is_dup = false;
+			for (unsigned int ki : kept_indices)
 			{
-				if(tmp_svtig[i]->svtig_size >= tmp_svtig[j]->svtig_size)
+				double overlap = overlap_ratio(r->start, r->end, tmp_svtig[ki]->start, tmp_svtig[ki]->end);
+				if (overlap > MIN_DUP_OVERLAP)
 				{
-					tmp_svtig[j]->duplicate = true;
-					continue;	
-				}
-				else
-				{
-					//std::cout<<"\t duplicate and longer, so do not add the inn\n";
 					r->duplicate = true;
 					dup_legit.first++;
-					toAdd = false;
+					is_dup = true;
 					break;
 				}
 			}
-		}
-		//Add if not a duplicate
-		if (toAdd)
-		{
-			//If the assembly is fragmented (i.e., multiple contigs), then we need to add the additional contig because it is not in final_svtigs DS (only None-s237302_123 is in final_svtigs). e.g., None-s237302_123 and None-s237302_123_2
-			auto npos = r->rname.rfind("_");
-			auto npos2 = r->rname.find("_");
-			std::string tmp_str = "";
-			if (npos != npos2)
+
+			if (!is_dup)
 			{
-				tmp_str = r->rname.substr(0, npos);
-				it_svtigs = final_svtigs.find(tmp_str);
-				
-				//Add it to the final_svtigs
-				if (it_svtigs != final_svtigs.end())
+				kept_indices.push_back(k);
+
+				// Handle fragmented assemblies (multiple contigs from same svtig)
+				auto npos = r->rname.rfind("_");
+				auto npos2 = r->rname.find("_");
+				if (npos != npos2)
 				{
-					SVtig *tmp = new SVtig;
-					tmp->name = r->rname;
-					tmp->pos = it_svtigs->second->pos;
-					(tmp->reads).insert(it_svtigs->second->reads.begin(), it_svtigs->second->reads.end());
-					tmp->contig = it_svtigs->second->contig;
-					tmp->output = true;
-					final_svtigs.insert(std::pair<std::string, SVtig*>(r->rname, tmp));
-					extra_added++;
+					std::string tmp_str = r->rname.substr(0, npos);
+					it_svtigs = final_svtigs.find(tmp_str);
+
+					if (it_svtigs != final_svtigs.end())
+					{
+						SVtig *tmp = new SVtig;
+						tmp->name = r->rname;
+						tmp->pos = it_svtigs->second->pos;
+						(tmp->reads).insert(it_svtigs->second->reads.begin(), it_svtigs->second->reads.end());
+						tmp->contig = it_svtigs->second->contig;
+						tmp->output = true;
+						final_svtigs.insert(std::pair<std::string, SVtig*>(r->rname, tmp));
+						extra_added++;
+					}
+					else
+						std::cerr<<"Error - SVtig= "<<r->rname<<" not found (multiple contig)...\n";
 				}
 				else
-					std::cerr<<"Error - SVtig= "<<r->rname<<" not found (multiple contig)...\n";
+				{
+					std::map<std::string, SVtig*>::iterator it_dup = final_svtigs.find(r->rname);
+					if (it_dup != final_svtigs.end())
+						it_dup->second->output = true;
+					else
+						std::cerr<<"Error - SVtig= "<<r->rname<<" not found...\n";
+				}
+				dup_legit.second++;
 			}
-			else
-			{
-				std::map<std::string, SVtig*>::iterator it_dup = final_svtigs.find(r->rname);
-				if (it_dup != final_svtigs.end())
-					it_dup->second->output = true;
-				else
-					std::cerr<<"Error - SVtig= "<<r->rname<<" not found...\n";
-			}
-			dup_legit.second++;
-			//std::cout<<"Legit, added\n";
 		}
+
+		i = group_end;
 	}
-	//Add the unmapped reads as well
-	
+
 	return dup_legit;
 }
 

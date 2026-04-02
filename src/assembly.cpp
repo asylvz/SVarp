@@ -7,6 +7,7 @@
 // memory included indirectly
 #include <zlib.h>
 #include <cstdlib>
+#include <cmath>
 #include <unistd.h>
 #include <vector>
 #include "assembly.h"
@@ -122,32 +123,34 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     if (support_threshold < 3) support_threshold = 3;
     int svtig_tmp_cnt = 0;
 
+    double zscore = (contig_depth > 0) ? (static_cast<double>(read_set.size()) - contig_depth) / std::sqrt(contig_depth) : 0.0;
+
     if (contig_depth * 2 < read_set.size())
     {
         this->filter_hicov++;
         if (params.fp_asm_log.is_open())
-            params.fp_asm_log << svtig_name << "\tFILTERED\treason=high_coverage\treads=" << read_set.size() << "\tcontig_depth=" << contig_depth << "\n";
+            params.fp_asm_log << svtig_name << "\tFILTERED\treason=high_coverage\treads=" << read_set.size() << "\tcontig_depth=" << contig_depth << "\tzscore=" << zscore << "\n";
         return 0;
     }
     else if (contig_depth > 5 * read_set.size())
     {
         this->filter_lowcov++;
         if (params.fp_asm_log.is_open())
-            params.fp_asm_log << svtig_name << "\tFILTERED\treason=low_coverage\treads=" << read_set.size() << "\tcontig_depth=" << contig_depth << "\n";
+            params.fp_asm_log << svtig_name << "\tFILTERED\treason=low_coverage\treads=" << read_set.size() << "\tcontig_depth=" << contig_depth << "\tzscore=" << zscore << "\n";
         return 0;
     }
     else if (read_set.size() < support_threshold)
     {
         this->filter_support++;
         if (params.fp_asm_log.is_open())
-            params.fp_asm_log << svtig_name << "\tFILTERED\treason=low_support\treads=" << read_set.size() << "\tthreshold=" << support_threshold << "\n";
+            params.fp_asm_log << svtig_name << "\tFILTERED\treason=low_support\treads=" << read_set.size() << "\tthreshold=" << support_threshold << "\tzscore=" << zscore << "\n";
         return 0;
     }
     else if (contig_depth > MAX_CONTIG_DEPTH)
     {
         this->filter_hicov++;
         if (params.fp_asm_log.is_open())
-            params.fp_asm_log << svtig_name << "\tFILTERED\treason=max_contig_depth\treads=" << read_set.size() << "\tcontig_depth=" << contig_depth << "\n";
+            params.fp_asm_log << svtig_name << "\tFILTERED\treason=max_contig_depth\treads=" << read_set.size() << "\tcontig_depth=" << contig_depth << "\tzscore=" << zscore << "\n";
         return 0;
     }
 
@@ -169,7 +172,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     int var_size = 4;
 
     // wtdbg2 -> wtpoa-cns (raw) -> minimap2 | samtools sort -> wtpoa-cns (polish)
-    std::vector<std::string> extra_dirs = {"third_party/wtdbg2", "dep/wtdbg2"};
+    std::vector<std::string> extra_dirs = {"third_party/wtdbg2", "dep/wtdbg2", "dep/minimap2", "dep/samtools"};
 
     std::string wtdbg2_bin = find_executable("wtdbg2");
     if (wtdbg2_bin.empty())
@@ -343,6 +346,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
                           << "\treads=" << read_set.size()
                           << "\tcontig=" << contig_name
                           << "\tpos=" << pos
+                          << "\tzscore=" << zscore
                           << "\ttime=" << format_duration(std::chrono::duration<double>(asm_t2 - asm_t1).count())
                           << "\n";
     }

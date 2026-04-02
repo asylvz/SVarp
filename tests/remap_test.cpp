@@ -108,7 +108,218 @@ int main() {
     delete node1;
     delete node2;
     delete sv1;
-    
-    std::cout << "remap test passed" << std::endl;
+
+    std::cout << "remap basic tests passed" << std::endl;
+
+    // ================================================================
+    // remove_duplicates tests
+    // ================================================================
+    auto make_read = [](const std::string& name, const std::string& node,
+                        int start, int end, int svtig_size) -> Read* {
+        Read* r = new Read;
+        r->rname = name;
+        r->node = node;
+        r->start = start;
+        r->end = end;
+        r->svtig_size = svtig_size;
+        r->highest_map_ratio = 0.95;
+        r->highest_aln_identity = 0.95;
+        r->freq = 1;
+        r->sv_in_cigar = true;
+        r->duplicate = false;
+        return r;
+    };
+
+    auto make_svtig = [](const std::string& name) -> SVtig* {
+        SVtig* s = new SVtig;
+        s->name = name;
+        s->pos = 0;
+        s->contig = "chr1";
+        s->output = false;
+        return s;
+    };
+
+    // Test 7: No duplicates - different regions on same node
+    {
+        std::vector<Read*> reads;
+        std::map<std::string, SVtig*> svtigs;
+        int extra = 0;
+
+        reads.push_back(make_read("H1-s100_1", "nodeA", 0, 1000, 500));
+        reads.push_back(make_read("H1-s100_2", "nodeA", 5000, 6000, 400));
+        reads.push_back(make_read("H1-s100_3", "nodeB", 0, 1000, 300));
+
+        svtigs["H1-s100_1"] = make_svtig("H1-s100_1");
+        svtigs["H1-s100_2"] = make_svtig("H1-s100_2");
+        svtigs["H1-s100_3"] = make_svtig("H1-s100_3");
+
+        auto result = remove_duplicates(reads, svtigs, extra);
+        if (result.first != 0 || result.second != 3) {
+            std::cerr << "Test 7 FAILED: expected 0 dup, 3 kept, got " << result.first << " dup, " << result.second << " kept" << std::endl;
+            return 1;
+        }
+        std::cout << "Test 7 passed: no duplicates" << std::endl;
+        for (auto* r : reads) delete r;
+        for (auto& p : svtigs) delete p.second;
+    }
+
+    // Test 8: Two overlapping reads, larger svtig_size wins
+    {
+        std::vector<Read*> reads;
+        std::map<std::string, SVtig*> svtigs;
+        int extra = 0;
+
+        reads.push_back(make_read("H1-s200_1", "nodeA", 100, 1100, 800));
+        reads.push_back(make_read("H1-s200_2", "nodeA", 100, 1100, 400));
+
+        svtigs["H1-s200_1"] = make_svtig("H1-s200_1");
+        svtigs["H1-s200_2"] = make_svtig("H1-s200_2");
+
+        auto result = remove_duplicates(reads, svtigs, extra);
+        if (result.first != 1 || result.second != 1) {
+            std::cerr << "Test 8 FAILED: expected 1 dup, 1 kept, got " << result.first << " dup, " << result.second << " kept" << std::endl;
+            return 1;
+        }
+        bool larger_kept = false, smaller_dup = false;
+        for (auto* r : reads) {
+            if (r->svtig_size == 800 && !r->duplicate) larger_kept = true;
+            if (r->svtig_size == 400 && r->duplicate) smaller_dup = true;
+        }
+        if (!larger_kept || !smaller_dup) {
+            std::cerr << "Test 8 FAILED: larger svtig should be kept" << std::endl;
+            return 1;
+        }
+        std::cout << "Test 8 passed: larger svtig wins" << std::endl;
+        for (auto* r : reads) delete r;
+        for (auto& p : svtigs) delete p.second;
+    }
+
+    // Test 9: Transitivity - greedy largest-first resolves consistently
+    {
+        std::vector<Read*> reads;
+        std::map<std::string, SVtig*> svtigs;
+        int extra = 0;
+
+        reads.push_back(make_read("H1-s300_1", "nodeA", 0, 950, 500));
+        reads.push_back(make_read("H1-s300_2", "nodeA", 0, 1000, 900));
+        reads.push_back(make_read("H1-s300_3", "nodeA", 50, 1000, 400));
+
+        svtigs["H1-s300_1"] = make_svtig("H1-s300_1");
+        svtigs["H1-s300_2"] = make_svtig("H1-s300_2");
+        svtigs["H1-s300_3"] = make_svtig("H1-s300_3");
+
+        auto result = remove_duplicates(reads, svtigs, extra);
+        if (result.first != 2 || result.second != 1) {
+            std::cerr << "Test 9 FAILED: expected 2 dup, 1 kept, got " << result.first << " dup, " << result.second << " kept" << std::endl;
+            return 1;
+        }
+        for (auto* r : reads) {
+            if (r->svtig_size == 900 && r->duplicate) {
+                std::cerr << "Test 9 FAILED: largest svtig should not be duplicate" << std::endl;
+                return 1;
+            }
+        }
+        std::cout << "Test 9 passed: transitivity" << std::endl;
+        for (auto* r : reads) delete r;
+        for (auto& p : svtigs) delete p.second;
+    }
+
+    // Test 10: Different nodes never duplicate each other
+    {
+        std::vector<Read*> reads;
+        std::map<std::string, SVtig*> svtigs;
+        int extra = 0;
+
+        reads.push_back(make_read("H1-s400_1", "nodeA", 100, 1100, 500));
+        reads.push_back(make_read("H1-s400_2", "nodeB", 100, 1100, 500));
+
+        svtigs["H1-s400_1"] = make_svtig("H1-s400_1");
+        svtigs["H1-s400_2"] = make_svtig("H1-s400_2");
+
+        auto result = remove_duplicates(reads, svtigs, extra);
+        if (result.first != 0 || result.second != 2) {
+            std::cerr << "Test 10 FAILED: different nodes should not be duplicates" << std::endl;
+            return 1;
+        }
+        std::cout << "Test 10 passed: different nodes" << std::endl;
+        for (auto* r : reads) delete r;
+        for (auto& p : svtigs) delete p.second;
+    }
+
+    // Test 11: Fragmented assembly (extra underscore suffix)
+    {
+        std::vector<Read*> reads;
+        std::map<std::string, SVtig*> svtigs;
+        int extra = 0;
+
+        reads.push_back(make_read("H1-s500_1", "nodeA", 100, 1100, 600));
+        reads.push_back(make_read("H1-s500_1_2", "nodeA", 5000, 6000, 300));
+
+        svtigs["H1-s500_1"] = make_svtig("H1-s500_1");
+
+        auto result = remove_duplicates(reads, svtigs, extra);
+        if (result.first != 0 || result.second != 2 || extra != 1) {
+            std::cerr << "Test 11 FAILED: expected 0 dup, 2 kept, 1 extra, got "
+                      << result.first << " dup, " << result.second << " kept, " << extra << " extra" << std::endl;
+            return 1;
+        }
+        if (svtigs.count("H1-s500_1_2") != 1 || !svtigs["H1-s500_1_2"]->output) {
+            std::cerr << "Test 11 FAILED: fragmented svtig not added correctly" << std::endl;
+            return 1;
+        }
+        std::cout << "Test 11 passed: fragmented assembly" << std::endl;
+        for (auto* r : reads) delete r;
+        for (auto& p : svtigs) delete p.second;
+    }
+
+    // Test 12: Pre-marked duplicates are skipped
+    {
+        std::vector<Read*> reads;
+        std::map<std::string, SVtig*> svtigs;
+        int extra = 0;
+
+        Read* r1 = make_read("H1-s600_1", "nodeA", 100, 1100, 600);
+        Read* r2 = make_read("H1-s600_2", "nodeA", 100, 1100, 500);
+        r2->duplicate = true;
+
+        reads.push_back(r1);
+        reads.push_back(r2);
+
+        svtigs["H1-s600_1"] = make_svtig("H1-s600_1");
+        svtigs["H1-s600_2"] = make_svtig("H1-s600_2");
+
+        auto result = remove_duplicates(reads, svtigs, extra);
+        if (result.first != 0 || result.second != 1) {
+            std::cerr << "Test 12 FAILED: expected 0 new dup, 1 kept" << std::endl;
+            return 1;
+        }
+        std::cout << "Test 12 passed: pre-marked duplicates" << std::endl;
+        for (auto* r : reads) delete r;
+        for (auto& p : svtigs) delete p.second;
+    }
+
+    // Test 13: Partial overlap below threshold - both kept
+    {
+        std::vector<Read*> reads;
+        std::map<std::string, SVtig*> svtigs;
+        int extra = 0;
+
+        reads.push_back(make_read("H1-s700_1", "nodeA", 0, 1000, 500));
+        reads.push_back(make_read("H1-s700_2", "nodeA", 900, 1900, 400));
+
+        svtigs["H1-s700_1"] = make_svtig("H1-s700_1");
+        svtigs["H1-s700_2"] = make_svtig("H1-s700_2");
+
+        auto result = remove_duplicates(reads, svtigs, extra);
+        if (result.first != 0 || result.second != 2) {
+            std::cerr << "Test 13 FAILED: partial overlap should keep both" << std::endl;
+            return 1;
+        }
+        std::cout << "Test 13 passed: partial overlap" << std::endl;
+        for (auto* r : reads) delete r;
+        for (auto& p : svtigs) delete p.second;
+    }
+
+    std::cout << "All remap tests passed" << std::endl;
     return 0;
 }
