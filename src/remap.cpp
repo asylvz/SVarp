@@ -201,7 +201,7 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 	std::vector <std::string> tokens;
 	std::ifstream fp;
 	
-	std::cout<<"--->reading remappings from "<< params.remap_gaf_path <<std::endl;	
+	std::cout<<"--> reading remappings from "<< params.remap_gaf_path <<std::endl;
 	fp.open(params.remap_gaf_path);
 
 	if(!fp.good())
@@ -312,25 +312,45 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 	for (auto &t: reads)
 	{
 		if(t.second->highest_map_ratio > 0)
-		{	
+		{
 			if(t.second->freq > 1)
 				tmp_svtig.push_back(t.second);
 			else if(t.second->highest_map_ratio < params.min_map_ratio)
 				tmp_svtig.push_back(t.second);
 			else if (t.second->sv_in_cigar)
 				tmp_svtig.push_back(t.second);
-			else
+			else {
 				filtered++;
+				if (params.fp_remap_log.is_open())
+					params.fp_remap_log << t.first << "\tFILTERED\treason=high_map_ratio\tmap_ratio=" << t.second->highest_map_ratio << "\tno_sv_in_cigar\n";
+			}
 		}
-		else
+		else {
 			filtered++;
+			if (params.fp_remap_log.is_open())
+				params.fp_remap_log << t.first << "\tFILTERED\treason=no_mapping\n";
+		}
 	}
 	//If an svtig is in tmp_svtig, check if it is a duplicate. If not set "->output=true"
 	//Check the unmapped svtigs and add them tooo
 	std::pair<int, int> dup_legit = remove_duplicates(tmp_svtig, final_svtigs, extra_added);
 
-	std::cout<<"--->"<< filtered << " filtered - " << dup_legit.first<<" duplicate\n";
-	std::cout<<"--->"<< primary<<" primary, "<<secondary<<" secondary mappings, "<<lowmq<<" low MAPQ(<"<<MINMAPQREMAP<<")" <<"; svtigs from multiple contig assemblies = "<<extra_added<<"\n";
+	if (params.fp_remap_log.is_open()) {
+		for (auto &r : tmp_svtig) {
+			if (r->duplicate)
+				params.fp_remap_log << r->rname << "\tDUPLICATE\tnode=" << r->node << "\tstart=" << r->start << "\tend=" << r->end << "\tsize=" << r->svtig_size << "\n";
+			else
+				params.fp_remap_log << r->rname << "\tKEPT\tnode=" << r->node << "\tmap_ratio=" << r->highest_map_ratio << "\tsv_in_cigar=" << (r->sv_in_cigar ? "yes" : "no") << "\tsize=" << r->svtig_size << "\n";
+		}
+	}
+
+	std::cout<<"--> "<< filtered << " filtered - " << dup_legit.first<<" duplicate\n";
+	std::cout<<"--> "<< primary<<" primary, "<<secondary<<" secondary mappings, "<<lowmq<<" low MAPQ(<"<<MINMAPQREMAP<<")" <<"; svtigs from multiple contig assemblies = "<<extra_added<<"\n";
+
+	if (params.fp_logs.is_open()) {
+		params.fp_logs << "--> " << filtered << " filtered - " << dup_legit.first << " duplicate\n";
+		params.fp_logs << "--> " << primary << " primary, " << secondary << " secondary mappings, " << lowmq << " low MAPQ(<" << MINMAPQREMAP << "); svtigs from multiple contig assemblies = " << extra_added << "\n";
+	}
 
 	for (auto& p : reads)
 		delete p.second;
@@ -380,10 +400,10 @@ int write_final_svtigs(faidx_t*& fasta_index, std::map <std::string, SVtig*>& fi
 
 int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map <std::string, SVtig*>& final_svtigs)
 {
-	std::cout<<"\nFiltering svtigs"<<std::endl;	
+	std::cout<<"\nFiltering svtigs"<<std::endl;
 	std::string svtigs_tmp_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
 
-	std::cout<<"--->remapping svtigs onto the graph using Graphaligner"<<std::endl;			
+	std::cout<<"--> remapping svtigs onto the graph using GraphAligner"<<std::endl;
 
 	// GraphAligner PATH'te mi?
 	std::string graphaligner_bin = find_executable("GraphAligner");
@@ -396,6 +416,9 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 		error(msg.c_str());
 	}
 
+	std::string ga_log = params.log_path + params.sample_name + "_graphaligner.log";
+	std::string ga_redir = params.debug ? (" >" + ga_log + " 2>&1") : " >/dev/null 2>&1";
+
 	std::string graphaligner_cmd =
 		graphaligner_bin +
 		" -g " + params.ref_graph +
@@ -406,7 +429,7 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 		" --precise-clipping " + std::to_string(params.min_precise_clipping) +
 		" --min-alignment-score " + std::to_string(params.min_alignment_score) +
 		" --multimap-score-fraction 0.9"
-		" >/dev/null 2>&1";
+		+ ga_redir;
 		
 	run_and_log(graphaligner_cmd, params, "GraphAligner", 2, 2, true);
 		
@@ -431,7 +454,9 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 		svtigs_path = params.log_path + params.sample_name + "_svtigs.fa";
 		int h1 = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "None");
 
-		std::cout<<"--->there are "<<h1<<" svtigs"<<"\n";
+		std::cout<<"--> "<<h1<<" svtigs after filtering\n";
+		if (params.fp_logs.is_open())
+			params.fp_logs << "--> " << h1 << " svtigs after filtering\n";
 	}
 	else
 	{
@@ -446,10 +471,16 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 			svtigs_path = params.log_path + params.sample_name + "_svtigs_untagged.fa";
 			int untagged = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "None");
 			
-			std::cout<<"--->there are "<<h1<<" haplotype 1, " <<h2<<" haplotype 2 and "<<untagged<<" untagged svtigs"<<"\n";
+			std::cout<<"--> "<<h1<<" haplotype 1, " <<h2<<" haplotype 2 and "<<untagged<<" untagged svtigs after filtering\n";
+			if (params.fp_logs.is_open())
+				params.fp_logs << "--> " << h1 << " haplotype 1, " << h2 << " haplotype 2 and " << untagged << " untagged svtigs after filtering\n";
 		}
 		else
-			std::cout<<"--->there are "<<h1<<" haplotype 1, " <<h2<<" haplotype 2 svtigs"<<"\n";
+		{
+			std::cout<<"--> "<<h1<<" haplotype 1, " <<h2<<" haplotype 2 svtigs after filtering\n";
+			if (params.fp_logs.is_open())
+				params.fp_logs << "--> " << h1 << " haplotype 1, " << h2 << " haplotype 2 svtigs after filtering\n";
+		}
 	}
 	fai_destroy(fasta_index);
 

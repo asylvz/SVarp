@@ -277,3 +277,34 @@ std::string& reverse_complement(std::string& seq)
 	}
 	return seq;
 }
+
+std::string current_timestamp()
+{
+	auto now = std::chrono::system_clock::now();
+	std::time_t t = std::chrono::system_clock::to_time_t(now);
+	char buf[64];
+	std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&t));
+	return std::string(buf);
+}
+
+std::string format_duration(double seconds)
+{
+	int total = static_cast<int>(seconds);
+	int h = total / 3600;
+	int m = (total % 3600) / 60;
+	int s = total % 60;
+	char buf[32];
+	if (h > 0)
+		std::snprintf(buf, sizeof(buf), "%dh %dm %ds", h, m, s);
+	else if (m > 0)
+		std::snprintf(buf, sizeof(buf), "%dm %ds", m, s);
+	else
+		std::snprintf(buf, sizeof(buf), "%.1fs", seconds);
+	return std::string(buf);
+}
+
+void log_step(LogFile& fp_logs, const std::string& step)
+{
+	if (fp_logs.is_open())
+		fp_logs << "\n[" << current_timestamp() << "] " << step << "\n";
+}

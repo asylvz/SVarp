@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <chrono>
+#include <ctime>
 
 #define EXIT_SUCCESS 0
 #define EXIT_COMMON 1
@@ -50,6 +52,8 @@ typedef struct _parameters
 	std::string sample_name;
 	LogFile fp_svtigs;
 	LogFile fp_logs;
+	LogFile fp_asm_log;
+	LogFile fp_remap_log;
 	int threads;
 	int support;
 	int dist_threshold;
@@ -136,4 +140,7 @@ int run_and_log(const std::string& cmd, parameters& params, const std::string& l
 std::string find_executable(const std::string &progname, const std::vector<std::string> &extra_dirs = {});
 
 std::string& reverse_complement(std::string& seq);
+std::string current_timestamp();
+std::string format_duration(double seconds);
+void log_step(LogFile& fp_logs, const std::string& step);
 #endif

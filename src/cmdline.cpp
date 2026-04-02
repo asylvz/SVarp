@@ -3,6 +3,7 @@
 #include <fstream>
 #include <getopt.h>
 #include "cmdline.h"
+#include "common.h"
 
 
 int parse_command_line(int argc, char** argv, parameters& params)
@@ -298,7 +299,12 @@ void init_logs(parameters& params)
 		error(msg.c_str());
 	}
 	params.fp_logs.open(params.log_path + params.sample_name + ".log");
-		
+
+	if (params.debug) {
+		params.fp_asm_log.open(params.log_path + params.sample_name + "_assembly.log");
+		params.fp_remap_log.open(params.log_path + params.sample_name + "_remap.log");
+	}
+
 	params.remap_gaf_path = params.log_path + params.sample_name + "_remap.gaf";
 
 
@@ -309,10 +315,23 @@ void init_logs(parameters& params)
 
 	
 	if (params.fp_logs.is_open()) {
-		params.fp_logs << "\nParameters:\n\tMinimum read support: " << params.support << "\n\tMinimum distance threshold: " << params.dist_threshold << "\n\n";
-		params.fp_logs << "\tMinimum map ratio: " << params.min_map_ratio << "\n\tPrecise clipping (Graphaligner): " << params.min_precise_clipping << "\n\tAlignment score (Graphaligner): " << params.min_alignment_score << "\n\n";
-		params.fp_logs << "\nInput files:\n\t" << params.gaf << "\n\t" << params.ref_graph << "\n\t" << params.fasta << "\n";
-		params.fp_logs << "\nLog folder:\n\t" << params.log_path << "\n\n";
+		params.fp_logs << "SVarp v" << SVARP_VERSION << " (" << SVARP_UPDATE << ")\n";
+		params.fp_logs << "Run started: " << current_timestamp() << "\n";
+		params.fp_logs << "\nParameters:\n";
+		params.fp_logs << "  Minimum read support: " << params.support << "\n";
+		params.fp_logs << "  Minimum distance threshold: " << params.dist_threshold << "\n";
+		params.fp_logs << "  Minimum map ratio: " << params.min_map_ratio << "\n";
+		params.fp_logs << "  Precise clipping (GraphAligner): " << params.min_precise_clipping << "\n";
+		params.fp_logs << "  Alignment score (GraphAligner): " << params.min_alignment_score << "\n";
+		params.fp_logs << "  Threads: " << params.threads << "\n";
+		params.fp_logs << "  Debug: " << (params.debug ? "yes" : "no") << "\n";
+		params.fp_logs << "\nInput files:\n";
+		params.fp_logs << "  GAF:   " << params.gaf << "\n";
+		params.fp_logs << "  Graph: " << params.ref_graph << "\n";
+		params.fp_logs << "  FASTA: " << params.fasta << "\n";
+		if (!params.phase_tags.empty())
+			params.fp_logs << "  Phase: " << params.phase_tags << "\n";
+		params.fp_logs << "\nOutput: " << params.log_path << "\n";
 	}
 }
 

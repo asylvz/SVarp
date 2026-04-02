@@ -125,21 +125,29 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     if (contig_depth * 2 < read_set.size())
     {
         this->filter_hicov++;
+        if (params.fp_asm_log.is_open())
+            params.fp_asm_log << svtig_name << "\tFILTERED\treason=high_coverage\treads=" << read_set.size() << "\tcontig_depth=" << contig_depth << "\n";
         return 0;
     }
     else if (contig_depth > 5 * read_set.size())
     {
         this->filter_lowcov++;
+        if (params.fp_asm_log.is_open())
+            params.fp_asm_log << svtig_name << "\tFILTERED\treason=low_coverage\treads=" << read_set.size() << "\tcontig_depth=" << contig_depth << "\n";
         return 0;
     }
     else if (read_set.size() < support_threshold)
     {
         this->filter_support++;
+        if (params.fp_asm_log.is_open())
+            params.fp_asm_log << svtig_name << "\tFILTERED\treason=low_support\treads=" << read_set.size() << "\tthreshold=" << support_threshold << "\n";
         return 0;
     }
     else if (contig_depth > MAX_CONTIG_DEPTH)
     {
         this->filter_hicov++;
+        if (params.fp_asm_log.is_open())
+            params.fp_asm_log << svtig_name << "\tFILTERED\treason=max_contig_depth\treads=" << read_set.size() << "\tcontig_depth=" << contig_depth << "\n";
         return 0;
     }
 
@@ -206,6 +214,13 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     std::string bam_path  = output_path + ".bam";
     std::string cns_fa    = output_path + ".cns.fa";
 
+    // In debug mode, capture stderr; otherwise discard
+    std::string stderr_file = output_path + ".stderr";
+    std::string redir = params.debug ? (" 2>" + stderr_file) : " >/dev/null 2>&1";
+    std::string redir_pipe = params.debug ? (" 2>" + stderr_file) : " 2>/dev/null";
+
+    auto asm_t1 = std::chrono::steady_clock::now();
+
     // 1) wtdbg2 assembler
     std::string asm_cmd = wtdbg2_bin +
         std::string(" -t ") + std::to_string(wtdbg2_threads) +
@@ -213,16 +228,25 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         " -g " + genome_opt +
         " -fo " + output_path +
         " -i " + file_path +
-        " >/dev/null 2>&1";
+        redir;
 
     int rc = run_and_log(asm_cmd, params, "wtdbg2_asm", 0, 1, false);
     if (rc != 0 || !std::filesystem::exists(layout_gz))
     {
         if (params.fp_logs.is_open())
-            params.fp_logs << "[final_assembly] wtdbg2 assembler failed for "
+            params.fp_logs << "[warning] wtdbg2 assembly failed for "
                            << svtig_name << " (rc=" << rc << ")" << std::endl;
         std::cout << "[warning] wtdbg2 assembly failed for "
                   << svtig_name << std::endl;
+        if (params.fp_asm_log.is_open()) {
+            params.fp_asm_log << svtig_name << "\tFAILED\tstep=wtdbg2\trc=" << rc
+                              << "\treads=" << read_set.size() << "\n";
+            if (std::filesystem::exists(stderr_file)) {
+                std::ifstream ef(stderr_file); std::string el;
+                while (std::getline(ef, el))
+                    params.fp_asm_log << "  stderr: " << el << "\n";
+            }
+        }
         return 0;
     }
 
@@ -231,16 +255,25 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         std::string(" -t ") + std::to_string(threads) +
         " -i " + layout_gz +
         " -fo " + raw_fa +
-        " >/dev/null 2>&1";
+        redir;
 
     rc = run_and_log(cns_raw_cmd, params, "wtpoa_raw", 0, 1, false);
     if (rc != 0 || !std::filesystem::exists(raw_fa))
     {
         if (params.fp_logs.is_open())
-            params.fp_logs << "[final_assembly] wtpoa-cns raw consensus failed for "
+            params.fp_logs << "[warning] wtpoa-cns raw consensus failed for "
                            << svtig_name << " (rc=" << rc << ")" << std::endl;
         std::cout << "[warning] wtpoa-cns raw consensus failed for "
                   << svtig_name << std::endl;
+        if (params.fp_asm_log.is_open()) {
+            params.fp_asm_log << svtig_name << "\tFAILED\tstep=wtpoa-raw\trc=" << rc
+                              << "\treads=" << read_set.size() << "\n";
+            if (std::filesystem::exists(stderr_file)) {
+                std::ifstream ef(stderr_file); std::string el;
+                while (std::getline(ef, el))
+                    params.fp_asm_log << "  stderr: " << el << "\n";
+            }
+        }
         return 0;
     }
 
@@ -251,22 +284,25 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         " -ax map-ont" +
         " -t" + std::to_string(threads) +
         " -r2k " + raw_fa + " " + file_path +
-        " 2>/dev/null" +
+        redir_pipe +
         " | " +
         samtools_bin +
         " sort -m 2g -@" + std::to_string(smt_threads) +
         " -o " + bam_path +
-        " 2>/dev/null" +
+        redir_pipe +
         ") >/dev/null 2>&1";
 
     rc = run_and_log(map_sort_cmd, params, "mm2_samtools", 0, 1, false);
     if (rc != 0 || !std::filesystem::exists(bam_path))
     {
         if (params.fp_logs.is_open())
-            params.fp_logs << "[final_assembly] minimap2+samtools sort failed for "
+            params.fp_logs << "[warning] minimap2+samtools sort failed for "
                            << svtig_name << " (rc=" << rc << ")" << std::endl;
         std::cout << "[warning] minimap2+samtools sort failed for "
                   << svtig_name << std::endl;
+        if (params.fp_asm_log.is_open())
+            params.fp_asm_log << svtig_name << "\tFAILED\tstep=mm2+samtools\trc=" << rc
+                              << "\treads=" << read_set.size() << "\n";
         return 0;
     }
 
@@ -275,25 +311,40 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         "(" +
         samtools_bin +
         " view -F0x900 " + bam_path +
-        " 2>/dev/null" +
+        redir_pipe +
         " | " +
         wtpoa_bin +
         " -t " + std::to_string(threads) +
         " -d " + raw_fa +
         " -i - -fo " + cns_fa +
-        " 2>/dev/null" +
+        redir_pipe +
         ") >/dev/null 2>&1";
 
     rc = run_and_log(polish_cmd, params, "wtpoa_cns_polish", 0, 1, false);
 
     if (rc != 0 || !std::filesystem::exists(cns_fa))
     {
-        if (params.fp_logs.is_open()) 
-            params.fp_logs << "[final_assembly] wtdbg2 pipeline failed for "
+        if (params.fp_logs.is_open())
+            params.fp_logs << "[warning] wtdbg2 pipeline failed for "
                            << svtig_name << " (rc=" << rc << ")" << std::endl;
         std::cout << "[warning] wtdbg2 pipeline failed for "
                   << svtig_name << std::endl;
+        if (params.fp_asm_log.is_open())
+            params.fp_asm_log << svtig_name << "\tFAILED\tstep=polish\trc=" << rc
+                              << "\treads=" << read_set.size() << "\n";
         return 0;
+    }
+
+    auto asm_t2 = std::chrono::steady_clock::now();
+    if (params.fp_asm_log.is_open()) {
+        std::string contig_name = (sv != nullptr) ? sv->contig : "unknown";
+        int pos = (sv != nullptr) ? sv->ref_pos : 0;
+        params.fp_asm_log << svtig_name << "\tOK"
+                          << "\treads=" << read_set.size()
+                          << "\tcontig=" << contig_name
+                          << "\tpos=" << pos
+                          << "\ttime=" << format_duration(std::chrono::duration<double>(asm_t2 - asm_t1).count())
+                          << "\n";
     }
 	
     //Write the assembly to the tmp fasta file
@@ -360,7 +411,7 @@ void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> 
 
 	auto t1 = std::chrono::steady_clock::now();
 	std::cout << "\nAssembly..." << std::endl;
-	std::cout << "--->assembling reads using " << params.assembler << std::endl;
+	std::cout << "--> assembling reads using " << params.assembler << std::endl;
 
 	std::string svtigs_tmp_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
 	params.fp_svtigs.open(svtigs_tmp_path);
@@ -390,20 +441,23 @@ void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> 
 		params.fp_svtigs.close();
 	fai_destroy(fasta_index);
 
-	std::cout << "--->" << (filter_hicov) + (this->filter_lowcov) + (this->filter_support) << " filtered (" << this->filter_hicov << " high, " << this->filter_lowcov << " low coverage read clusters and " << this->filter_support << " low read support)\n";
+	std::cout << "--> " << (filter_hicov) + (this->filter_lowcov) + (this->filter_support) << " filtered (" << this->filter_hicov << " high, " << this->filter_lowcov << " low coverage read clusters and " << this->filter_support << " low read support)\n";
 
 	if (params.fp_logs.is_open())
-		params.fp_logs << "--->" << (this->filter_hicov) + (this->filter_lowcov) + (this->filter_support) << " filtered (" << this->filter_hicov << " high, " << this->filter_lowcov << " low coverage read clusters and " << this->filter_support << " low read support)\n";
+		params.fp_logs << "--> " << (this->filter_hicov) + (this->filter_lowcov) + (this->filter_support) << " filtered (" << this->filter_hicov << " high, " << this->filter_lowcov << " low coverage read clusters and " << this->filter_support << " low read support)\n";
 
-	std::cout << "--->" << unassembled_cnt << " clusters cannot be assembled\n";
+	std::cout << "--> " << unassembled_cnt << " clusters cannot be assembled\n";
 	if (params.fp_logs.is_open())
-		params.fp_logs << "--->" << unassembled_cnt << " clusters cannot be assembled\n";
+		params.fp_logs << "--> " << unassembled_cnt << " clusters cannot be assembled\n";
 
-	std::cout << "--->there are " << initial_svtigs_cnt << " svtigs before final filtering \n";
+	std::cout << "--> " << initial_svtigs_cnt << " svtigs before final filtering\n";
 	if (params.fp_logs.is_open())
-		params.fp_logs << "--->there are " << initial_svtigs_cnt << " svtigs before final filtering \n";
+		params.fp_logs << "--> " << initial_svtigs_cnt << " svtigs before final filtering\n";
 
 	auto t2 = std::chrono::steady_clock::now();
+	std::string asm_dur = format_duration(std::chrono::duration<double>(t2 - t1).count());
 
-	std::cout << "--->assembly execution time: " << std::chrono::duration<double>(t2 - t1).count() << " sec.\n";
+	std::cout << "--> assembly execution time: " << asm_dur << "\n";
+	if (params.fp_logs.is_open())
+		params.fp_logs << "--> assembly execution time: " << asm_dur << "\n";
 }

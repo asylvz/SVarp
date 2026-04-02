@@ -318,22 +318,39 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 	}
 	auto t2 = std::chrono::steady_clock::now();
 
-	std::cout<<"--->execution time: "<<std::chrono::duration<double> (t2 - t1).count()<<"sec.\n";
-	std::cout<<"--->"<<primary_cnt<<" primary mappings and "<<insertion_cnt<<" insertion, "<<deletion_cnt<<" deletion loci in the cigar\n";
-	std::cout<<"--->there are "<<inter_cnt + intra_cnt<<" SV signal (" <<inter_cnt<< " inter alignment and "<<intra_cnt<<" intra alignment)\n";
-	std::cout<<"--->there are "<<unmapped.size()<<" unmapped alignments\n";
-	
-	if (params.fp_logs.is_open()) { params.fp_logs << "--->" << primary_cnt << " primary mappings and " << insertion_cnt << " insertion, " << deletion_cnt << " deletion loci in the cigar\n"; }
-	if (params.fp_logs.is_open()) { params.fp_logs << "--->there are " << inter_cnt + intra_cnt << " SV signal (" << inter_cnt << " inter alignment and " << intra_cnt << " intra alignment)\n"; }
-	if (params.fp_logs.is_open()) { params.fp_logs << "--->there are " << unmapped.size() << " unmapped alignments\n"; }
-	
+	std::cout<<"--> execution time: "<<format_duration(std::chrono::duration<double>(t2 - t1).count())<<"\n";
+	std::cout<<"--> "<<primary_cnt<<" primary mappings and "<<insertion_cnt<<" insertion, "<<deletion_cnt<<" deletion loci in the cigar\n";
+	std::cout<<"--> "<<inter_cnt + intra_cnt<<" SV signal (" <<inter_cnt<< " inter alignment and "<<intra_cnt<<" intra alignment)\n";
+	std::cout<<"--> "<<unmapped.size()<<" unmapped alignments\n";
+
+	if (params.fp_logs.is_open()) {
+		params.fp_logs << "--> execution time: " << format_duration(std::chrono::duration<double>(t2 - t1).count()) << "\n";
+		params.fp_logs << "--> " << primary_cnt << " primary mappings and " << insertion_cnt << " insertion, " << deletion_cnt << " deletion loci in the cigar\n";
+		params.fp_logs << "--> " << inter_cnt + intra_cnt << " SV signal (" << inter_cnt << " inter alignment and " << intra_cnt << " intra alignment)\n";
+		params.fp_logs << "--> " << unmapped.size() << " unmapped alignments\n";
+	}
+
 	std::map<std::string, Contig*>::iterator it2;
-	
-	if (params.fp_logs.is_open()) { params.fp_logs << "------->Contig coverage\n\n"; }
+
+	int contigs_without_coverage = 0;
+	if (params.fp_logs.is_open()) { params.fp_logs << "\nContig coverage (only contigs with mapped reads):\n"; }
 	for (it2=ref.begin(); it2 != ref.end(); ++it2)
 	{
 		it2->second->coverage = (it2->second->contig_length > 0) ? (double) it2->second->mapped_bases / it2->second->contig_length : 0.0;
-		if (params.fp_logs.is_open()) { params.fp_logs << it2->first << "---> LEN= " << it2->second->contig_length << " - Mapped bases= " << it2->second->mapped_bases << " - Mapped reads= " << it2->second->mapped_reads << " - Cov= " << it2->second->coverage << std::endl; }
+		if (it2->first == "overall")
+			continue;
+		if (it2->second->mapped_reads > 0) {
+			if (params.fp_logs.is_open()) { params.fp_logs << "  " << it2->first << "\tLEN=" << it2->second->contig_length << "\tMapped_bases=" << it2->second->mapped_bases << "\tMapped_reads=" << it2->second->mapped_reads << "\tCov=" << it2->second->coverage << "\n"; }
+		} else {
+			contigs_without_coverage++;
+		}
+	}
+	if (params.fp_logs.is_open()) { params.fp_logs << "  (" << contigs_without_coverage << " contigs with 0 coverage omitted)\n"; }
+	// Overall summary line, separated
+	it2 = ref.find("overall");
+	if (it2 != ref.end()) {
+		it2->second->coverage = (it2->second->contig_length > 0) ? (double) it2->second->mapped_bases / it2->second->contig_length : 0.0;
+		if (params.fp_logs.is_open()) { params.fp_logs << "\n  OVERALL\tLEN=" << it2->second->contig_length << "\tMapped_bases=" << it2->second->mapped_bases << "\tMapped_reads=" << it2->second->mapped_reads << "\tCov=" << it2->second->coverage << "\n"; }
 	}			
 	
 	return RETURN_SUCCESS;

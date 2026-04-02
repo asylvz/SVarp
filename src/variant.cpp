@@ -237,8 +237,13 @@ int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map
 	merge_neighbor_nodes(params, gfa, init_svtigs, incoming, outgoing);
 	find_final_svtigs(params, init_svtigs, final_svtigs, svtig_cnt_rp_filtered);
 		
-	std::cout<<"--->"<<svtig_cnt<<" read clusters (putative svtigs) after merging and\n";
-	std::cout<<"--->"<<svtig_cnt_rp_filtered<<" read clusters after filtering based on minimum read support\n\n";
+	std::cout<<"--> "<<svtig_cnt<<" read clusters (putative svtigs) after merging\n";
+	std::cout<<"--> "<<svtig_cnt_rp_filtered<<" read clusters after filtering based on minimum read support\n\n";
+
+	if (params.fp_logs.is_open()) {
+		params.fp_logs << "--> " << svtig_cnt << " read clusters (putative svtigs) after merging\n";
+		params.fp_logs << "--> " << svtig_cnt_rp_filtered << " read clusters after filtering based on minimum read support\n";
+	}
 
 	return RETURN_SUCCESS;
 }
