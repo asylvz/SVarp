@@ -192,6 +192,12 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     }
 
     int threads     = params.threads;
+#if defined(__APPLE__) && defined(__aarch64__)
+    // wtdbg2 + sse2neon crashes with multiple threads on macOS ARM
+    int wtdbg2_threads = 1;
+#else
+    int wtdbg2_threads = threads;
+#endif
     int smt_threads = (threads < 4 ? 4 : threads);
     std::string genome_opt = std::to_string(var_size) + "m";
 
@@ -202,7 +208,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
 
     // 1) wtdbg2 assembler
     std::string asm_cmd = wtdbg2_bin +
-        std::string(" -t ") + std::to_string(threads) +
+        std::string(" -t ") + std::to_string(wtdbg2_threads) +
         " -x ont" +
         " -g " + genome_opt +
         " -fo " + output_path +
