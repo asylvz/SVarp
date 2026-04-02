@@ -86,7 +86,7 @@ build/test_logfile: src/logfile.cpp tests/logfile_test.cpp
 	mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I. -Isrc -Idep/htslib -Idep/wfa src/logfile.cpp tests/logfile_test.cpp -o $@
 
-test-common: build/test_common_parse_gaf build/test_cigar build/test_common_utils build/test_run_and_log build/test_variant build/test_generate_sv_node build/test_merge_neighbor_nodes build/test_assembly build/test_remap build/test_alignment build/test_phasing build/test_variant_mapping build/test_alignment_read_gz
+test-common: build/test_common_parse_gaf build/test_cigar build/test_common_utils build/test_run_and_log build/test_variant build/test_generate_sv_node build/test_merge_neighbor_nodes build/test_assembly build/test_remap build/test_alignment build/test_phasing build/test_variant_mapping build/test_alignment_read_gz build/test_reference
 	./build/test_common_parse_gaf
 	./build/test_cigar
 	./build/test_common_utils
@@ -100,6 +100,7 @@ test-common: build/test_common_parse_gaf build/test_cigar build/test_common_util
 	./build/test_phasing
 	./build/test_variant_mapping
 	./build/test_alignment_read_gz
+	./build/test_reference
 
 test-all: test-logfile test-common
 	@echo "=== All tests finished ==="
@@ -167,6 +168,10 @@ build/test_phasing: tests/phasing_test.cpp src/phasing.cpp src/variant.cpp src/c
 build/test_alignment_read_gz: tests/alignment_read_gz_test.cpp src/alignment.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
 	mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/alignment.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/alignment_read_gz_test.cpp -o $@ $(LDFLAGS)
+
+build/test_reference: tests/reference_test.cpp src/common.cpp src/reference.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/common.cpp src/reference.cpp src/logfile.cpp tests/reference_test.cpp -o $@ -lz
 
 
 # Main binary
