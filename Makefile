@@ -1,5 +1,5 @@
-SVARP_VERSION := "1.1.1"
-SVARP_UPDATE  := "Dec 09, 2025"
+SVARP_VERSION := "1.2.0"
+SVARP_UPDATE  := "Apr 03, 2026"
 SVARP_DEBUG   := 0
 BUILD_DATE    := "$(shell date)"
 
