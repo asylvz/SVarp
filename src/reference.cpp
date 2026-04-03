@@ -29,53 +29,53 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 		p = q;
 		node_count += 1;
 
-		if (gfa.count(node) == 0)
+		auto git = gfa.find(node);
+		if (git == gfa.end())
 			continue;
+
+		gfaNode* gn = git->second;
+		Contig* rc = ref[gn->contig];
+		Contig* overall = ref["overall"];
 
 		if ((node_count == 1) && (p == path.size())) //the single node
 		{
+			rc->mapped_bases += path_end - path_start;
+			rc->mapped_reads++;
 
-			std::string contig = gfa[node]->contig; 
-			ref[contig]->mapped_bases += path_end - path_start;	
-			ref[contig]->mapped_reads++;	
+			overall->mapped_reads++;
+			overall->mapped_bases += path_end - path_start;
 
-			ref["overall"]->mapped_reads++;	
-			ref["overall"]->mapped_bases += path_end - path_start;
-		
 			return path_end - path_start;
 		}
 		else if((node_count == 1) && (p < path.size())) //first node
 		{
-			std::string contig = gfa[node]->contig; 
-			ref[contig]->mapped_bases += gfa[node]->len - path_start;	
-			ref[contig]->mapped_reads++;	
+			rc->mapped_bases += gn->len - path_start;
+			rc->mapped_reads++;
 
-			ref["overall"]->mapped_reads++;	
-			ref["overall"]->mapped_bases += gfa[node]->len - path_start;
-			
-			total_so_far += gfa[node]->len - path_start;
+			overall->mapped_reads++;
+			overall->mapped_bases += gn->len - path_start;
+
+			total_so_far += gn->len - path_start;
 		}
 		else if(p == path.size()) //Last node
 		{
-			std::string contig = gfa[node]->contig; 
-			ref[contig]->mapped_bases += total_path_length - total_so_far;
-			ref[contig]->mapped_reads++;	
+			rc->mapped_bases += total_path_length - total_so_far;
+			rc->mapped_reads++;
 
-			ref["overall"]->mapped_reads++;	
-			ref["overall"]->mapped_bases += total_path_length - total_so_far;
-			
+			overall->mapped_reads++;
+			overall->mapped_bases += total_path_length - total_so_far;
+
 			return total_path_length;
 		}
 		else //middle node
 		{
-			std::string contig = gfa[node]->contig; 
-			ref[contig]->mapped_bases += gfa[node]->len;		
-			ref[contig]->mapped_reads++;	
+			rc->mapped_bases += gn->len;
+			rc->mapped_reads++;
 
-			ref["overall"]->mapped_reads++;	
-			ref["overall"]->mapped_bases += gfa[node]->len;		
+			overall->mapped_reads++;
+			overall->mapped_bases += gn->len;
 
-			total_so_far += gfa[node]->len;
+			total_so_far += gn->len;
 		}
 	}
 	std::cerr<<"Error in contig_coverage()\n";

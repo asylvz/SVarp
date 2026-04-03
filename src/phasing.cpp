@@ -40,7 +40,7 @@ int read_phase_file(parameters& params, std::map<std::string, phase*>& phased_re
 	return RETURN_SUCCESS;
 }
 
-void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string, std::vector<SVCluster*>>& vars)
+void phase_svs(const std::map<std::string, phase*>& phased_reads, std::map<std::string, std::vector<SVCluster*>>& vars)
 {
 	std::map<std::string, std::vector<SVCluster*>>::iterator itr;
 
@@ -53,25 +53,22 @@ void phase_svs(std::map<std::string, phase*> phased_reads, std::map<std::string,
 		{
 			for (auto &read: sv->reads_untagged)
 			{
-				if (phased_reads.find(read) == phased_reads.end())
-				{
-					//std::cout <<read<< " not found in your .tsv file...\n";
+				auto pit = phased_reads.find(read);
+				if (pit == phased_reads.end())
 					continue;
-				}	
-				//std::cout<<phased_reads[read]->haplotype<<" "<< phased_reads[read]->phase_set <<std::endl;
-				if(phased_reads[read]->haplotype == "none" || phased_reads[read]->phase_set == "none")
+
+				if(pit->second->haplotype == "none" || pit->second->phase_set == "none")
 				{
-					//none_reads.insert(read);
 					none_cnt++;
 					continue;
 				}
 
-				if (phased_reads[read]->haplotype == "H1")
+				if (pit->second->haplotype == "H1")
 				{
 					sv->reads_h1.insert(read);
 					h1_cnt++;
 				}
-				else if (phased_reads[read]->haplotype == "H2")
+				else if (pit->second->haplotype == "H2")
 				{
 					sv->reads_h2.insert(read);
 					h2_cnt++;
