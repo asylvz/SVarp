@@ -26,7 +26,6 @@ else
   RT_LIB := -lrt
 endif
 
-ifeq (1, ${DEBUG})
 EXTRA_CFLAGS  ?=
 EXTRA_LDFLAGS ?=
 
