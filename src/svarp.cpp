@@ -12,6 +12,8 @@
 
 int main(int argc, char** argv)
 {
+	std::cout << std::unitbuf; // flush stdout after every write
+
 	auto t_start = std::chrono::steady_clock::now();
 
 	std::map <std::string, Variant*> tmp_var;

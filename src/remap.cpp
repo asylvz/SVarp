@@ -349,7 +349,7 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 	}
 
 	std::cout<<"--> "<< filtered << " filtered - " << dup_legit.first<<" duplicate\n";
-	std::cout<<"--> "<< primary<<" primary, "<<secondary<<" secondary mappings, "<<lowmq<<" low MAPQ(<"<<MINMAPQREMAP<<")" <<"; svtigs from multiple contig assemblies = "<<extra_added<<"\n";
+	// Detailed mapping stats only in log file
 
 	if (params.fp_logs.is_open()) {
 		params.fp_logs << "--> " << filtered << " filtered - " << dup_legit.first << " duplicate\n";

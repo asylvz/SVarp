@@ -279,7 +279,8 @@ int parse_command_line(int argc, char** argv, parameters& params)
 void init_logs(parameters& params)
 {	
 	
-	std::cout<<"\n...hallo, merhaba, ola, salaam, hello!!! SVarp is running...\n";
+	std::cout << "\nSVarp v" << SVARP_VERSION << " (" << SVARP_UPDATE << ")\n";
+	std::cout << "...hallo, merhaba, ola, salaam, hello!!! SVarp is running...\n";
 	if(std::filesystem::exists(params.log_path))
 		std::filesystem::remove_all(params.log_path);
   	
@@ -312,10 +313,22 @@ void init_logs(parameters& params)
 	params.remap_gaf_path = params.log_path + params.sample_name + "_remap.gaf";
 
 
-	std::cout<<"\nParameters:\n\tMinimum read support: "<<params.support<<"\n\tMinimum distance threshold: "<< params.dist_threshold<<"\n"<<std::endl;
-	std::cout<<"\tMinimum map ratio: "<<params.min_map_ratio<<"\n\tPrecise clipping (Graphaligner): "<< params.min_precise_clipping<<"\n\tAlignment score (Graphaligner): "<< params.min_alignment_score<<"\n"<<std::endl;
-	std::cout<<"\nInput files:\n\t"<<params.gaf<<"\n\t"<< params.ref_graph<<"\n\t"<<params.fasta<<std::endl;
-	std::cout<<"\nLog folder:\n\t"<<params.log_path<<std::endl;
+	std::cout << "\nParameters:\n";
+	std::cout << "  Minimum read support: " << params.support << "\n";
+	std::cout << "  Minimum distance threshold: " << params.dist_threshold << "\n";
+	std::cout << "  Minimum map ratio: " << params.min_map_ratio << "\n";
+	std::cout << "  Precise clipping (GraphAligner): " << params.min_precise_clipping << "\n";
+	std::cout << "  Alignment score (GraphAligner): " << params.min_alignment_score << "\n";
+	std::cout << "  Threads: " << params.threads << "\n";
+	if (params.debug)
+		std::cout << "  Debug: yes\n";
+	std::cout << "\nInput files:\n";
+	std::cout << "  " << params.gaf << "\n";
+	std::cout << "  " << params.ref_graph << "\n";
+	std::cout << "  " << params.fasta << "\n";
+	if (!params.phase_tags.empty())
+		std::cout << "  " << params.phase_tags << "\n";
+	std::cout << "\nOutput: " << params.log_path << "\n";
 
 	
 	if (params.fp_logs.is_open()) {

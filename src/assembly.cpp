@@ -424,9 +424,51 @@ void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> 
 	if (!fasta_index)
 		error("Error loading FASTA index: file not found or corrupted");
 
-	// Iterating over contigs; i.e., check SV clusters of each contig
+	// Count total clusters for progress reporting
+	int total_clusters = 0;
 	for (itr = vars.begin(); itr != vars.end(); ++itr)
-		initial_svtigs_cnt += assemble_clusters(params, fasta_index, itr->second, depth, final_svtigs);
+		total_clusters += itr->second.size();
+
+	// Iterating over contigs; i.e., check SV clusters of each contig
+	int processed_clusters = 0;
+	for (itr = vars.begin(); itr != vars.end(); ++itr)
+	{
+		for (auto &sv : itr->second)
+		{
+			double contig_depth = depth[sv->contig]->coverage;
+			if (contig_depth < 5)
+				contig_depth = 5;
+
+			std::string svtig_name;
+			if ((params.phase_tags).empty())
+			{
+				svtig_name = sv->node + "_" + std::to_string(sv->start_pos);
+				initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_untagged, svtig_name, contig_depth, sv, final_svtigs);
+			}
+			else
+			{
+				svtig_name = "H1-" + sv->node + "_" + std::to_string(sv->start_pos);
+				initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_h1, svtig_name, contig_depth, sv, final_svtigs);
+
+				svtig_name = "H2-" + sv->node + "_" + std::to_string(sv->start_pos);
+				initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_h2, svtig_name, contig_depth, sv, final_svtigs);
+
+				if (!params.skip_untagged)
+				{
+					svtig_name = "None-" + sv->node + "_" + std::to_string(sv->start_pos);
+					initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_untagged, svtig_name, contig_depth, sv, final_svtigs);
+				}
+			}
+
+			processed_clusters++;
+			if (processed_clusters % 100 == 0)
+			{
+				std::cout << "\r--> assembled " << processed_clusters << "/" << total_clusters << " clusters" << std::flush;
+			}
+		}
+	}
+	if (total_clusters >= 100)
+		std::cout << "\r--> assembled " << total_clusters << "/" << total_clusters << " clusters\n";
 
 	// Assemble unmapped reads
 	double unmapped_count = static_cast<double>(unmapped.size());
