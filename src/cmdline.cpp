@@ -31,10 +31,11 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		{"sample" , required_argument, NULL, 'i'},
 		{"threads" , required_argument, NULL, 't'},
 		{"debug" , no_argument, NULL, 'u'},
+		{"version" , no_argument, NULL, 'v'},
 		{NULL, 0, NULL, 0}
 	};
-	
-	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:h:i:j:m:n:o:p:r:s:t:u:", long_options, &index)) != -1)
+
+	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jmn:o:p:rs:t:uv", long_options, &index)) != -1)
 	{
 		switch(o)
 		{
@@ -91,6 +92,9 @@ int parse_command_line(int argc, char** argv, parameters& params)
 				break;
 			case 'h':
 				print_help();
+				exit(0);
+			case 'v':
+				std::cout << "SVarp v" << SVARP_VERSION << " (" << SVARP_UPDATE << ")" << std::endl;
 				exit(0);
 		}
 	}	
@@ -354,17 +358,15 @@ void print_help()
 	std::cerr << "\t--fasta (-f)                : Fasta sequence file"<<std::endl;
 	std::cerr << std::endl;
 	std::cerr << "Optional arguments"<<std::endl;
-	std::cerr << "\t--sample (-i)               : Sample name."<<std::endl;
-	std::cerr << "\t--out (-o)                  : Output folder."<<std::endl;
-	std::cerr << "\t--debug                     : Output multiple log files for debugging purpose."<<std::endl;
-	std::cerr << "\t--skip-untagged             : Output only phased variants (~30\% faster)."<<std::endl;
-	std::cerr << "\t--dist_threshold (-d)       : Distance threshold to merge SV breakpoints (default=100)"<<std::endl;
+	std::cerr << "\t--sample (-i)               : Sample (Individual) name"<<std::endl;
 	std::cerr << "\t--out (-o)                  : Output folder path"<<std::endl;
 	std::cerr << "\t--phase (-p)                : WhatsHap haplotag file in .tsv (https://whatshap.readthedocs.io/en/latest/guide.html#whatshap-haplotag)"<<std::endl;
-	std::cerr << "\t--reads(-r)                 : Bgzipped FASTA file of reads for extensive mode (needed for WFA realignment)"<<std::endl;
-	std::cerr << "\t--sample (-i)               : Sample (Individual) name"<<std::endl;
 	std::cerr << "\t--support (-s)              : Minimum support for a cluster to be assembled (default=5 for diploid samples)"<<std::endl;
-	std::cerr << "\t--threads(-t)               : Number of threads for assembly and realignment (default:32)"<<std::endl;
+	std::cerr << "\t--dist-threshold (-d)       : Distance threshold to merge SV breakpoints (default=100)"<<std::endl;
+	std::cerr << "\t--threads (-t)              : Number of threads for assembly and realignment (default=16)"<<std::endl;
+	std::cerr << "\t--skip-untagged             : Output only phased variants (~30\% faster)"<<std::endl;
+	std::cerr << "\t--no-remap (-r)             : Skip remapping (not suggested)"<<std::endl;
+	std::cerr << "\t--debug (-u)                : Output multiple log files for debugging purpose"<<std::endl;
 	//std::cerr << "\t--assembler                 : (Experimental) Assembler can be either \"Shasta\", \"wtdbg2\" or \"bsalign\" (default:wtdbg2) "<<std::endl;
 	//std::cerr << "\t--asm                       : (Experimental) Runs in assembly mode. You can provide assembly to find the variations. This outputs exact breakpoints instead of SVtigs"<<std::endl;
 	std::cerr << "\t--help                      : Print this help menu"<<std::endl;
