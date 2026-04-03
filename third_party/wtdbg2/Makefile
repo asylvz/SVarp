@@ -27,12 +27,16 @@ else
 endif
 
 ifeq (1, ${DEBUG})
-CFLAGS=-g -W -Wall -Wno-unused-but-set-variable -O0 -DDEBUG=1 -DVERSION="$(VERSION)" -DRELEASE="$(RELEASE)" -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -std=gnu11 $(ARCH_FLAGS)
+EXTRA_CFLAGS  ?=
+EXTRA_LDFLAGS ?=
+
+ifeq (1, ${DEBUG})
+CFLAGS=-g -W -Wall -Wno-unused-but-set-variable -O0 -DDEBUG=1 -DVERSION="$(VERSION)" -DRELEASE="$(RELEASE)" -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -std=gnu11 $(ARCH_FLAGS) $(EXTRA_CFLAGS)
 else
-CFLAGS=-g -W -Wall -Wno-unused-but-set-variable -O3 -DVERSION="$(VERSION)" -DRELEASE="$(RELEASE)" -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -std=gnu11 $(ARCH_FLAGS)
+CFLAGS=-g -W -Wall -Wno-unused-but-set-variable -O3 -DVERSION="$(VERSION)" -DRELEASE="$(RELEASE)" -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE -std=gnu11 $(ARCH_FLAGS) $(EXTRA_CFLAGS)
 endif
 
-GLIBS=-lm $(RT_LIB) -lpthread -lz
+GLIBS=-lm $(RT_LIB) -lpthread -lz $(EXTRA_LDFLAGS)
 GENERIC_SRC=mem_share.h chararray.h sort.h list.h pgzf.h sort.h list.h dna.h thread.h filereader.h filewriter.h bitvec.h bit2vec.h bitsvec.h hashset.h
 
 PROGS=kbm2 wtdbg2 wtdbg-cns wtpoa-cns pgzf

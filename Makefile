@@ -328,4 +328,4 @@ ifeq ($(shell uname -s),Darwin)
 endif
 
 $(WTDBG2_BIN):
-	cd $(WTDBG2_DIR) && $(MAKE) CC=$(WTDBG2_CC)
+	cd $(WTDBG2_DIR) && $(MAKE) CC=$(WTDBG2_CC) EXTRA_CFLAGS="$(EXTRA_CFLAGS)" EXTRA_LDFLAGS="$(EXTRA_LDFLAGS)"
