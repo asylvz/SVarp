@@ -32,10 +32,11 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		{"threads" , required_argument, NULL, 't'},
 		{"debug" , no_argument, NULL, 'u'},
 		{"version" , no_argument, NULL, 'v'},
+		{"reads" , required_argument, NULL, 'w'},
 		{NULL, 0, NULL, 0}
 	};
 
-	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jmn:o:p:rs:t:uv", long_options, &index)) != -1)
+	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jmn:o:p:rs:t:uvw:", long_options, &index)) != -1)
 	{
 		switch(o)
 		{
@@ -89,6 +90,9 @@ int parse_command_line(int argc, char** argv, parameters& params)
 				break;
 			case 'u':
 				params.debug = true;
+				break;
+			case 'w':
+				params.read_type = optarg;
 				break;
 			case 'h':
 				print_help();
@@ -253,6 +257,14 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		}
 	}
 
+	if(params.read_type.empty())
+		params.read_type = "ont";
+	else if(params.read_type != "ont" && params.read_type != "hifi" && params.read_type != "clr")
+	{
+		std::cerr << "[SVARP CMDLINE ERROR] --reads must be one of: ont, hifi, clr (got: " << params.read_type << ")" << std::endl;
+		return RETURN_ERROR;
+	}
+
 	// Validate input files exist
 	if (!std::filesystem::exists(params.gaf))
 	{
@@ -319,6 +331,7 @@ void init_logs(parameters& params)
 	std::cout << "  Minimum map ratio: " << params.min_map_ratio << "\n";
 	std::cout << "  Precise clipping (GraphAligner): " << params.min_precise_clipping << "\n";
 	std::cout << "  Alignment score (GraphAligner): " << params.min_alignment_score << "\n";
+	std::cout << "  Read type: " << params.read_type << "\n";
 	std::cout << "  Threads: " << params.threads << "\n";
 	if (params.debug)
 		std::cout << "  Debug: yes\n";
@@ -340,6 +353,7 @@ void init_logs(parameters& params)
 		params.fp_logs << "  Minimum map ratio: " << params.min_map_ratio << "\n";
 		params.fp_logs << "  Precise clipping (GraphAligner): " << params.min_precise_clipping << "\n";
 		params.fp_logs << "  Alignment score (GraphAligner): " << params.min_alignment_score << "\n";
+		params.fp_logs << "  Read type: " << params.read_type << "\n";
 		params.fp_logs << "  Threads: " << params.threads << "\n";
 		params.fp_logs << "  Debug: " << (params.debug ? "yes" : "no") << "\n";
 		params.fp_logs << "\nInput files:\n";
@@ -376,6 +390,7 @@ void print_help()
 	std::cerr << "\t--phase (-p)                : WhatsHap haplotag file in .tsv (https://whatshap.readthedocs.io/en/latest/guide.html#whatshap-haplotag)"<<std::endl;
 	std::cerr << "\t--support (-s)              : Minimum support for a cluster to be assembled (default=5 for diploid samples)"<<std::endl;
 	std::cerr << "\t--dist-threshold (-d)       : Distance threshold to merge SV breakpoints (default=100)"<<std::endl;
+	std::cerr << "\t--reads (-w)                : Read type: ont, hifi, or clr (default=ont)"<<std::endl;
 	std::cerr << "\t--threads (-t)              : Number of threads for assembly and realignment (default=16)"<<std::endl;
 	std::cerr << "\t--skip-untagged             : Output only phased variants (~30\% faster)"<<std::endl;
 	std::cerr << "\t--no-remap (-r)             : Skip remapping (not suggested)"<<std::endl;

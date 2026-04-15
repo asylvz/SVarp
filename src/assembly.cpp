@@ -212,6 +212,19 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     int smt_threads = (threads < 4 ? 4 : threads);
     std::string genome_opt = std::to_string(var_size) + "m";
 
+    // Set presets based on read type
+    std::string wtdbg2_preset, minimap2_preset;
+    if (params.read_type == "hifi") {
+        wtdbg2_preset = "sq";
+        minimap2_preset = "map-hifi";
+    } else if (params.read_type == "clr") {
+        wtdbg2_preset = "rs";
+        minimap2_preset = "map-pb";
+    } else {
+        wtdbg2_preset = "ont";
+        minimap2_preset = "map-ont";
+    }
+
     std::string layout_gz = output_path + ".ctg.lay.gz";
     std::string raw_fa    = output_path + ".raw.fa";
     std::string bam_path  = output_path + ".bam";
@@ -227,7 +240,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     // 1) wtdbg2 assembler
     std::string asm_cmd = wtdbg2_bin +
         std::string(" -t ") + std::to_string(wtdbg2_threads) +
-        " -x ont" +
+        " -x " + wtdbg2_preset +
         " -g " + genome_opt +
         " -fo " + output_path +
         " -i " + file_path +
@@ -284,7 +297,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     std::string map_sort_cmd =
         "(" +
         minimap2_bin +
-        " -ax map-ont" +
+        " -ax " + minimap2_preset +
         " -t" + std::to_string(threads) +
         " -r2k " + raw_fa + " " + file_path +
         redir_pipe +

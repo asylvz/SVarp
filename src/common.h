@@ -59,6 +59,9 @@ typedef struct _parameters
 	int dist_threshold;
 	double min_map_ratio; //Used in filtering
 	
+	//Read type: ont, hifi, clr
+	std::string read_type;
+
 	//Graphaligner parameters
 	int min_alignment_score;
 	double min_precise_clipping;
