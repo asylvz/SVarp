@@ -174,21 +174,22 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     // wtdbg2 -> wtpoa-cns (raw) -> minimap2 | samtools sort -> wtpoa-cns (polish)
     std::vector<std::string> extra_dirs = {"third_party/wtdbg2", "dep/wtdbg2", "dep/minimap2", "dep/samtools"};
 
-    std::string wtdbg2_bin = find_executable("wtdbg2");
+    // Prefer bundled binaries over PATH
+    std::string wtdbg2_bin = find_executable("wtdbg2", extra_dirs);
     if (wtdbg2_bin.empty())
-        wtdbg2_bin = find_executable("wtdbg2", extra_dirs);
+        wtdbg2_bin = find_executable("wtdbg2");
 
-    std::string wtpoa_bin = find_executable("wtpoa-cns");
+    std::string wtpoa_bin = find_executable("wtpoa-cns", extra_dirs);
     if (wtpoa_bin.empty())
-        wtpoa_bin = find_executable("wtpoa-cns", extra_dirs);
+        wtpoa_bin = find_executable("wtpoa-cns");
 
-    std::string minimap2_bin = find_executable("minimap2");
+    std::string minimap2_bin = find_executable("minimap2", extra_dirs);
     if (minimap2_bin.empty())
-        minimap2_bin = find_executable("minimap2", extra_dirs);
+        minimap2_bin = find_executable("minimap2");
 
-    std::string samtools_bin = find_executable("samtools");
+    std::string samtools_bin = find_executable("samtools", extra_dirs);
     if (samtools_bin.empty())
-        samtools_bin = find_executable("samtools", extra_dirs);
+        samtools_bin = find_executable("samtools");
 
     if (wtdbg2_bin.empty() || wtpoa_bin.empty() ||
         minimap2_bin.empty() || samtools_bin.empty())
@@ -215,7 +216,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     // Set presets based on read type
     std::string wtdbg2_preset, minimap2_preset;
     if (params.read_type == "hifi") {
-        wtdbg2_preset = "sq";
+        wtdbg2_preset = "ccs";
         minimap2_preset = "map-hifi";
     } else if (params.read_type == "clr") {
         wtdbg2_preset = "rs";
@@ -338,11 +339,13 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
 
     rc = run_and_log(polish_cmd, params, "wtpoa_cns_polish", 0, 1, false);
 
-    if (rc != 0 || !std::filesystem::exists(cns_fa))
+    if (rc != 0 || !std::filesystem::exists(cns_fa) || std::filesystem::file_size(cns_fa) == 0)
     {
         if (params.fp_logs.is_open())
             params.fp_logs << "[warning] wtdbg2 pipeline failed for "
-                           << svtig_name << " (rc=" << rc << ")" << std::endl;
+                           << svtig_name << " (rc=" << rc << ", empty="
+                           << (std::filesystem::exists(cns_fa) && std::filesystem::file_size(cns_fa) == 0)
+                           << ")" << std::endl;
         std::cout << "[warning] wtdbg2 pipeline failed for "
                   << svtig_name << std::endl;
         if (params.fp_asm_log.is_open())
