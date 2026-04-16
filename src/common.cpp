@@ -10,6 +10,9 @@
 #include "common.h"
 #include <filesystem>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
 
 int parse_gaf_line(std::string& line, Gaf& gafline)
@@ -191,10 +194,35 @@ std::string find_executable(const std::string &progname,
             return progname;
     }
 
+    // Resolve extra_dirs relative to the svarp binary's directory
+    fs::path exe_dir;
+    {
+        char buf[4096];
+#ifdef __linux__
+        ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+#elif defined(__APPLE__)
+        uint32_t sz = sizeof(buf);
+        int ret = _NSGetExecutablePath(buf, &sz);
+        ssize_t len = (ret == 0) ? strlen(buf) : -1;
+#else
+        ssize_t len = -1;
+#endif
+        if (len > 0) {
+            buf[len] = '\0';
+            exe_dir = fs::path(buf).parent_path().parent_path(); // build/../ = SVarp root
+        }
+    }
+
     for (const auto& d : extra_dirs) {
         fs::path p = fs::path(d) / progname;
         if (fs::exists(p) && access(p.c_str(), X_OK) == 0)
             return p.string();
+        // Try relative to svarp binary's root directory
+        if (!exe_dir.empty()) {
+            fs::path p2 = exe_dir / d / progname;
+            if (fs::exists(p2) && access(p2.c_str(), X_OK) == 0)
+                return p2.string();
+        }
     }
 
     {
