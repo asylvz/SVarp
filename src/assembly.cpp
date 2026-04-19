@@ -238,8 +238,18 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
 
     auto asm_t1 = std::chrono::steady_clock::now();
 
+    // Per-step wall-clock caps. wtpoa-cns has been observed to hang on
+    // pathological HiFi clusters (single-cluster freezes of 24 h+ seen in
+    // practice); without a cap the whole run stalls. `timeout` returns 124
+    // when the child is killed for exceeding the limit, which our empty-
+    // output check then catches as a FAILED cluster.
+    const std::string TIMEOUT_WTDBG2     = "timeout 600s ";
+    const std::string TIMEOUT_WTPOA_RAW  = "timeout 120s ";
+    const std::string TIMEOUT_MM2_SORT   = "timeout 300s ";
+    const std::string TIMEOUT_WTPOA_CNS  = "timeout 120s ";
+
     // 1) wtdbg2 assembler
-    std::string asm_cmd = wtdbg2_bin +
+    std::string asm_cmd = TIMEOUT_WTDBG2 + wtdbg2_bin +
         std::string(" -t ") + std::to_string(wtdbg2_threads) +
         " -x " + wtdbg2_preset +
         " -g " + genome_opt +
@@ -248,15 +258,18 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         redir;
 
     int rc = run_and_log(asm_cmd, params, "wtdbg2_asm", 0, 1, false);
-    if (rc != 0 || !std::filesystem::exists(layout_gz))
+    if (rc != 0 || !std::filesystem::exists(layout_gz) || std::filesystem::file_size(layout_gz) == 0)
     {
+        const char* reason = (WEXITSTATUS(rc) == 124) ? " (timeout)" : "";
         if (params.fp_logs.is_open())
             params.fp_logs << "[warning] wtdbg2 assembly failed for "
-                           << svtig_name << " (rc=" << rc << ")" << std::endl;
+                           << svtig_name << " (rc=" << rc << ")"
+                           << reason << std::endl;
         std::cout << "[warning] wtdbg2 assembly failed for "
-                  << svtig_name << std::endl;
+                  << svtig_name << reason << std::endl;
         if (params.fp_asm_log.is_open()) {
             params.fp_asm_log << svtig_name << "\tFAILED\tstep=wtdbg2\trc=" << rc
+                              << reason
                               << "\treads=" << read_set.size() << "\n";
             if (std::filesystem::exists(stderr_file)) {
                 std::ifstream ef(stderr_file); std::string el;
@@ -268,14 +281,14 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     }
 
     // 2) raw consensus
-    std::string cns_raw_cmd = wtpoa_bin +
+    std::string cns_raw_cmd = TIMEOUT_WTPOA_RAW + wtpoa_bin +
         std::string(" -t ") + std::to_string(threads) +
         " -i " + layout_gz +
         " -fo " + raw_fa +
         redir;
 
     rc = run_and_log(cns_raw_cmd, params, "wtpoa_raw", 0, 1, false);
-    if (rc != 0 || !std::filesystem::exists(raw_fa))
+    if (rc != 0 || !std::filesystem::exists(raw_fa) || std::filesystem::file_size(raw_fa) == 0)
     {
         if (params.fp_logs.is_open())
             params.fp_logs << "[warning] wtpoa-cns raw consensus failed for "
@@ -295,8 +308,9 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     }
 
     // 3) minimap2 + samtools sort
-    std::string map_sort_cmd =
-        "(" +
+    // timeout needs a single child process; wrap the whole pipeline through
+    // /bin/sh -c so the timeout covers back-pressure hangs too.
+    std::string inner_mm =
         minimap2_bin +
         " -ax " + minimap2_preset +
         " -t" + std::to_string(threads) +
@@ -306,8 +320,9 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         samtools_bin +
         " sort -m 2g -@" + std::to_string(smt_threads) +
         " -o " + bam_path +
-        redir_pipe +
-        ") >/dev/null 2>&1";
+        redir_pipe;
+    std::string map_sort_cmd =
+        TIMEOUT_MM2_SORT + "sh -c \"" + inner_mm + "\" >/dev/null 2>&1";
 
     rc = run_and_log(map_sort_cmd, params, "mm2_samtools", 0, 1, false);
     if (rc != 0 || !std::filesystem::exists(bam_path))
@@ -324,8 +339,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     }
 
     // 4) polishing consensus
-    std::string polish_cmd =
-        "(" +
+    std::string inner_pol =
         samtools_bin +
         " view -F0x900 " + bam_path +
         redir_pipe +
@@ -334,8 +348,9 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         " -t " + std::to_string(threads) +
         " -d " + raw_fa +
         " -i - -fo " + cns_fa +
-        redir_pipe +
-        ") >/dev/null 2>&1";
+        redir_pipe;
+    std::string polish_cmd =
+        TIMEOUT_WTPOA_CNS + "sh -c \"" + inner_pol + "\" >/dev/null 2>&1";
 
     rc = run_and_log(polish_cmd, params, "wtpoa_cns_polish", 0, 1, false);
 
