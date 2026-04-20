@@ -3,7 +3,7 @@
 
 SVarp discovers **haplotype-resolved structural variants (SVs)** on pangenome graphs using long-read sequencing data. It outputs **local assemblies** of SV alleles (*svtigs*).
 
-*For questions, please open an issue or feel free to send me an e-mail (asoylev@gmail.com)*
+*For questions, please open an issue.*
 
 ---
 
@@ -32,9 +32,9 @@ SVarp depends on:
 * **WFA2-lib** *(https://github.com/smarco/WFA2-lib)*
 * **Minimap2** *(https://github.com/lh3/minimap2)*
 
-> **Note:** wtdbg2 is bundled under `third_party/wtdbg2/` and built automatically.
+> **Note:** wtdbg2, Minimap2, and Samtools are bundled under `third_party/` and built automatically. Their paths are resolved relative to the `svarp` executable, so the binary is portable.
 
-You can download and build **HTSlib, WFA2-lib, wtdbg2, Minimap2** using:
+You can download and build **HTSlib, WFA2-lib, wtdbg2, Minimap2, Samtools** using:
 ```bash
 make libs
 ```
@@ -51,11 +51,24 @@ make
 >Binary will be at **build/svarp**.
 
 #### 4. Run
+
+**ONT (default):**
 ```bash
 build/svarp \
     --gaf sample.gaf \
     --graph pangenome.gfa \
     --fasta reads.fasta.gz \
+    --sample SAMPLE1 \
+    --out output_dir
+```
+
+**PacBio HiFi:**
+```bash
+build/svarp \
+    --gaf sample.gaf \
+    --graph pangenome.gfa \
+    --fasta reads.fasta.gz \
+    --reads hifi \
     --sample SAMPLE1 \
     --out output_dir
 ```
@@ -80,6 +93,7 @@ build/svarp \
     --gaf sample.gaf \
     --graph pangenome.gfa \
     --fasta reads.fasta.gz \
+    --reads hifi \
     --phase read_tags.tsv \
     --sample SAMPLE1 \
     --out output_dir
@@ -98,12 +112,13 @@ build/svarp \
 	--out (-o)                  : Output folder.
 	--debug                     : Output multiple log files for debugging purpose.
 	--skip-untagged             : Output only phased variants (~30% faster).
-	--dist_threshold (-d)       : Distance threshold to merge SV breakpoints (default=100)
+	--dist-threshold (-d)       : Distance threshold to merge SV breakpoints (default=100)
 	--phase (-p)                : WhatsHap haplotag file in .tsv (https://whatshap.readthedocs.io/en/latest/guide.html#whatshap-haplotag)
-	--reads(-r)                 : Bgzipped FASTA file of reads for extensive mode (needed for WFA realignment)
+	--reads (-w)                : Read type: ont (default), hifi, or clr. Sets wtdbg2 preset and assembly parameters.
 	--support (-s)              : Minimum support for a cluster to be assembled (default=5 for diploid samples)
-	--threads(-t)               : Number of threads for assembly and realignment (default:32)
-	--help                      : Print this help menu
+	--threads (-t)              : Number of threads for assembly and realignment (default=16)
+	--version (-v)              : Print version
+	--help (-h)                 : Print this help menu
 
 ## Citation
 
