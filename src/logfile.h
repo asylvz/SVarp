@@ -20,6 +20,7 @@ public:
     template<typename T>
     LogFile& operator<<(const T& v) {
         out() << v;
+        out().flush();
         return *this;
     }
     // manipulator (e.g. std::endl)
