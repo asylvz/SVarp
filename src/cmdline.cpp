@@ -284,6 +284,14 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		return RETURN_ERROR;
 	}
 
+	// Validate --phase existence here so a wrong path is caught before loading
+	// the graph; otherwise the run would silently continue unphased.
+	if (!params.phase_tags.empty() && !std::filesystem::exists(params.phase_tags))
+	{
+		std::cerr << "[SVARP CMDLINE ERROR] phase file not found: " << params.phase_tags << std::endl;
+		return RETURN_ERROR;
+	}
+
 	return RETURN_SUCCESS;
 }
 
@@ -293,24 +301,24 @@ void init_logs(parameters& params)
 	
 	std::cout << "\nSVarp v" << SVARP_VERSION << " (" << SVARP_UPDATE << ")\n";
 	std::cout << "...hallo, merhaba, ola, salaam, hello!!! SVarp is running...\n";
-	if(std::filesystem::exists(params.log_path))
-		std::filesystem::remove_all(params.log_path);
-  	
+
+	// --out may be an existing user directory; wiping the whole thing destroys
+	// their other files. Reset only the SVarp-managed subdirs (tmp/, plus in/
+	// out/ in debug). Clearing tmp/ is required: merge_svtigs scans it and a
+	// leftover .cns.fa from a previous run would corrupt the result. Output
+	// files (sample.log, svtigs_tmp.fa) are truncated when opened.
+	auto reset_dir = [](const std::string& d) {
+		std::filesystem::remove_all(d);
+		std::filesystem::create_directory(d);
+	};
 	try {
-		if (!std::filesystem::create_directory(params.log_path))
-			error("Error creating log folder");
-  	
+		std::filesystem::create_directories(params.log_path);   // ok if it already exists
+		reset_dir(params.log_path + "tmp/");
 		if (params.debug)
 		{
-  			if (!std::filesystem::create_directory(params.log_path + "in/"))
-				error("Error creating log/in/ directory");
-  		
-  			if (!std::filesystem::create_directory(params.log_path + "out/"))
-				error("Error creating log/out/ directory");
+			reset_dir(params.log_path + "in/");
+			reset_dir(params.log_path + "out/");
 		}
-	
-  		if (!std::filesystem::create_directory(params.log_path + "tmp/"))
-			error("Error creating log/tmp/ directory");
 	} catch (const std::filesystem::filesystem_error& e) {
 		std::string msg = std::string("Error creating log directories: ") + e.what();
 		error(msg.c_str());
@@ -388,7 +396,7 @@ void print_help()
 	std::cerr << "\t--sample (-i)               : Sample (Individual) name"<<std::endl;
 	std::cerr << "\t--out (-o)                  : Output folder path"<<std::endl;
 	std::cerr << "\t--phase (-p)                : WhatsHap haplotag file in .tsv (https://whatshap.readthedocs.io/en/latest/guide.html#whatshap-haplotag)"<<std::endl;
-	std::cerr << "\t--support (-s)              : Minimum support for a cluster to be assembled (default=5 for diploid samples)"<<std::endl;
+	std::cerr << "\t--support (-s)              : A cluster is assembled only if it has MORE than this many reads (default=5 for diploid samples)"<<std::endl;
 	std::cerr << "\t--dist-threshold (-d)       : Distance threshold to merge SV breakpoints (default=100)"<<std::endl;
 	std::cerr << "\t--reads (-w)                : Read type: ont, hifi, or clr (default=ont)"<<std::endl;
 	std::cerr << "\t--threads (-t)              : Number of threads for assembly and realignment (default=16)"<<std::endl;

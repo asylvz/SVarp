@@ -84,6 +84,10 @@ int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& g
 				(svtig_tmp->reads_untagged).insert((sv->reads_untagged).begin(), (sv->reads_untagged).end());
 				start_pos = sv->pos_in_node;
 			}
+			// Cluster by shared read identity, not only by position: an SV beyond
+			// dist_threshold whose reads are all already in this cluster stays
+			// merged, and start_pos advances so a chain of same-read signals keeps
+			// clustering.
 			else if(sets_intersect.size() == sv->reads_untagged.size())
 				start_pos = sv->pos_in_node;
 			else
@@ -138,6 +142,10 @@ int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gf
 			it_nodes = incoming.find(nd.first);
 			if (it_nodes != incoming.end())
 			{
+				// A boundary cluster on an incoming node X that feeds several
+				// successors (X->Y, X->Z) is merged into each successor's front
+				// cluster, so a shared breakpoint is represented on every branch
+				// of the bubble.
 				for(auto &incoming_node: it_nodes->second)
 				{
 					it_neighbors = init_svtigs.find(incoming_node);
@@ -331,7 +339,9 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 			node_map_size += gfa[current_node]->len;
 	}
 	
-	if (!skip_start)
+	// If start_node/end_node is empty the boundary node was absent from the
+	// graph; skip it (gfa[""] would null-dereference).
+	if (!skip_start && !start_node.empty())
 	{
 		std::string var_name = start_node + ":" + std::to_string(br1_start);
 		std::map<std::string, Variant*>::iterator it = variations_inter.find(var_name);
@@ -353,7 +363,7 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 		}
 
 	}
-	if (!skip_end)
+	if (!skip_end && !end_node.empty())
 	{
 		std::string var_name = end_node + ":" + std::to_string(br2_end);
 
@@ -589,6 +599,7 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 		}
 	}
 
+	delete v;   // no branch matched; v is not owned
 	return nullptr;
 }
 

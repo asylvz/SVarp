@@ -96,6 +96,16 @@ int main() {
         if (rc != RETURN_ERROR) { std::cerr << "Test 3: Expected error for empty path" << std::endl; return 1; }
     }
 
+    // Test 4 (B1): a non-existent (but non-empty) path must not silently succeed
+    {
+        parameters params;
+        params.phase_tags = "/tmp/svarp_no_such_phase_file_12345.tsv";
+        std::map<std::string, phase*> phased_reads;
+
+        int rc = read_phase_file(params, phased_reads);
+        if (rc != RETURN_ERROR) { std::cerr << "Test 4: Expected error for missing phase file, got SUCCESS (silent unphased run)" << std::endl; return 1; }
+    }
+
     std::cout << "phasing test passed" << std::endl;
     return 0;
 }

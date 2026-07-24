@@ -178,7 +178,12 @@ void wfa_align(std::map<std::string, gfaNode*>& gfa, std::string& cigar, std::st
 		if (strand == '>')
 			ref_tmp += gfa[node_name]->sequence;
 		else if (strand == '<')
-			ref_tmp += reverse_complement(gfa[node_name]->sequence);
+		{
+			// reverse_complement mutates in place; work on a copy so the
+			// stored node sequence is not corrupted.
+			std::string rc = gfa[node_name]->sequence;
+			ref_tmp += reverse_complement(rc);
+		}
 		else
 			std::cerr<<"Strand resolution issue in wfa_align()\n";
 	}
@@ -402,14 +407,13 @@ int write_final_svtigs(faidx_t*& fasta_index, std::map <std::string, SVtig*>& fi
 }
 
 
-int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map <std::string, SVtig*>& final_svtigs)
+static void remap_and_flag(parameters& params, std::map<std::string, gfaNode*>& gfa,
+                           std::map <std::string, SVtig*>& final_svtigs, faidx_t*& fasta_index,
+                           std::string& svtigs_tmp_path)
 {
-	std::cout<<"\nFiltering svtigs"<<std::endl;
-	std::string svtigs_tmp_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
-
 	std::cout<<"--> remapping svtigs onto the graph using GraphAligner"<<std::endl;
 
-	// GraphAligner PATH'te mi?
+	// Is GraphAligner on PATH?
 	std::string graphaligner_bin = find_executable("GraphAligner");
 	if (graphaligner_bin.empty())
 	{
@@ -443,15 +447,36 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 		std::cerr<< "--->Command: " << graphaligner_cmd << "\n";
 		exit(0);
 	}
-	
-	std::string file_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
-	faidx_t* fasta_index = fai_load((file_path).c_str());
+
+	//Now the ones that we want to output have final_svtigs->output = true	
+	read_remappings(params, gfa, final_svtigs, fasta_index);
+}
+
+
+int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map <std::string, SVtig*>& final_svtigs)
+{
+	std::cout<<"\nFiltering svtigs"<<std::endl;
+	std::string svtigs_tmp_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
+
+	faidx_t* fasta_index = fai_load(svtigs_tmp_path.c_str());
 	if (!fasta_index)
 		error("Error loading FASTA index for remapping: file not found or corrupted");
 
-	//Now the ones that we want to output have final_svtigs->output = true	
-	read_remappings(params, gfa, final_svtigs, fasta_index);	
-	
+	if (params.no_remap)
+	{
+		// write_final_svtigs only writes svtigs flagged by read_remappings,
+		// so skipping the remap means flagging them all here.
+		std::cout<<"--> skipping GraphAligner remapping (--no-remap)"<<std::endl;
+		if (params.fp_logs.is_open())
+			params.fp_logs << "--> skipping GraphAligner remapping (--no-remap)\n";
+
+		std::map<std::string, SVtig*>::iterator it;
+		for (it = final_svtigs.begin(); it != final_svtigs.end(); ++it)
+			it->second->output = true;
+	}
+	else
+		remap_and_flag(params, gfa, final_svtigs, fasta_index, svtigs_tmp_path);
+
 	std::string svtigs_path;
 	if ((params.phase_tags).empty())
 	{

@@ -24,7 +24,10 @@ int add_variant(std::map<std::string, gfaNode*>& gfa, std::map<std::string, Vari
 
 		std::map<std::string, Variant*>::iterator it = vars.find(var_name);
 		if (it != vars.end())
+		{
 			it->second->reads_untagged.insert(line.query_name);
+			delete var;   // locus already present; this copy is not owned
+		}
 		else
 		{
 			var->reads_untagged.insert(line.query_name);

@@ -20,6 +20,7 @@ public:
 		int filter_lowcov = 0;
 		int filter_support = 0;
 		int unassembled_cnt = 0;
+		int no_contig_cnt = 0;
 		std::set <std::string> raw_svtigs;
 
 		void run_assembly(parameters& params, std::map <std::string, Contig*>& depth, std::map<std::string, std::vector<SVCluster*>>& vars, std::set <std::string>& unmapped, std::map <std::string, SVtig*>& final_svtigs);

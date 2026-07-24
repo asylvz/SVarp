@@ -14,7 +14,12 @@ int read_phase_file(parameters& params, std::map<std::string, phase*>& phased_re
 	
 	std::cout<<"--> reading .tsv file"<<std::endl;
 	std::ifstream fp(params.phase_tags);
-	std::vector <std::string> tokens; 
+	if (!fp.is_open())
+	{
+		std::cerr << "Error: could not open phase file: " << params.phase_tags << std::endl;
+		return RETURN_ERROR;
+	}
+	std::vector <std::string> tokens;
 	std::string line;	
 	
 	while(getline(fp, line))

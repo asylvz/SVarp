@@ -111,6 +111,21 @@ int Assembly::merge_svtigs(parameters &params)
 	return cnt;
 }
 
+// wtdbg2 can write a non-empty but unreadable .ctg.lay.gz, which wtpoa-cns
+// segfaults on instead of failing cleanly.
+static bool layout_has_contigs(const std::string& layout_gz)
+{
+    gzFile fp = gzopen(layout_gz.c_str(), "rb");
+    if (!fp)
+        return false;
+
+    char buf[256];
+    const char* line = gzgets(fp, buf, sizeof(buf));
+    bool ok = (line != nullptr && buf[0] == '>');
+    gzclose(fp);
+    return ok;
+}
+
 // Assemble SV clusters
 int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
                              std::set<std::string>& read_set,
@@ -238,11 +253,8 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
 
     auto asm_t1 = std::chrono::steady_clock::now();
 
-    // Per-step wall-clock caps. wtpoa-cns has been observed to hang on
-    // pathological HiFi clusters (single-cluster freezes of 24 h+ seen in
-    // practice); without a cap the whole run stalls. `timeout` returns 124
-    // when the child is killed for exceeding the limit, which our empty-
-    // output check then catches as a FAILED cluster.
+    // Per-step wall-clock caps: wtpoa-cns can hang for a day on one bad
+    // cluster. timeout exits 124, caught below as a failed cluster.
     const std::string TIMEOUT_WTDBG2     = "timeout 600s ";
     const std::string TIMEOUT_WTPOA_RAW  = "timeout 120s ";
     const std::string TIMEOUT_MM2_SORT   = "timeout 300s ";
@@ -258,7 +270,11 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         redir;
 
     int rc = run_and_log(asm_cmd, params, "wtdbg2_asm", 0, 1, false);
-    if (rc != 0 || !std::filesystem::exists(layout_gz) || std::filesystem::file_size(layout_gz) == 0)
+
+    // A non-zero rc is a real failure and is reported per cluster. A clean exit
+    // with no usable layout only means too few or too short reads, so it is
+    // counted and reported once in the summary.
+    if (rc != 0)
     {
         const char* reason = (WEXITSTATUS(rc) == 124) ? " (timeout)" : "";
         if (params.fp_logs.is_open())
@@ -277,6 +293,17 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
                     params.fp_asm_log << "  stderr: " << el << "\n";
             }
         }
+        return 0;
+    }
+
+    if (!std::filesystem::exists(layout_gz) ||
+        std::filesystem::file_size(layout_gz) == 0 ||
+        !layout_has_contigs(layout_gz))
+    {
+        this->no_contig_cnt++;
+        if (params.fp_asm_log.is_open())
+            params.fp_asm_log << svtig_name << "\tFAILED\tstep=wtdbg2\treason=no_contig"
+                              << "\treads=" << read_set.size() << "\n";
         return 0;
     }
 
@@ -308,8 +335,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     }
 
     // 3) minimap2 + samtools sort
-    // timeout needs a single child process; wrap the whole pipeline through
-    // /bin/sh -c so the timeout covers back-pressure hangs too.
+    // Wrapped in sh -c so timeout covers the whole pipeline, not just minimap2.
     std::string inner_mm =
         minimap2_bin +
         " -ax " + minimap2_preset +
@@ -522,6 +548,10 @@ void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> 
 
 	if (params.fp_logs.is_open())
 		params.fp_logs << "--> " << (this->filter_hicov) + (this->filter_lowcov) + (this->filter_support) << " filtered (" << this->filter_hicov << " high, " << this->filter_lowcov << " low coverage read clusters and " << this->filter_support << " low read support)\n";
+
+	std::cout << "--> " << this->no_contig_cnt << " clusters produced no contig (too few or too short reads)\n";
+	if (params.fp_logs.is_open())
+		params.fp_logs << "--> " << this->no_contig_cnt << " clusters produced no contig (too few or too short reads)\n";
 
 	std::cout << "--> " << unassembled_cnt << " clusters cannot be assembled\n";
 	if (params.fp_logs.is_open())

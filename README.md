@@ -115,7 +115,7 @@ build/svarp \
 	--dist-threshold (-d)       : Distance threshold to merge SV breakpoints (default=100)
 	--phase (-p)                : WhatsHap haplotag file in .tsv (https://whatshap.readthedocs.io/en/latest/guide.html#whatshap-haplotag)
 	--reads (-w)                : Read type: ont (default), hifi, or clr. Sets wtdbg2 preset and assembly parameters.
-	--support (-s)              : Minimum support for a cluster to be assembled (default=5 for diploid samples)
+	--support (-s)              : A cluster is assembled only if it has MORE than this many reads (default=5 for diploid samples)
 	--threads (-t)              : Number of threads for assembly and realignment (default=16)
 	--version (-v)              : Print version
 	--help (-h)                 : Print this help menu
