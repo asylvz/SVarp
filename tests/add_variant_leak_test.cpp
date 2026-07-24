@@ -49,7 +49,7 @@ int main()
 
     long base = g_live;
 
-    // Same locus, twice -> the second call leaks a Variant (before the fix)
+    // Same locus twice: the second call must free the Variant it allocates
     add_variant(gfa, vars, line, 10, INSERTION, 60);
     add_variant(gfa, vars, line, 10, INSERTION, 60);
 

@@ -171,6 +171,33 @@ int main()
         for (auto &kv : ref) delete kv.second;
     }
 
+    // Test 5b: an S line with a tag shorter than 5 chars is skipped, not crashed on
+    {
+        const char* gfa_path = "/tmp/test_svarp_shorttag.gfa.gz";
+        gzFile gz = gzopen(gfa_path, "wb");
+        std::string bad  = "S\ts_bad\tACGT\tLN:i:4\tSN\tSO:i:0\tSR:i:0\n"; // SN tag too short
+        std::string good = "S\ts_good\tACGT\tLN:i:4\tSN:Z:chr1\tSO:i:0\tSR:i:0\n";
+        gzwrite(gz, bad.c_str(), bad.size());
+        gzwrite(gz, good.c_str(), good.size());
+        gzclose(gz);
+
+        parameters params;
+        params.ref_graph = gfa_path;
+
+        std::map<std::string, Contig*> ref;
+        std::map<std::string, gfaNode*> gfa;
+        std::map<std::string, std::vector<std::string>> incoming, outgoing;
+
+        int rc = read_gfa(params, ref, gfa, incoming, outgoing);
+        if (rc != RETURN_SUCCESS) { std::cerr << "Test 5b: read_gfa failed" << std::endl; return 1; }
+        if (gfa.size() != 1) { std::cerr << "Test 5b: Expected 1 node (short-tag skipped), got " << gfa.size() << std::endl; return 1; }
+        if (gfa.find("s_good") == gfa.end()) { std::cerr << "Test 5b: s_good should exist" << std::endl; return 1; }
+
+        std::remove(gfa_path);
+        for (auto &kv : gfa) delete kv.second;
+        for (auto &kv : ref) delete kv.second;
+    }
+
     // Test 6: contig_coverage with single-node path
     {
         std::map<std::string, gfaNode*> gfa;

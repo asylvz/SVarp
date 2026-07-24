@@ -24,16 +24,19 @@ int read_phase_file(parameters& params, std::map<std::string, phase*>& phased_re
 	
 	while(getline(fp, line))
 	{
-		if (line[0] == '#')
+		if (line.empty() || line[0] == '#')
 			continue;
-		
+
 		std::string tmp_str;
 		std::stringstream s(line);
 		tokens.clear();
-		
+
 		while(getline(s, tmp_str, '\t'))
-        	tokens.push_back(tmp_str);	
-		
+        	tokens.push_back(tmp_str);
+
+		if (tokens.size() < 4)
+			continue;
+
 		phase *temp = new phase;
     	temp->read_name = tokens[0];
     	temp->haplotype = tokens[1];

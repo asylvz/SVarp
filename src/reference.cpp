@@ -157,14 +157,13 @@ int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<
 		try {
 			g->len = stoi(tokens[3].substr(5));
 			g->offset = stoi(tokens[5].substr(5));
-		} catch (const std::invalid_argument&) {
-			std::cerr << "[read_gfa] Invalid numeric value in GFA line: " << line << std::endl;
+			g->contig = tokens[4].substr(5);
+		} catch (const std::exception&) {
+			std::cerr << "[read_gfa] Invalid tag value in GFA line: " << line << std::endl;
 			delete g;
 			line.clear();
 			continue;
 		}
-
-		g->contig = tokens[4].substr(5);
 
 		// Insert Contig if not present, using insert return value
 		auto [it_contig, inserted] = ref.insert({g->contig, nullptr});

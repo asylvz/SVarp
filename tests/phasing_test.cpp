@@ -106,6 +106,27 @@ int main() {
         if (rc != RETURN_ERROR) { std::cerr << "Test 4: Expected error for missing phase file, got SUCCESS (silent unphased run)" << std::endl; return 1; }
     }
 
+    // Test 5: malformed lines (empty, or fewer than 4 fields) are skipped, not crashed on
+    {
+        const char* tsv_path = "/tmp/test_svarp_phase_malformed.tsv";
+        std::ofstream f(tsv_path);
+        f << "read_001\tH1\tps_100\tchr1\n";  // valid
+        f << "\n";                            // empty line
+        f << "read_002\tH2\n";                // only 2 fields
+        f.close();
+
+        parameters params;
+        params.phase_tags = tsv_path;
+        std::map<std::string, phase*> phased_reads;
+
+        int rc = read_phase_file(params, phased_reads);
+        if (rc != RETURN_SUCCESS) { std::cerr << "Test 5: read_phase_file failed" << std::endl; return 1; }
+        if (phased_reads.size() != 1) { std::cerr << "Test 5: Expected only the valid line, got " << phased_reads.size() << std::endl; return 1; }
+
+        for (auto &kv : phased_reads) delete kv.second;
+        std::remove(tsv_path);
+    }
+
     std::cout << "phasing test passed" << std::endl;
     return 0;
 }

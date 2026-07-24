@@ -175,7 +175,7 @@ int parse_command_line(int argc, char** argv, parameters& params)
 	{
 		try {
 			params.dist_threshold = stoi(dist_threshold);
-		} catch (const std::invalid_argument&) {
+		} catch (const std::exception&) {
 			std::cerr << "[SVARP CMDLINE ERROR] dist_threshold must be an integer: " << dist_threshold << std::endl;
 			return RETURN_ERROR;
 		}
@@ -187,7 +187,7 @@ int parse_command_line(int argc, char** argv, parameters& params)
 	{
 		try {
 			params.min_alignment_score = stoi(as);
-		} catch (const std::invalid_argument&) {
+		} catch (const std::exception&) {
 			std::cerr << "[SVARP CMDLINE ERROR] alignment_score must be an integer: " << as << std::endl;
 			return RETURN_ERROR;
 		}
@@ -199,7 +199,7 @@ int parse_command_line(int argc, char** argv, parameters& params)
 	{
 		try {
 			params.min_precise_clipping = stod(pc);
-		} catch (const std::invalid_argument&) {
+		} catch (const std::exception&) {
 			std::cerr << "[SVARP CMDLINE ERROR] precise_clipping must be a float: " << pc << std::endl;
 			return RETURN_ERROR;
 		}
@@ -211,7 +211,7 @@ int parse_command_line(int argc, char** argv, parameters& params)
 	{
 		try {
 			params.min_map_ratio = stod(map_ratio);
-		} catch (const std::invalid_argument&) {
+		} catch (const std::exception&) {
 			std::cerr << "[SVARP CMDLINE ERROR] map_ratio must be a float: " << map_ratio << std::endl;
 			return RETURN_ERROR;
 		}
@@ -226,7 +226,7 @@ int parse_command_line(int argc, char** argv, parameters& params)
 	{
 		try {
 			params.support = stoi(support);
-		} catch (const std::invalid_argument&) {
+		} catch (const std::exception&) {
 			std::cerr << "[SVARP CMDLINE ERROR] support must be an integer: " << support << std::endl;
 			return RETURN_ERROR;
 		}
@@ -251,7 +251,7 @@ int parse_command_line(int argc, char** argv, parameters& params)
 	{
 		try {
 			params.threads = stoi(threads);
-		} catch (const std::invalid_argument&) {
+		} catch (const std::exception&) {
 			std::cerr << "[SVARP CMDLINE ERROR] threads must be an integer: " << threads << std::endl;
 			return RETURN_ERROR;
 		}

@@ -188,9 +188,13 @@ void wfa_align(std::map<std::string, gfaNode*>& gfa, std::string& cigar, std::st
 			std::cerr<<"Strand resolution issue in wfa_align()\n";
 	}
 	
+	// A dropped path node leaves ref_tmp shorter than the path coordinates
+	// expect; skip rather than substr past the end (would throw out_of_range).
+	if (gfa_start < 0 || static_cast<size_t>(gfa_start) > ref_tmp.size())
+		return;
 	std::string ref = ref_tmp.substr(gfa_start, gfa_end - gfa_start + 1);
 
-	int loc_length;	
+	int loc_length;
 	char *tmp_query = faidx_fetch_seq(fasta_index, query_name.c_str(), query_start, query_end, &loc_length);
 	if (tmp_query == nullptr)
 		return;
