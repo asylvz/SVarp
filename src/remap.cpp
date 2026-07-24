@@ -188,8 +188,8 @@ void wfa_align(std::map<std::string, gfaNode*>& gfa, std::string& cigar, std::st
 			std::cerr<<"Strand resolution issue in wfa_align()\n";
 	}
 	
-	// A dropped path node leaves ref_tmp shorter than the path coordinates
-	// expect; skip rather than substr past the end (would throw out_of_range).
+	// A dropped path node can leave ref_tmp shorter than gfa_start; skip
+	// rather than substr past the end (which would throw out_of_range).
 	if (gfa_start < 0 || static_cast<size_t>(gfa_start) > ref_tmp.size())
 		return;
 	std::string ref = ref_tmp.substr(gfa_start, gfa_end - gfa_start + 1);

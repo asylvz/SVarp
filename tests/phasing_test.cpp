@@ -106,7 +106,7 @@ int main() {
         if (rc != RETURN_ERROR) { std::cerr << "Test 4: Expected error for missing phase file, got SUCCESS (silent unphased run)" << std::endl; return 1; }
     }
 
-    // Test 5: malformed lines (empty, or fewer than 4 fields) are skipped, not crashed on
+    // Test 5: malformed lines (empty, or fewer than 4 fields) are skipped
     {
         const char* tsv_path = "/tmp/test_svarp_phase_malformed.tsv";
         std::ofstream f(tsv_path);

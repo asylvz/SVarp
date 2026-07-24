@@ -302,8 +302,8 @@ void init_logs(parameters& params)
 	std::cout << "\nSVarp v" << SVARP_VERSION << " (" << SVARP_UPDATE << ")\n";
 	std::cout << "...hallo, merhaba, ola, salaam, hello!!! SVarp is running...\n";
 
-	// --out may be an existing user directory; wiping the whole thing destroys
-	// their other files. Reset only the SVarp-managed subdirs (tmp/, plus in/
+	// --out may be an existing user directory; removing it would destroy
+	// unrelated files. Reset only the SVarp-managed subdirs (tmp/, plus in/
 	// out/ in debug). Clearing tmp/ is required: merge_svtigs scans it and a
 	// leftover .cns.fa from a previous run would corrupt the result. Output
 	// files (sample.log, svtigs_tmp.fa) are truncated when opened.

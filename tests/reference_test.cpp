@@ -171,7 +171,7 @@ int main()
         for (auto &kv : ref) delete kv.second;
     }
 
-    // Test 5b: an S line with a tag shorter than 5 chars is skipped, not crashed on
+    // Test 6: GFA with a short S-line tag (< 5 chars) should be skipped
     {
         const char* gfa_path = "/tmp/test_svarp_shorttag.gfa.gz";
         gzFile gz = gzopen(gfa_path, "wb");
@@ -189,16 +189,16 @@ int main()
         std::map<std::string, std::vector<std::string>> incoming, outgoing;
 
         int rc = read_gfa(params, ref, gfa, incoming, outgoing);
-        if (rc != RETURN_SUCCESS) { std::cerr << "Test 5b: read_gfa failed" << std::endl; return 1; }
-        if (gfa.size() != 1) { std::cerr << "Test 5b: Expected 1 node (short-tag skipped), got " << gfa.size() << std::endl; return 1; }
-        if (gfa.find("s_good") == gfa.end()) { std::cerr << "Test 5b: s_good should exist" << std::endl; return 1; }
+        if (rc != RETURN_SUCCESS) { std::cerr << "Test 6: read_gfa failed" << std::endl; return 1; }
+        if (gfa.size() != 1) { std::cerr << "Test 6: Expected 1 node (short-tag skipped), got " << gfa.size() << std::endl; return 1; }
+        if (gfa.find("s_good") == gfa.end()) { std::cerr << "Test 6: s_good should exist" << std::endl; return 1; }
 
         std::remove(gfa_path);
         for (auto &kv : gfa) delete kv.second;
         for (auto &kv : ref) delete kv.second;
     }
 
-    // Test 6: contig_coverage with single-node path
+    // Test 7: contig_coverage with single-node path
     {
         std::map<std::string, gfaNode*> gfa;
         gfaNode* n1 = new gfaNode("s1", "", 1000, "chr1", 0);
@@ -214,15 +214,15 @@ int main()
         g.path_end = 500;
 
         int mapped = contig_coverage(ref, gfa, g);
-        if (mapped != 400) { std::cerr << "Test 6: Expected 400 mapped bases, got " << mapped << std::endl; return 1; }
-        if (ref["chr1"]->mapped_bases != 400) { std::cerr << "Test 6: chr1 mapped_bases mismatch" << std::endl; return 1; }
-        if (ref["chr1"]->mapped_reads != 1) { std::cerr << "Test 6: chr1 mapped_reads should be 1" << std::endl; return 1; }
+        if (mapped != 400) { std::cerr << "Test 7: Expected 400 mapped bases, got " << mapped << std::endl; return 1; }
+        if (ref["chr1"]->mapped_bases != 400) { std::cerr << "Test 7: chr1 mapped_bases mismatch" << std::endl; return 1; }
+        if (ref["chr1"]->mapped_reads != 1) { std::cerr << "Test 7: chr1 mapped_reads should be 1" << std::endl; return 1; }
 
         for (auto &kv : gfa) delete kv.second;
         for (auto &kv : ref) delete kv.second;
     }
 
-    // Test 7: contig_coverage with multi-node path
+    // Test 8: contig_coverage with multi-node path
     {
         std::map<std::string, gfaNode*> gfa;
         gfaNode* n1 = new gfaNode("s1", "", 100, "chr1", 0);
@@ -246,8 +246,8 @@ int main()
         // last node: 350-50-200=100 bases
 
         int mapped = contig_coverage(ref, gfa, g);
-        if (mapped != 350) { std::cerr << "Test 7: Expected 350, got " << mapped << std::endl; return 1; }
-        if (ref["chr1"]->mapped_reads != 3) { std::cerr << "Test 7: mapped_reads should be 3 (one per node)" << std::endl; return 1; }
+        if (mapped != 350) { std::cerr << "Test 8: Expected 350, got " << mapped << std::endl; return 1; }
+        if (ref["chr1"]->mapped_reads != 3) { std::cerr << "Test 8: mapped_reads should be 3 (one per node)" << std::endl; return 1; }
 
         for (auto &kv : gfa) delete kv.second;
         for (auto &kv : ref) delete kv.second;
