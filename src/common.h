@@ -54,17 +54,17 @@ typedef struct _parameters
 	LogFile fp_logs;
 	LogFile fp_asm_log;
 	LogFile fp_remap_log;
-	int threads;
-	int support;
-	int dist_threshold;
-	double min_map_ratio; //Used in filtering
-	
+	int threads = 0;
+	int support = 0;
+	int dist_threshold = 0;
+	double min_map_ratio = 0; //Used in filtering
+
 	//Read type: ont, hifi, clr
 	std::string read_type;
 
 	//Graphaligner parameters
-	int min_alignment_score;
-	double min_precise_clipping;
+	int min_alignment_score = 0;
+	double min_precise_clipping = 0;
 
 	_parameters() {
     }

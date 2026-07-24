@@ -49,18 +49,17 @@ int parse_gaf_line(std::string& line, Gaf& gafline)
 
 	for (auto& tok : tokens)
 	{
-		if(strstr(tok.c_str(), "tp:A:"))
+		if (tok.rfind("tp:A:", 0) == 0)
 		{
 			if (tok.substr(5, 6) != "P")
 				gafline.is_primary = false;
 		}
-		if(strstr(tok.c_str(), "AS:f:"))
+		else if (tok.rfind("AS:f:", 0) == 0)
 		{
 			try { gafline.aln_score = std::stof(tok.substr(5)); }
 			catch (const std::exception&) { return RETURN_ERROR; }
 		}
-
-		if(strstr(tok.c_str(), "cg:Z:"))
+		else if (tok.rfind("cg:Z:", 0) == 0)
 			gafline.cigar = tok.substr(5);
 	}
 
@@ -74,7 +73,10 @@ double overlap_ratio(int x_start, int x_end, int y_start, int y_end)
 	int total_length = x_end - x_start + y_end - y_start;
 	int x_length = x_end - x_start;
 	int y_length = y_end - y_start;
-	
+
+	if (x_length <= 0 || y_length <= 0 || total_length <= 0)
+		return 0;
+
 	double a = (double) 2 * (overlap / (double) total_length);
 	double b = (double) overlap / (double) x_length;
 	double c = (double) (overlap / (double) y_length);
@@ -92,9 +94,6 @@ double overlap_ratio(int x_start, int x_end, int y_start, int y_end)
 		else
 			return b;
 	}
-	//std::cout<<a<<" "<<b<<" "<<c<<" "<<max_overlap<<"\n";
-
-	return -1;
 }
 
 
@@ -117,10 +116,11 @@ std::string exec(const std::string& command, bool return_out)
 	   	while (!feof(pipe)) 
 			if (fgets(buffer, 128, pipe) != nullptr)
 				result += buffer;
-   		
+
 		pclose(pipe);
    		return result;
 	}
+	pclose(pipe);
 	return "Success";
 }
 
@@ -300,6 +300,18 @@ std::string& reverse_complement(std::string& seq)
 				break;
 			case 'T':
 				seq[i] = 'A';
+				break;
+			case 'a':
+				seq[i] = 't';
+				break;
+			case 'c':
+				seq[i] = 'g';
+				break;
+			case 'g':
+				seq[i] = 'c';
+				break;
+			case 't':
+				seq[i] = 'a';
 				break;
 		}
 	}

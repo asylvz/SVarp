@@ -100,8 +100,11 @@ int parse_command_line(int argc, char** argv, parameters& params)
 			case 'v':
 				std::cout << "SVarp v" << SVARP_VERSION << " (" << SVARP_UPDATE << ")" << std::endl;
 				exit(0);
+			default:
+				print_help();
+				return RETURN_ERROR;
 		}
-	}	
+	}
 	
 	std::cout<<"\n";
 	/* check if --ref   is invoked */
@@ -402,6 +405,9 @@ void print_help()
 	std::cerr << "\t--threads (-t)              : Number of threads for assembly and realignment (default=16)"<<std::endl;
 	std::cerr << "\t--skip-untagged             : Output only phased variants (~30\% faster)"<<std::endl;
 	std::cerr << "\t--no-remap (-r)             : Skip remapping (not suggested)"<<std::endl;
+	std::cerr << "\t--map-ratio                 : Minimum fraction of an svtig that must map back to the graph (default=0.90)"<<std::endl;
+	std::cerr << "\t--as                        : GraphAligner minimum alignment score for remapping (default=5000)"<<std::endl;
+	std::cerr << "\t--pc                        : GraphAligner minimum precise clipping ratio for remapping (default=0.97)"<<std::endl;
 	std::cerr << "\t--debug (-u)                : Output multiple log files for debugging purpose"<<std::endl;
 	//std::cerr << "\t--assembler                 : (Experimental) Assembler can be either \"Shasta\", \"wtdbg2\" or \"bsalign\" (default:wtdbg2) "<<std::endl;
 	//std::cerr << "\t--asm                       : (Experimental) Runs in assembly mode. You can provide assembly to find the variations. This outputs exact breakpoints instead of SVtigs"<<std::endl;

@@ -76,50 +76,59 @@ int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& g
 		}
 		else
 		{
-			sets_intersect.clear();
-			std::set_intersection((svtig_tmp->reads_untagged).begin(), (svtig_tmp->reads_untagged).end(), (sv->reads_untagged).begin(), (sv->reads_untagged).end(), std::inserter(sets_intersect, sets_intersect.end()));
-			
 			if(start_pos + params.dist_threshold >= sv->pos_in_node)
 			{
 				(svtig_tmp->reads_untagged).insert((sv->reads_untagged).begin(), (sv->reads_untagged).end());
 				start_pos = sv->pos_in_node;
 			}
-			// Cluster by shared read identity, not only by position: an SV beyond
-			// dist_threshold whose reads are all already in this cluster stays
-			// merged, and start_pos advances so a chain of same-read signals keeps
-			// clustering.
-			else if(sets_intersect.size() == sv->reads_untagged.size())
-				start_pos = sv->pos_in_node;
 			else
 			{
-				if(svtig_tmp->reads_untagged.size() > 0)
-					var_vector.push_back(svtig_tmp);
+				// Cluster by shared read identity, not only by position: an SV beyond
+				// dist_threshold whose reads are all already in this cluster stays
+				// merged, and start_pos advances so a chain of same-read signals keeps
+				// clustering. The intersection is only needed here, so it is computed
+				// on this branch rather than for every SV.
+				sets_intersect.clear();
+				std::set_intersection((svtig_tmp->reads_untagged).begin(), (svtig_tmp->reads_untagged).end(), (sv->reads_untagged).begin(), (sv->reads_untagged).end(), std::inserter(sets_intersect, sets_intersect.end()));
+
+				if(sets_intersect.size() == sv->reads_untagged.size())
+					start_pos = sv->pos_in_node;
 				else
-					delete svtig_tmp;
-				
-				svtig_tmp = new SVCluster();
-				svtig_tmp->node = vars_by_node->first;
-				svtig_tmp->phased = false;
-				svtig_tmp->contig = gfa[vars_by_node->first]->contig;
-				svtig_tmp->ref_pos = sv->pos_in_ref;
-			
-				start_pos = sv->pos_in_node;	
-				svtig_tmp->start_pos = sv->pos_in_node;
-				(svtig_tmp->reads_untagged).insert((sv->reads_untagged).begin(), (sv->reads_untagged).end());
-				first = false;
+				{
+					if(svtig_tmp->reads_untagged.size() > 0)
+						var_vector.push_back(svtig_tmp);
+					else
+						delete svtig_tmp;
+
+					svtig_tmp = new SVCluster();
+					svtig_tmp->node = vars_by_node->first;
+					svtig_tmp->phased = false;
+					svtig_tmp->contig = gfa[vars_by_node->first]->contig;
+					svtig_tmp->ref_pos = sv->pos_in_ref;
+
+					start_pos = sv->pos_in_node;
+					svtig_tmp->start_pos = sv->pos_in_node;
+					(svtig_tmp->reads_untagged).insert((sv->reads_untagged).begin(), (sv->reads_untagged).end());
+					first = false;
+				}
 			}
-		}	
+		}
 	}
 
 	// Add the last one as well (if allocated)
 	if (svtig_tmp != nullptr && !first)
-		var_vector.push_back(svtig_tmp);
+	{
+		if (svtig_tmp->reads_untagged.size() > 0)
+			var_vector.push_back(svtig_tmp);
+		else
+			delete svtig_tmp;
+	}
 
 	return RETURN_SUCCESS;
 }
 
 
-int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<SVCluster*>> init_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& /*outgoing*/)
+int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<SVCluster*>>& init_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& /*outgoing*/)
 {
 	std::map<std::string, std::vector<std::string>>::iterator it_nodes;
 	std::map<std::string, std::vector<SVCluster*>>::iterator it_neighbors;
@@ -189,14 +198,18 @@ int find_final_svtigs(parameters& params, std::map<std::string, std::vector<SVCl
 		var_vector.clear();
 		for(auto &svtig: node.second)
 		{
+			// Clusters not promoted to final_svtigs (merged away or below support)
+			// are owned nowhere else, so free them here.
 			if (svtig->filter)
+			{
+				delete svtig;
 				continue;
-			
-			//if (node.first == "s105205" || node.first == "s105207")
-				//std::cout<<node.first<<"\t"<<svtig->start_pos<<" "<<svtig->reads_untagged.size()<<"\n";
+			}
 
 			if (svtig->reads_untagged.size() > static_cast<unsigned int>(params.support))
-				var_vector.push_back(svtig);	
+				var_vector.push_back(svtig);
+			else
+				delete svtig;
 		}
 		if (!var_vector.empty())
 		{

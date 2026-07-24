@@ -167,9 +167,6 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 				continue;
 		
 			
-			if(g.mapping_quality == 0)
-				continue;
-
 			it = read_freq_tmp.find(g.query_name);
 			if (it != read_freq_tmp.end())
 				it->second++;

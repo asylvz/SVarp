@@ -29,9 +29,9 @@ public:
 
 	std::string name;
 	std::string sequence;
-	int len;
-	int offset;
-	std::string contig;	
+	int len = 0;
+	int offset = 0;
+	std::string contig;
 	
 	gfaNode()
 	{
