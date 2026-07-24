@@ -1,13 +1,11 @@
-// A5 — does add_variant leak the Variant returned by generate_sv_node when the
-// same locus is hit again? LeakSanitizer is unavailable on macOS, so we replace
-// global operator new/delete with a counter and measure net live allocations.
+// add_variant must not leak the Variant returned by generate_sv_node when a
+// repeat SV signal hits a locus already in the map. LeakSanitizer is not
+// available on macOS, so global operator new/delete are replaced with a
+// counter; the test asserts net live allocations return to zero after cleanup.
 //
-// Scenario: add_variant is called twice for the same (node, position). The first
-// call stores the Variant in vars (owned). The second finds the key, adds the
-// read to the existing Variant, and orphans the one it just allocated.
-//
-// Before the fix: net live allocations > 0 after cleanup (leak) -> exit 1
-// After the fix:  net live allocations == 0 -> exit 0
+// The scenario calls add_variant twice for the same (node, position): the first
+// stores the Variant, the second adds its read to the existing entry and must
+// free the Variant it allocated.
 
 #include <cstdlib>
 #include <new>
@@ -65,7 +63,7 @@ int main()
     gfa.clear();
 
     if (delta != 0) {
-        std::cerr << "A5: add_variant sizdiriyor, net canli tahsis = " << delta << std::endl;
+        std::cerr << "add_variant leaked; net live allocations = " << delta << std::endl;
         return 1;
     }
     std::cout << "add_variant leak test passed" << std::endl;

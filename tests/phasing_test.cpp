@@ -96,7 +96,7 @@ int main() {
         if (rc != RETURN_ERROR) { std::cerr << "Test 3: Expected error for empty path" << std::endl; return 1; }
     }
 
-    // Test 4 (B1): a non-existent (but non-empty) path must not silently succeed
+    // Test 4: a non-existent (but non-empty) phase path must not silently succeed
     {
         parameters params;
         params.phase_tags = "/tmp/svarp_no_such_phase_file_12345.tsv";

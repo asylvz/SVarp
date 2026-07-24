@@ -38,7 +38,7 @@ int main()
     if (variations_inter[k1]->reads_untagged.find("readX") == variations_inter[k1]->reads_untagged.end()) { std::cerr << "read not recorded for "<<k1<<std::endl; return 1; }
     if (variations_inter[k2]->reads_untagged.find("readX") == variations_inter[k2]->reads_untagged.end()) { std::cerr << "read not recorded for "<<k2<<std::endl; return 1; }
 
-    // --- B3: a boundary node absent from the graph must not crash (null deref) ---
+    // --- a boundary node absent from the graph must not crash (null deref) ---
     {
         std::map<std::string, gfaNode*> gfa2;
         gfaNode* g2 = new gfaNode("node2", "", 100, "contig1", 100);
@@ -59,7 +59,7 @@ int main()
 
         for (auto &kv : vi2)
             if (kv.first.empty() || kv.first[0] == ':') {
-                std::cerr << "B3: variant created for unresolved node: " << kv.first << std::endl;
+                std::cerr << "variant created for unresolved node: " << kv.first << std::endl;
                 return 1;
             }
         for (auto &kv : vi2) delete kv.second;
