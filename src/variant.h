@@ -37,13 +37,15 @@ class SVtig
 private:
 public:
 
-	std::string name; //Format e.g., H1-node_name:start_pos_in_node
+	std::string name; //Format e.g., H1-node_name_start_pos_in_node
 	int pos; //This is the reference poisiton, not the node position
 	//int coverage; //Number of supporting reads
 	std::string contig;
 	std::set <std::string> reads; //Read names that support this SVtig
 	bool output = false; //Whether to output after remapping (filtered if false)
 	std::string seq; //svtig genomic sequence
+	std::string remap_path; //Graph path this svtig aligns to, from remapping
+	double map_ratio = -1; //Fraction of the svtig aligned to the graph; -1 if not remapped
 };
 
 

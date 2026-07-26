@@ -4,6 +4,7 @@
 #include <string>
 #include <cstring>
 #include <fstream>
+#include <sstream>
 #include <iterator>
 #include <chrono>
 #include <algorithm>
@@ -46,19 +47,33 @@ int get_middle_string(std::string& s)
 }
 
 
-int write_final_svtigs_fasta(faidx_t*& fasta_index, std::string& svtig_name, int pos, std::string& contig, int coverage, std::ostream& fp_write)
+//Header of an output svtig. path/map_ratio come from remapping, so they are
+//omitted when the svtig was never remapped (--no-remap).
+std::string svtig_header(const SVtig* svtig)
 {
-	
+	std::ostringstream out;
+	out << ">" << svtig->name << " contig=" << svtig->contig << " pos=" << svtig->pos
+		<< " support=" << svtig->reads.size();
+
+	if (svtig->map_ratio >= 0)
+		out << " path=" << svtig->remap_path << " map_ratio=" << svtig->map_ratio;
+
+	return out.str();
+}
+
+
+int write_final_svtigs_fasta(faidx_t*& fasta_index, SVtig* svtig, std::ostream& fp_write)
+{
+
 	int loc_length;
-	std::string line;	
 	const size_t line_len = 60;
 
-	char *tmp_seq = faidx_fetch_seq(fasta_index, svtig_name.c_str(), 0, MAX_FETCH_LEN, &loc_length);
+	char *tmp_seq = faidx_fetch_seq(fasta_index, (svtig->name).c_str(), 0, MAX_FETCH_LEN, &loc_length);
 	if (tmp_seq == nullptr)
 		return RETURN_ERROR;
 	std::string seq(tmp_seq);
 	free(tmp_seq);
-	fp_write<< ">"<<svtig_name<<" contig="<<contig<<" pos="<<pos<<" support="<<coverage<< std::endl;
+	fp_write<< svtig_header(svtig) << std::endl;
 
 	for (unsigned int i = 0; i < seq.size(); i += line_len)
 	{
@@ -133,6 +148,8 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 						(tmp->reads).insert(it_svtigs->second->reads.begin(), it_svtigs->second->reads.end());
 						tmp->contig = it_svtigs->second->contig;
 						tmp->output = true;
+						tmp->remap_path = r->node;
+						tmp->map_ratio = r->highest_map_ratio;
 						final_svtigs.insert(std::pair<std::string, SVtig*>(r->rname, tmp));
 						extra_added++;
 					}
@@ -143,7 +160,11 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 				{
 					std::map<std::string, SVtig*>::iterator it_dup = final_svtigs.find(r->rname);
 					if (it_dup != final_svtigs.end())
+					{
 						it_dup->second->output = true;
+						it_dup->second->remap_path = r->node;
+						it_dup->second->map_ratio = r->highest_map_ratio;
+					}
 					else
 						std::cerr<<"Error - SVtig= "<<r->rname<<" not found...\n";
 				}
@@ -390,12 +411,12 @@ int write_final_svtigs(faidx_t*& fasta_index, std::map <std::string, SVtig*>& fi
 			file_name = itr->second->name;
 			if (haplotype != "None" && (file_name.find(haplotype) != std::string::npos))
 			{
-				write_final_svtigs_fasta(fasta_index, file_name, itr->second->pos, itr->second->contig, itr->second->reads.size(), fp_write);
+				write_final_svtigs_fasta(fasta_index, itr->second, fp_write);
 				cnt++;
 			}
 			else if(haplotype == "None" && (file_name.find("H1") == std::string::npos) && (file_name.find("H2") == std::string::npos))
 			{
-				write_final_svtigs_fasta(fasta_index, file_name, itr->second->pos, itr->second->contig, itr->second->reads.size(), fp_write);
+				write_final_svtigs_fasta(fasta_index, itr->second, fp_write);
 				cnt++;
 			}
 

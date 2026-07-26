@@ -320,6 +320,85 @@ int main() {
         for (auto& p : svtigs) delete p.second;
     }
 
+    // Test 14: A kept svtig carries the path and map ratio of its remapping
+    {
+        std::vector<Read*> reads;
+        std::map<std::string, SVtig*> svtigs;
+        int extra = 0;
+
+        Read* r = make_read("H1-s800_1", ">s800<s801", 100, 1100, 500);
+        r->highest_map_ratio = 0.42;
+        reads.push_back(r);
+
+        svtigs["H1-s800_1"] = make_svtig("H1-s800_1");
+
+        remove_duplicates(reads, svtigs, extra);
+        if (svtigs["H1-s800_1"]->remap_path != ">s800<s801") {
+            std::cerr << "Test 14 FAILED: expected remap_path=>s800<s801, got "
+                      << svtigs["H1-s800_1"]->remap_path << std::endl;
+            return 1;
+        }
+        if (svtigs["H1-s800_1"]->map_ratio != 0.42) {
+            std::cerr << "Test 14 FAILED: expected map_ratio=0.42, got "
+                      << svtigs["H1-s800_1"]->map_ratio << std::endl;
+            return 1;
+        }
+        std::cout << "Test 14 passed: remapping recorded on svtig" << std::endl;
+        for (auto* p : reads) delete p;
+        for (auto& p : svtigs) delete p.second;
+    }
+
+    // Test 15: Svtigs from a fragmented assembly carry it as well
+    {
+        std::vector<Read*> reads;
+        std::map<std::string, SVtig*> svtigs;
+        int extra = 0;
+
+        reads.push_back(make_read("H1-s900_1", ">s900", 100, 1100, 600));
+        Read* frag = make_read("H1-s900_1_2", ">s901", 5000, 6000, 300);
+        frag->highest_map_ratio = 0.33;
+        reads.push_back(frag);
+
+        svtigs["H1-s900_1"] = make_svtig("H1-s900_1");
+
+        remove_duplicates(reads, svtigs, extra);
+        if (svtigs.count("H1-s900_1_2") != 1) {
+            std::cerr << "Test 15 FAILED: fragmented svtig missing" << std::endl;
+            return 1;
+        }
+        if (svtigs["H1-s900_1_2"]->remap_path != ">s901" || svtigs["H1-s900_1_2"]->map_ratio != 0.33) {
+            std::cerr << "Test 15 FAILED: fragmented svtig lost its remapping" << std::endl;
+            return 1;
+        }
+        std::cout << "Test 15 passed: fragmented svtig keeps remapping" << std::endl;
+        for (auto* p : reads) delete p;
+        for (auto& p : svtigs) delete p.second;
+    }
+
+    // Test 16: Header reports the remapping only when the svtig was remapped
+    {
+        SVtig* s = make_svtig("H1-s1000_400");
+        s->pos = 1234567;
+        s->reads.insert("read_a");
+        s->reads.insert("read_b");
+
+        std::string bare = svtig_header(s);
+        if (bare != ">H1-s1000_400 contig=chr1 pos=1234567 support=2") {
+            std::cerr << "Test 16 FAILED: unexpected header without remapping: " << bare << std::endl;
+            return 1;
+        }
+
+        s->remap_path = ">s1000<s1001";
+        s->map_ratio = 0.75;
+        std::string mapped = svtig_header(s);
+        if (mapped != ">H1-s1000_400 contig=chr1 pos=1234567 support=2 path=>s1000<s1001 map_ratio=0.75") {
+            std::cerr << "Test 16 FAILED: unexpected header with remapping: " << mapped << std::endl;
+            return 1;
+        }
+        std::cout << "Test 16 passed: header reports remapping" << std::endl;
+        delete s;
+    }
+
     std::cout << "All remap tests passed" << std::endl;
     return 0;
 }
