@@ -138,20 +138,29 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     if (support_threshold < 3) support_threshold = 3;
     int svtig_tmp_cnt = 0;
 
+    // Whether a cluster is plausible for the region's coverage is a property of
+    // the cluster, so the two coverage checks weigh all of its reads. Splitting
+    // them by haplotype must not change that verdict; only the support check
+    // below is per haplotype. Without a phase file the untagged set holds every
+    // read, so this is the read set itself.
+    size_t cluster_reads = (sv != nullptr)
+        ? sv->reads_h1.size() + sv->reads_h2.size() + sv->reads_untagged.size()
+        : read_set.size();
+
     double zscore = (contig_depth > 0) ? (static_cast<double>(read_set.size()) - contig_depth) / std::sqrt(contig_depth) : 0.0;
 
-    if (contig_depth * 2 < read_set.size())
+    if (contig_depth * 2 < cluster_reads)
     {
         this->filter_hicov++;
         if (params.fp_asm_log.is_open())
-            params.fp_asm_log << svtig_name << "\tFILTERED\treason=high_coverage\treads=" << read_set.size() << "\tcontig_depth=" << contig_depth << "\tzscore=" << zscore << "\n";
+            params.fp_asm_log << svtig_name << "\tFILTERED\treason=high_coverage\treads=" << read_set.size() << "\tcluster_reads=" << cluster_reads << "\tcontig_depth=" << contig_depth << "\tzscore=" << zscore << "\n";
         return 0;
     }
-    else if (contig_depth > 5 * read_set.size())
+    else if (contig_depth > 5 * cluster_reads)
     {
         this->filter_lowcov++;
         if (params.fp_asm_log.is_open())
-            params.fp_asm_log << svtig_name << "\tFILTERED\treason=low_coverage\treads=" << read_set.size() << "\tcontig_depth=" << contig_depth << "\tzscore=" << zscore << "\n";
+            params.fp_asm_log << svtig_name << "\tFILTERED\treason=low_coverage\treads=" << read_set.size() << "\tcluster_reads=" << cluster_reads << "\tcontig_depth=" << contig_depth << "\tzscore=" << zscore << "\n";
         return 0;
     }
     else if (read_set.size() < support_threshold)
