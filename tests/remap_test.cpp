@@ -399,6 +399,59 @@ int main() {
         delete s;
     }
 
+    // Test 17: The two haplotypes of one locus are alleles, not duplicates
+    {
+        std::vector<Read*> reads;
+        std::map<std::string, SVtig*> svtigs;
+        int extra = 0;
+
+        // Same graph path, overlapping footprints: a homozygous SV assembled twice.
+        reads.push_back(make_read("H1-s1234_500", ">s1234>s1235", 400, 3400, 3000));
+        reads.push_back(make_read("H2-s1234_500", ">s1234>s1235", 418, 3392, 2974));
+
+        svtigs["H1-s1234_500"] = make_svtig("H1-s1234_500");
+        svtigs["H2-s1234_500"] = make_svtig("H2-s1234_500");
+
+        auto result = remove_duplicates(reads, svtigs, extra);
+        if (result.first != 0 || result.second != 2) {
+            std::cerr << "Test 17 FAILED: expected 0 dup, 2 kept, got "
+                      << result.first << " dup, " << result.second << " kept" << std::endl;
+            return 1;
+        }
+        if (!svtigs["H1-s1234_500"]->output || !svtigs["H2-s1234_500"]->output) {
+            std::cerr << "Test 17 FAILED: a haplotype lost its svtig" << std::endl;
+            return 1;
+        }
+        std::cout << "Test 17 passed: haplotypes are not duplicates" << std::endl;
+        for (auto* r : reads) delete r;
+        for (auto& p : svtigs) delete p.second;
+    }
+
+    // Test 18: The untagged copy survives alongside both haplotypes
+    {
+        std::vector<Read*> reads;
+        std::map<std::string, SVtig*> svtigs;
+        int extra = 0;
+
+        reads.push_back(make_read("H1-s5000_7", ">s5000", 400, 3400, 3000));
+        reads.push_back(make_read("H2-s5000_7", ">s5000", 410, 3390, 2900));
+        reads.push_back(make_read("None-s5000_7", ">s5000", 405, 3395, 2950));
+
+        svtigs["H1-s5000_7"] = make_svtig("H1-s5000_7");
+        svtigs["H2-s5000_7"] = make_svtig("H2-s5000_7");
+        svtigs["None-s5000_7"] = make_svtig("None-s5000_7");
+
+        auto result = remove_duplicates(reads, svtigs, extra);
+        if (result.first != 0 || result.second != 3) {
+            std::cerr << "Test 18 FAILED: expected 0 dup, 3 kept, got "
+                      << result.first << " dup, " << result.second << " kept" << std::endl;
+            return 1;
+        }
+        std::cout << "Test 18 passed: untagged svtig kept with both haplotypes" << std::endl;
+        for (auto* r : reads) delete r;
+        for (auto& p : svtigs) delete p.second;
+    }
+
     std::cout << "All remap tests passed" << std::endl;
     return 0;
 }

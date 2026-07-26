@@ -67,6 +67,9 @@ int parse_gaf_line(std::string& line, Gaf& gafline)
 }
 
 
+// Largest of three ratios, so an interval contained in another scores 1. A
+// reciprocal criterion (the smaller of the two one-sided ratios) is the usual
+// choice when comparing SV calls and is the alternative worth revisiting.
 double overlap_ratio(int x_start, int x_end, int y_start, int y_end)
 {
 	int overlap = std::max(0, std::min(x_end, y_end) - std::max(x_start, y_start));

@@ -84,25 +84,48 @@ int write_final_svtigs_fasta(faidx_t*& fasta_index, SVtig* svtig, std::ostream& 
 }
 
 
+// Svtigs assembled from different haplotypes describe different alleles of the
+// same locus, so they are never duplicates of each other. Without a phase file
+// the names carry no prefix and all svtigs fall into one class.
+static std::string haplotype_of(const std::string& svtig_name)
+{
+	if (svtig_name.rfind("H1-", 0) == 0)
+		return "H1";
+	if (svtig_name.rfind("H2-", 0) == 0)
+		return "H2";
+	if (svtig_name.rfind("None-", 0) == 0)
+		return "None";
+	return "";
+}
+
+
 std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <std::string, SVtig*>& final_svtigs, int& extra_added)
 {
 	std::pair<int, int> dup_legit(0,0);
 	std::map<std::string, SVtig*>::iterator it_svtigs;
 
-	// Sort by node first, then by svtig_size descending (greedy: largest first)
+	// Sort by haplotype and node first, then by svtig_size descending (greedy: largest first).
+	// Size alone decides the representative; map ratio and sv_in_cigar are on the
+	// Read as well and would rank candidates better.
 	std::sort(tmp_svtig.begin(), tmp_svtig.end(), [](const Read* a, const Read* b) {
+		const std::string hap_a = haplotype_of(a->rname), hap_b = haplotype_of(b->rname);
+		if (hap_a != hap_b)
+			return hap_a < hap_b;
 		if (a->node != b->node)
 			return a->node < b->node;
 		return a->svtig_size > b->svtig_size; // descending by size
 	});
 
-	// Process each node group independently
+	// Process each haplotype/node group independently
 	unsigned int i = 0;
 	while (i < tmp_svtig.size())
 	{
-		// Find the range [i, group_end) for the current node
+		// Find the range [i, group_end) for the current haplotype and node.
+		// Paths have to match exactly, so svtigs of one locus reached over
+		// slightly different paths never compare.
 		unsigned int group_end = i + 1;
-		while (group_end < tmp_svtig.size() && tmp_svtig[group_end]->node == tmp_svtig[i]->node)
+		while (group_end < tmp_svtig.size() && tmp_svtig[group_end]->node == tmp_svtig[i]->node
+		       && haplotype_of(tmp_svtig[group_end]->rname) == haplotype_of(tmp_svtig[i]->rname))
 			group_end++;
 
 		// Greedy: iterate from largest svtig_size to smallest
