@@ -66,6 +66,54 @@ int main()
         delete g2;
     }
 
+    // --- a reverse-strand breakpoint must not depend on how many nodes follow ---
+    {
+        std::map<std::string, gfaNode*> gfa3;
+        gfaNode* a = new gfaNode("nodeA", "", 20000, "chr1", 1000000);
+        gfaNode* b = new gfaNode("nodeB", "", 20000, "chr1", 1020000);
+        gfa3.insert({"nodeA", a});
+        gfa3.insert({"nodeB", b});
+
+        // 5'-clipped read, so only the start of the alignment is a breakpoint.
+        Gaf single;
+        single.query_name = "readR";
+        single.query_length = 20000;
+        single.query_start = 8000;   // skip_start = false
+        single.query_end = 20000;    // skip_end = true
+        single.path = "<nodeA";
+        single.path_length = 20000;
+        single.path_start = 2000;
+        single.path_end = 14000;
+
+        Gaf multi = single;
+        multi.path = "<nodeA<nodeB";
+        multi.path_length = 40000;
+
+        std::map<std::string, Variant*> vi_single, vi_multi;
+        mapping_start_end(gfa3, single, vi_single);
+        mapping_start_end(gfa3, multi, vi_multi);
+
+        // The alignment starts at path offset 2000 of a reverse-complemented
+        // node, which is 20000 - 2000 within the node itself.
+        const std::string expected = "nodeA:18000";
+        if (vi_single.find(expected) == vi_single.end()) {
+            std::cerr << "reverse single-node breakpoint wrong; expected " << expected << ", got";
+            for (auto &kv : vi_single) std::cerr << " " << kv.first;
+            std::cerr << std::endl;
+            return 1;
+        }
+        if (vi_multi.find(expected) == vi_multi.end()) {
+            std::cerr << "reverse multi-node breakpoint wrong; expected " << expected << ", got";
+            for (auto &kv : vi_multi) std::cerr << " " << kv.first;
+            std::cerr << std::endl;
+            return 1;
+        }
+
+        for (auto &kv : vi_single) delete kv.second;
+        for (auto &kv : vi_multi) delete kv.second;
+        delete a; delete b;
+    }
+
     // Cleanup
     for (auto &kv : variations_inter) delete kv.second;
     delete n1; delete n2;

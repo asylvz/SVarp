@@ -311,16 +311,16 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 				if(strand == '>')
 					br1_start = line.path_start;
 				else
-					br1_start = gfa[current_node]->len - line.path_end;
+					br1_start = gfa[current_node]->len - line.path_start;
 				start_node = current_node;
 			}
-			
+
 			if (!skip_end)
 			{
 				if(strand == '>')
 					br2_end = line.path_end;
 				else
-					br2_end = gfa[current_node]->len - line.path_start;
+					br2_end = gfa[current_node]->len - line.path_end;
 				end_node = current_node;
 			}
 		}
@@ -463,7 +463,9 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 		{
 			node_map_size = gfa[v->node]->len - path_start;
 			
-			if ((sv_type != DELETION && pos_in_cigar < node_map_size) || (strand == '>' && pos_in_cigar < node_map_size) || (strand == '<' && sv_type == DELETION && pos_in_cigar + var_len < node_map_size))
+			// Positions are 1-based here (add_variant passes base_pos + 1), so a
+			// variant on the node's last base has pos_in_cigar == node_map_size.
+			if ((sv_type != DELETION && pos_in_cigar <= node_map_size) || (strand == '>' && pos_in_cigar <= node_map_size) || (strand == '<' && sv_type == DELETION && pos_in_cigar + var_len <= node_map_size))
 			{
 				int pos_in_node = path_start + pos_in_cigar;
 				
@@ -558,7 +560,7 @@ Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const
 		{
 			node_map_size = total_so_far + gfa[v->node]->len;
 			
-			if ((sv_type != DELETION && pos_in_cigar < node_map_size) || (del_incomplete && pos_in_cigar < node_map_size) || (strand == '>' && pos_in_cigar < node_map_size) || (strand == '<' && sv_type == DELETION && pos_in_cigar + var_len < node_map_size && del_incomplete == false))
+			if ((sv_type != DELETION && pos_in_cigar <= node_map_size) || (del_incomplete && pos_in_cigar <= node_map_size) || (strand == '>' && pos_in_cigar <= node_map_size) || (strand == '<' && sv_type == DELETION && pos_in_cigar + var_len <= node_map_size && del_incomplete == false))
 			{
 				int pos_in_node = pos_in_cigar - total_so_far;
 				

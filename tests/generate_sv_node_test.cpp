@@ -76,6 +76,15 @@ int main() {
     if (v5->sv_type != DELETION) { std::cerr << "Test 5: Expected sv_type=DELETION" << std::endl; return 1; }
     delete v5;
     
+    // Test 6: A variant on the last base of a node stays on that node.
+    // add_variant() passes base_pos + 1, so a variant whose first affected base
+    // is the last base of node1 (0-based offset 11) arrives here as 12.
+    Variant* v6 = generate_sv_node(gfa, line3, 11 + 1, 2, DELETION);
+    if (v6 == nullptr) { std::cerr << "generate_sv_node returned nullptr for test 6" << std::endl; return 1; }
+    if (v6->node != "node1") { std::cerr << "Test 6: Expected node1, got " << v6->node << std::endl; return 1; }
+    if (v6->pos_in_node != 12) { std::cerr << "Test 6: Expected pos_in_node=12, got " << v6->pos_in_node << std::endl; return 1; }
+    delete v6;
+
     // Cleanup
     delete node1;
     delete node2;
