@@ -452,6 +452,32 @@ int main() {
         for (auto& p : svtigs) delete p.second;
     }
 
+    // Test 19: MINSVSIZE is the smallest callable SV, so a realignment that
+    // diverges by exactly that much still counts as carrying one
+    {
+        if (!cigar_has_sv("100M50D100M")) {
+            std::cerr << "Test 19 FAILED: 50 bp deletion not counted as an SV" << std::endl;
+            return 1;
+        }
+        if (!cigar_has_sv("100M50I100M")) {
+            std::cerr << "Test 19 FAILED: 50 bp insertion not counted as an SV" << std::endl;
+            return 1;
+        }
+        if (cigar_has_sv("100M49D100M")) {
+            std::cerr << "Test 19 FAILED: 49 bp deletion counted as an SV" << std::endl;
+            return 1;
+        }
+        if (!cigar_has_sv("100M120I100M")) {
+            std::cerr << "Test 19 FAILED: 120 bp insertion not counted as an SV" << std::endl;
+            return 1;
+        }
+        if (cigar_has_sv("300M")) {
+            std::cerr << "Test 19 FAILED: a gapless alignment counted as an SV" << std::endl;
+            return 1;
+        }
+        std::cout << "Test 19 passed: SV bound matches MINSVSIZE" << std::endl;
+    }
+
     std::cout << "All remap tests passed" << std::endl;
     return 0;
 }

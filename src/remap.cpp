@@ -84,6 +84,25 @@ int write_final_svtigs_fasta(faidx_t*& fasta_index, SVtig* svtig, std::ostream& 
 }
 
 
+// An svtig still carries an SV when its realignment to the graph diverges by at
+// least MINSVSIZE, the same bound the CIGAR walk applies when the signal is
+// first picked up from the reads.
+bool cigar_has_sv(const std::string& cigar)
+{
+	std::vector<int> cigar_len;
+	std::vector<char> cigar_op;
+
+	int cigar_cnt = decompose_cigars(cigar, cigar_len, cigar_op);
+	for (int c = 0; c < cigar_cnt; c++)
+	{
+		if ((cigar_op[c] == INSERTION || cigar_op[c] == DELETION || cigar_op[c] == MISMATCH)
+		    && cigar_len[c] >= MINSVSIZE)
+			return true;
+	}
+	return false;
+}
+
+
 // Svtigs assembled from different haplotypes describe different alleles of the
 // same locus, so they are never duplicates of each other. Without a phase file
 // the names carry no prefix and all svtigs fall into one class.
@@ -271,8 +290,6 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 	std::map<std::string, Read*>::iterator it;
 	std::map <std::string, Read*> reads;
 	std::map <std::string, std::string> non_dup_by_pos, non_dup_by_rname;
-	std::vector<int> cigarLen;
-	std::vector<char> cigarOp;
 	
 	wfa::WFAlignerGapAffine aligner(4, 6, 2, wfa::WFAligner::Alignment, wfa::WFAligner::MemoryMed);
 	
@@ -296,23 +313,12 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 			primary++;
 		
 
-		cigarLen.clear();
-		cigarOp.clear();
-
 		std::string cigar;
-				
+
 		//Use the cigar of WFA realignment
 		wfa_align(gfa, cigar, g.query_name, g.query_start, g.query_end, g.path, g.path_start, g.path_end, aligner, fasta_index);
 
-		int cigar_cnt = decompose_cigars(cigar, cigarLen, cigarOp);
-		for (int c = 0; c < cigar_cnt; c++)
-		{
-			if ((cigarOp[c] == INSERTION || cigarOp[c] == DELETION || cigarOp[c] == MISMATCH) && cigarLen[c] > MINSVSIZE)
-			{
-				hasSV = true;
-				break;
-			}
-		}
+		hasSV = cigar_has_sv(cigar);
 
 		map_ratio = static_cast<double> ((double) g.query_end - g.query_start) / g.query_length;
 
@@ -352,7 +358,10 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 		{	
 			Read *r = new Read();
 			r->highest_map_ratio = map_ratio;
-			r->freq = 1;
+			// freq counts the good alignments of this svtig, and later records
+			// only add to it when they are primary and pass MINMAPQREMAP, so the
+			// first record has to be weighed the same way.
+			r->freq = (LowMQ || !g.is_primary) ? 0 : 1;
 			r->rname = g.query_name;
 			r->node = g.path;
 			r->start = g.path_start;

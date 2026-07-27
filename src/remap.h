@@ -25,6 +25,7 @@ typedef struct _read
 
 int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map <std::string, SVtig*>& final_svtigs);
 std::pair<int, int> remove_duplicates(std::vector<Read*>& tmp_svtig, std::map<std::string, SVtig*>& final_svtigs, int& extra_added);
+bool cigar_has_sv(const std::string& cigar);
 std::string svtig_header(const SVtig* svtig);
 
 #endif
