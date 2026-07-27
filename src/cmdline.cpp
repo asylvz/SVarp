@@ -160,7 +160,13 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		if(!std::filesystem::exists(params.output_path))
 		{
 			std::cerr<<params.output_path<<" does not exist, generating...\n";
-			std::filesystem::create_directory(params.output_path);
+			std::error_code ec;
+			std::filesystem::create_directories(params.output_path, ec);
+			if (ec)
+			{
+				std::cerr<<"[SVARP CMDLINE ERROR] Could not create "<<params.output_path<<": "<<ec.message()<<"\n";
+				return RETURN_ERROR;
+			}
 		}
 
 		if (params.output_path.at(params.output_path.size()-1) == '/')
