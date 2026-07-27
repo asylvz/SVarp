@@ -85,6 +85,56 @@ int main() {
     delete cluster2;
     delete cluster3;
     
+    // A node whose only cluster has already been merged into a successor cannot
+    // absorb anything more: that cluster is about to be dropped, so reads folded
+    // into it would disappear with it.
+    //
+    //   nX --> nY --> nA,  and nY holds a single cluster
+    //
+    // Nodes are visited in name order, so nA merges nY away before nY is reached.
+    {
+        parameters params;
+        params.dist_threshold = 100;
+        params.support = 1;
+
+        std::map<std::string, gfaNode*> gfa;
+        gfa["nA"] = new gfaNode("nA", "", 1000, "chr1", 0);
+        gfa["nX"] = new gfaNode("nX", "", 1000, "chr1", 2000);
+        gfa["nY"] = new gfaNode("nY", "",  100, "chr1", 1000);
+
+        auto make_cluster = [](const std::string& node, int start_pos, const std::string& tag) {
+            SVCluster* c = new SVCluster();
+            c->node = node; c->contig = "chr1"; c->start_pos = start_pos;
+            c->ref_pos = start_pos; c->phased = false;
+            for (int i = 0; i < 5; i++) c->reads_untagged.insert(tag + std::to_string(i));
+            return c;
+        };
+
+        std::map<std::string, std::vector<SVCluster*>> init;
+        init["nA"] = { make_cluster("nA",  10, "a") };
+        init["nX"] = { make_cluster("nX", 990, "x") };
+        init["nY"] = { make_cluster("nY",  50, "y") };
+
+        std::map<std::string, std::vector<std::string>> in_edges, out_edges;
+        in_edges["nA"] = { "nY" };
+        in_edges["nY"] = { "nX" };
+
+        merge_neighbor_nodes(params, gfa, init, in_edges, out_edges);
+
+        if (!init["nY"][0]->filter) {
+            std::cerr << "Expected nY cluster to be merged into nA" << std::endl;
+            return 1;
+        }
+        if (init["nX"][0]->filter) {
+            std::cerr << "nX cluster was merged into a cluster that is already dropped, "
+                      << "so its reads are lost" << std::endl;
+            return 1;
+        }
+
+        for (auto& kv : init) for (auto* c : kv.second) delete c;
+        for (auto& kv : gfa) delete kv.second;
+    }
+
     std::cout << "merge_neighbor_nodes test passed" << std::endl;
     return 0;
 }

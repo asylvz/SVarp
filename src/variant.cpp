@@ -144,7 +144,12 @@ int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gf
 		//These may need to be merged with the SVs in the neighboring nodes
 		SVCluster* svtig_front = nd.second.front();
 		//SVCluster* svtig_back = nd.second.back();
-		
+
+		// This cluster has already been merged into a successor and will be
+		// dropped, so anything folded into it now would go with it.
+		if (svtig_front->filter)
+			continue;
+
 		//First check the svtigs at the front of the vector of svs for this node
 		if (svtig_front->start_pos < params.dist_threshold)
 		{
@@ -164,6 +169,10 @@ int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gf
 
 						if (gfa.count(incoming_node) == 0)
 							continue;
+						// Measured from the far end of the incoming node, which
+						// holds while the edge is traversed forward. read_gfa
+						// drops the L-line orientations, so a reverse traversal
+						// is measured from the wrong end.
 						int node_len = gfa[incoming_node]->len;
 						if ((node_len - svtig_incoming->start_pos + svtig_front->start_pos) < params.dist_threshold)
 						{

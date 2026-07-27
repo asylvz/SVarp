@@ -132,6 +132,9 @@ int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<
 		{
 			if (tokens[0] == "L" && tokens.size() >= 4)
 			{
+				// Only the two node names are kept. The orientation fields say
+				// which end of each node the edge joins, which merge_neighbor_nodes
+				// would need to measure the distance across a reverse traversal.
 				// Add incoming: use insert with hint to avoid redundant lookups
 				auto [it_in, inserted_in] = incoming.insert({tokens[3], {}});
 				it_in->second.push_back(tokens[1]);
