@@ -15,6 +15,8 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 	const std::string &path = line.path;
 	
 	int node_count = 0, total_so_far = 0;
+	Contig* credited = nullptr;
+	bool credited_overall = false;
 	int path_start = line.path_start;
 	int path_end = line.path_end;
 	int total_path_length = path_end - path_start;
@@ -37,12 +39,22 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 		Contig* rc = ref[gn->contig];
 		Contig* overall = ref["overall"];
 
+		// One read stays one read however many nodes its path crosses, so each
+		// contig it touches is credited once and the overall tally once.
+		if (rc != credited)
+		{
+			rc->mapped_reads++;
+			credited = rc;
+		}
+		if (!credited_overall)
+		{
+			overall->mapped_reads++;
+			credited_overall = true;
+		}
+
 		if ((node_count == 1) && (p == path.size())) //the single node
 		{
 			rc->mapped_bases += path_end - path_start;
-			rc->mapped_reads++;
-
-			overall->mapped_reads++;
 			overall->mapped_bases += path_end - path_start;
 
 			return path_end - path_start;
@@ -50,9 +62,6 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 		else if((node_count == 1) && (p < path.size())) //first node
 		{
 			rc->mapped_bases += gn->len - path_start;
-			rc->mapped_reads++;
-
-			overall->mapped_reads++;
 			overall->mapped_bases += gn->len - path_start;
 
 			total_so_far += gn->len - path_start;
@@ -60,9 +69,6 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 		else if(p == path.size()) //Last node
 		{
 			rc->mapped_bases += total_path_length - total_so_far;
-			rc->mapped_reads++;
-
-			overall->mapped_reads++;
 			overall->mapped_bases += total_path_length - total_so_far;
 
 			return total_path_length;
@@ -70,9 +76,6 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 		else //middle node
 		{
 			rc->mapped_bases += gn->len;
-			rc->mapped_reads++;
-
-			overall->mapped_reads++;
 			overall->mapped_bases += gn->len;
 
 			total_so_far += gn->len;

@@ -247,7 +247,9 @@ int main()
 
         int mapped = contig_coverage(ref, gfa, g);
         if (mapped != 350) { std::cerr << "Test 8: Expected 350, got " << mapped << std::endl; return 1; }
-        if (ref["chr1"]->mapped_reads != 3) { std::cerr << "Test 8: mapped_reads should be 3 (one per node)" << std::endl; return 1; }
+        // One read crossing three nodes of one contig is still one mapped read
+        if (ref["chr1"]->mapped_reads != 1) { std::cerr << "Test 8: expected mapped_reads=1, got " << ref["chr1"]->mapped_reads << std::endl; return 1; }
+        if (ref["overall"]->mapped_reads != 1) { std::cerr << "Test 8: expected overall mapped_reads=1, got " << ref["overall"]->mapped_reads << std::endl; return 1; }
 
         for (auto &kv : gfa) delete kv.second;
         for (auto &kv : ref) delete kv.second;

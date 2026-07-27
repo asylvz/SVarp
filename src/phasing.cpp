@@ -52,7 +52,8 @@ void phase_svs(const std::map<std::string, phase*>& phased_reads, std::map<std::
 {
 	std::map<std::string, std::vector<SVCluster*>>::iterator itr;
 
-	int h1_cnt = 0, h2_cnt = 0, none_cnt = 0;
+	// A read supports several clusters, so tally names rather than occurrences.
+	std::set<std::string> h1_reads, h2_reads, untagged_reads;
 
 	std::cout<<"--> reading SVs to phase"<<std::endl;
 	for (itr=vars.begin(); itr != vars.end(); ++itr)
@@ -63,23 +64,28 @@ void phase_svs(const std::map<std::string, phase*>& phased_reads, std::map<std::
 			{
 				auto pit = phased_reads.find(read);
 				if (pit == phased_reads.end())
+				{
+					// Absent from the haplotag file, so untagged like any other
+					// read the phaser could not place.
+					untagged_reads.insert(read);
 					continue;
+				}
 
 				if(pit->second->haplotype == "none" || pit->second->phase_set == "none")
 				{
-					none_cnt++;
+					untagged_reads.insert(read);
 					continue;
 				}
 
 				if (pit->second->haplotype == "H1")
 				{
 					sv->reads_h1.insert(read);
-					h1_cnt++;
+					h1_reads.insert(read);
 				}
 				else if (pit->second->haplotype == "H2")
 				{
 					sv->reads_h2.insert(read);
-					h2_cnt++;
+					h2_reads.insert(read);
 				}
 			}
 			//Erase reads added to the second set, from the first set
@@ -107,7 +113,7 @@ void phase_svs(const std::map<std::string, phase*>& phased_reads, std::map<std::
 
 	}
 	std::cout<<"--> " <<svtig_h1+svtig_h2+svtig_untagged<<" phased read clusters ("<<svtig_h1<<" H1, " <<svtig_h2 << " H2, "<< svtig_untagged <<" untagged based on read-support > 0)\n";
-	std::cout<<"--> " <<h1_cnt<<" reads in haplotype 1, "<<h2_cnt<< " in haplotype 2 and "<<none_cnt<< " are untagged in total\n";
+	std::cout<<"--> " <<h1_reads.size()<<" reads in haplotype 1, "<<h2_reads.size()<< " in haplotype 2 and "<<untagged_reads.size()<< " are untagged in total\n";
 }
 
 
