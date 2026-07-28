@@ -255,10 +255,18 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     std::string bam_path  = output_path + ".bam";
     std::string cns_fa    = output_path + ".cns.fa";
 
-    // In debug mode, capture stderr; otherwise discard
+    // In debug mode, capture stderr; otherwise discard.
+    //
+    // wtpoa-cns aborts inside glibc on some clusters. The shell system() starts
+    // announces that abort on its OWN stderr, and glibc writes its heap report
+    // straight to the terminal, so neither obeys a redirection written inside the
+    // command and both surface as if SVarp had crashed. Redirecting the shell
+    // itself with exec covers the announcement, and LIBC_FATAL_STDERR_ sends the
+    // glibc report along the same path.
     std::string stderr_file = output_path + ".stderr";
-    std::string redir = params.debug ? (" 2>" + stderr_file) : " >/dev/null 2>&1";
-    std::string redir_pipe = params.debug ? (" 2>" + stderr_file) : " 2>/dev/null";
+    std::string err_target  = params.debug ? stderr_file : std::string("/dev/null");
+    std::string quiet       = "exec 2>" + err_target + "; LIBC_FATAL_STDERR_=1 ";
+    std::string out_redir   = params.debug ? std::string("") : std::string(" >/dev/null");
 
     auto asm_t1 = std::chrono::steady_clock::now();
 
@@ -270,13 +278,13 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     const std::string TIMEOUT_WTPOA_CNS  = "timeout 120s ";
 
     // 1) wtdbg2 assembler
-    std::string asm_cmd = TIMEOUT_WTDBG2 + wtdbg2_bin +
+    std::string asm_cmd = quiet + TIMEOUT_WTDBG2 + wtdbg2_bin +
         std::string(" -t ") + std::to_string(wtdbg2_threads) +
         " -x " + wtdbg2_preset +
         " -g " + genome_opt +
         " -fo " + output_path +
         " -i " + file_path +
-        redir;
+        out_redir;
 
     int rc = run_and_log(asm_cmd, params, "wtdbg2_asm", 0, 1, false);
 
@@ -317,11 +325,11 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     }
 
     // 2) raw consensus
-    std::string cns_raw_cmd = TIMEOUT_WTPOA_RAW + wtpoa_bin +
+    std::string cns_raw_cmd = quiet + TIMEOUT_WTPOA_RAW + wtpoa_bin +
         std::string(" -t ") + std::to_string(threads) +
         " -i " + layout_gz +
         " -fo " + raw_fa +
-        redir;
+        out_redir;
 
     rc = run_and_log(cns_raw_cmd, params, "wtpoa_raw", 0, 1, false);
     if (rc != 0 || !std::filesystem::exists(raw_fa) || std::filesystem::file_size(raw_fa) == 0)
@@ -350,14 +358,12 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         " -ax " + minimap2_preset +
         " -t" + std::to_string(threads) +
         " -r2k " + raw_fa + " " + file_path +
-        redir_pipe +
         " | " +
         samtools_bin +
         " sort -m 2g -@" + std::to_string(smt_threads) +
-        " -o " + bam_path +
-        redir_pipe;
+        " -o " + bam_path;
     std::string map_sort_cmd =
-        TIMEOUT_MM2_SORT + "sh -c \"" + inner_mm + "\" >/dev/null 2>&1";
+        quiet + TIMEOUT_MM2_SORT + "sh -c \"" + inner_mm + "\"" + out_redir;
 
     rc = run_and_log(map_sort_cmd, params, "mm2_samtools", 0, 1, false);
     if (rc != 0 || !std::filesystem::exists(bam_path))
@@ -377,15 +383,13 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     std::string inner_pol =
         samtools_bin +
         " view -F0x900 " + bam_path +
-        redir_pipe +
         " | " +
         wtpoa_bin +
         " -t " + std::to_string(threads) +
         " -d " + raw_fa +
-        " -i - -fo " + cns_fa +
-        redir_pipe;
+        " -i - -fo " + cns_fa;
     std::string polish_cmd =
-        TIMEOUT_WTPOA_CNS + "sh -c \"" + inner_pol + "\" >/dev/null 2>&1";
+        quiet + TIMEOUT_WTPOA_CNS + "sh -c \"" + inner_pol + "\"" + out_redir;
 
     rc = run_and_log(polish_cmd, params, "wtpoa_cns_polish", 0, 1, false);
 
