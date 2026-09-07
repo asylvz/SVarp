@@ -47,8 +47,80 @@ int get_middle_string(std::string& s)
 }
 
 
-//Header of an output svtig. path/map_ratio come from remapping, so they are
-//omitted when the svtig was never remapped (--no-remap).
+//Non-reference nodes of the remap path as "first-last:contig" blocks; "" if a node is unknown
+std::string collect_alt_nodes(const std::string& path, std::map<std::string, gfaNode*>& gfa)
+{
+	//GAF also allows a stable sequence name ("chr21:100-900"), which has no nodes
+	if (path.empty() || (path[0] != '>' && path[0] != '<'))
+		return "";
+
+	std::ostringstream out;
+	std::string first, last, contig;
+	bool have_block = false;
+
+	auto flush = [&]() {
+		if (!have_block)
+			return;
+		if (out.tellp() > 0)
+			out << ';';
+		out << first;
+		if (last != first)
+			out << '-' << last;
+		out << ':' << contig;
+		have_block = false;
+	};
+
+	size_t p = 0;
+	while (p < path.size())
+	{
+		++p;   //skip '>' or '<'
+		size_t q = p;
+		while (q < path.size() && path[q] != '>' && path[q] != '<') ++q;
+		std::string node_name = path.substr(p, q - p);
+		p = q;
+
+		if (node_name.empty())
+			continue;
+
+		auto it = gfa.find(node_name);
+		if (it == gfa.end())
+			return "";   //path and graph disagree
+
+		const gfaNode* n = it->second;
+
+		//rank 0 is the reference, -1 means no SR tag to judge by
+		if (n->rank <= 0)
+		{
+			flush();
+			continue;
+		}
+
+		if (have_block && n->contig == contig)
+			last = node_name;
+		else
+		{
+			flush();
+			first = last = node_name;
+			contig = n->contig;
+			have_block = true;
+		}
+	}
+	flush();
+
+	return out.str();
+}
+
+
+//Fill alt_nodes for every svtig that survived remapping.
+void fill_alt_nodes(std::map<std::string, SVtig*>& final_svtigs, std::map<std::string, gfaNode*>& gfa)
+{
+	for (auto& s : final_svtigs)
+		if (s.second->output && !s.second->remap_path.empty())
+			s.second->alt_nodes = collect_alt_nodes(s.second->remap_path, gfa);
+}
+
+
+//Output svtig header; remap fields are omitted with --no-remap
 std::string svtig_header(const SVtig* svtig)
 {
 	std::ostringstream out;
@@ -56,7 +128,11 @@ std::string svtig_header(const SVtig* svtig)
 		<< " support=" << svtig->reads.size();
 
 	if (svtig->map_ratio >= 0)
+	{
 		out << " path=" << svtig->remap_path << " map_ratio=" << svtig->map_ratio;
+		if (!svtig->alt_nodes.empty())
+			out << " alt_nodes=" << svtig->alt_nodes;
+	}
 
 	return out.str();
 }
@@ -400,6 +476,9 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 	//If an svtig is in tmp_svtig, check if it is a duplicate. If not set "->output=true"
 	//Check the unmapped svtigs and add them tooo
 	std::pair<int, int> dup_legit = remove_duplicates(tmp_svtig, final_svtigs, extra_added);
+
+	//Done here, not in remove_duplicates, which has no graph to look nodes up in
+	fill_alt_nodes(final_svtigs, gfa);
 
 	if (params.fp_remap_log.is_open()) {
 		for (auto &r : tmp_svtig) {

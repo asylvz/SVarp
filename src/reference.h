@@ -32,7 +32,9 @@ public:
 	int len = 0;
 	int offset = 0;
 	std::string contig;
-	
+	//rGFA SR: 0 is the reference, >0 an allele, -1 no tag
+	int rank = -1;
+
 	gfaNode()
 	{
 	}

@@ -164,6 +164,9 @@ int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<
 			g->len = stoi(tokens[3].substr(5));
 			g->offset = stoi(tokens[5].substr(5));
 			g->contig = tokens[4].substr(5);
+			//SR is optional; without it rank stays -1
+			if (tokens.size() > 6 && tokens[6].compare(0, 5, "SR:i:") == 0)
+				g->rank = stoi(tokens[6].substr(5));
 		} catch (const std::exception&) {
 			std::cerr << "[read_gfa] Invalid tag value in GFA line: " << line << std::endl;
 			delete g;
@@ -184,6 +187,18 @@ int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<
 		line.clear();
 	}
 	gzclose(fp);
+
+	//Warn once when the graph has no SR tags
+	bool ranked = false;
+	for (const auto& n : gfa)
+		if (n.second->rank >= 0)
+		{
+			ranked = true;
+			break;
+		}
+	if (!gfa.empty() && !ranked)
+		std::cout << "  no SR tags in the graph, svtigs will carry no alt_nodes" << std::endl;
+
 	return RETURN_SUCCESS;
 }
 

@@ -104,7 +104,7 @@ build/test_logfile: src/logfile.cpp tests/logfile_test.cpp
 	mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I. -Isrc -Idep/htslib -Idep/wfa src/logfile.cpp tests/logfile_test.cpp -o $@
 
-test-common: build/test_common_parse_gaf build/test_cigar build/test_common_utils build/test_run_and_log build/test_variant build/test_generate_sv_node build/test_merge_neighbor_nodes build/test_assembly build/test_remap build/test_alignment build/test_phasing build/test_variant_mapping build/test_alignment_read_gz build/test_reference build/test_a5_leak
+test-common: build/test_common_parse_gaf build/test_cigar build/test_common_utils build/test_run_and_log build/test_variant build/test_generate_sv_node build/test_merge_neighbor_nodes build/test_assembly build/test_remap build/test_alignment build/test_phasing build/test_variant_mapping build/test_alignment_read_gz build/test_reference build/test_a5_leak build/test_generate_sv_node_revstrand
 	./build/test_common_parse_gaf
 	./build/test_cigar
 	./build/test_common_utils
@@ -120,6 +120,7 @@ test-common: build/test_common_parse_gaf build/test_cigar build/test_common_util
 	./build/test_alignment_read_gz
 	./build/test_reference
 	./build/test_a5_leak
+	./build/test_generate_sv_node_revstrand
 
 test-all: test-logfile test-common
 	@echo "=== All tests finished ==="
@@ -152,6 +153,10 @@ build/test_variant: tests/variant_test.cpp src/variant.cpp src/common.cpp src/re
 build/test_generate_sv_node: tests/generate_sv_node_test.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
 	mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/generate_sv_node_test.cpp -o $@ -lz
+
+build/test_generate_sv_node_revstrand: tests/generate_sv_node_revstrand_test.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp tests/generate_sv_node_revstrand_test.cpp -o $@ -lz
 
 
 build/test_variant_mapping: tests/variant_mapping_test.cpp src/variant.cpp src/common.cpp src/reference.cpp src/logfile.cpp

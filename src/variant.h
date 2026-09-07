@@ -46,6 +46,8 @@ public:
 	std::string seq; //svtig genomic sequence
 	std::string remap_path; //Graph path this svtig aligns to, from remapping
 	double map_ratio = -1; //Fraction of the svtig aligned to the graph; -1 if not remapped
+	//Non-reference nodes on remap_path, "first-last:contig" joined by ';'
+	std::string alt_nodes;
 };
 
 

@@ -478,6 +478,113 @@ int main() {
         std::cout << "Test 19 passed: SV bound matches MINSVSIZE" << std::endl;
     }
 
+    // Test 20: alternative alleles read off a remap path
+    {
+        std::map<std::string, gfaNode*> gfa;
+        auto add = [&gfa](const std::string& name, int rank, const std::string& contig) {
+            gfaNode* n = new gfaNode();
+            n->name = name;
+            n->rank = rank;
+            n->contig = contig;
+            n->len = 100;
+            gfa[name] = n;
+        };
+        add("r1", 0, "CHM13#0#chr21");
+        add("r2", 0, "CHM13#0#chr21");
+        add("r3", 0, "CHM13#0#chr21");
+        add("a1", 1, "HG01252#2#JBHIHZ010000014.1");
+        add("a2", 1, "HG01252#2#JBHIHZ010000014.1");
+        add("a3", 1, "NA21102#1#JBIREH010000004.1");
+        add("u1", -1, "CHM13#0#chr21");   // GFA carried no SR tag
+
+        struct { const char* path; const char* want; const char* why; } cases[] = {
+            {">r1>r2>r3", "", "a path that stays on the reference reports nothing"},
+            {">r1>a1>r2", "a1:HG01252#2#JBHIHZ010000014.1", "a lone allele needs no range"},
+            {">r1>a1>a2>r2", "a1-a2:HG01252#2#JBHIHZ010000014.1",
+             "consecutive nodes from one donor are one allele"},
+            {">r1>a1>a2>a3>r2",
+             "a1-a2:HG01252#2#JBHIHZ010000014.1;a3:NA21102#1#JBIREH010000004.1",
+             "a change of donor splits the block"},
+            {">r1>a1>r2>a3>r3",
+             "a1:HG01252#2#JBHIHZ010000014.1;a3:NA21102#1#JBIREH010000004.1",
+             "a reference node between two alleles splits them"},
+            {"<r3<a1<r1", "a1:HG01252#2#JBHIHZ010000014.1",
+             "orientation does not change which nodes are alleles"},
+            {">r1>a1>a1>r2", "a1:HG01252#2#JBHIHZ010000014.1",
+             "a node repeated back to back is still one allele"},
+            {">r1>missing>r2", "", "a node absent from the graph withholds the whole list"},
+            {"chr21:100-900", "", "a stable-sequence path carries no nodes"},
+            {"", "", "an empty path reports nothing"},
+            {">r1>u1>r2", "", "without an SR tag a node cannot be called an allele"},
+        };
+
+        for (const auto& c : cases) {
+            std::string got = collect_alt_nodes(c.path, gfa);
+            if (got != c.want) {
+                std::cerr << "Test 20 FAILED (" << c.why << "): path=" << c.path
+                          << " expected \"" << c.want << "\" got \"" << got << "\"" << std::endl;
+                return 1;
+            }
+        }
+        std::cout << "Test 20 passed: alt_nodes read off the remap path" << std::endl;
+
+        // Test 21: filling alt_nodes and printing it in the header
+        {
+            std::map<std::string, SVtig*> svtigs;
+            auto mk = [&svtigs](const std::string& name, bool output,
+                                const std::string& path, double ratio) {
+                SVtig* s = new SVtig();
+                s->name = name;
+                s->contig = "CHM13#0#chr21";
+                s->pos = 100;
+                s->output = output;
+                s->remap_path = path;
+                s->map_ratio = ratio;
+                svtigs[name] = s;
+                return s;
+            };
+            SVtig* kept = mk("kept", true, ">r1>a1>r2", 0.9);
+            SVtig* dropped = mk("dropped", false, ">r1>a1>r2", 0.9);
+            SVtig* noremap = mk("noremap", true, "", -1);
+
+            fill_alt_nodes(svtigs, gfa);
+
+            if (kept->alt_nodes != "a1:HG01252#2#JBHIHZ010000014.1") {
+                std::cerr << "Test 21 FAILED: kept svtig got \"" << kept->alt_nodes << "\"" << std::endl;
+                return 1;
+            }
+            if (!dropped->alt_nodes.empty()) {
+                std::cerr << "Test 21 FAILED: filtered svtig was filled" << std::endl;
+                return 1;
+            }
+            if (!noremap->alt_nodes.empty()) {
+                std::cerr << "Test 21 FAILED: svtig without a path was filled" << std::endl;
+                return 1;
+            }
+
+            std::string h = svtig_header(kept);
+            if (h.find(" alt_nodes=a1:HG01252#2#JBHIHZ010000014.1") == std::string::npos) {
+                std::cerr << "Test 21 FAILED: header missing alt_nodes: " << h << std::endl;
+                return 1;
+            }
+            if (svtig_header(noremap).find("alt_nodes=") != std::string::npos) {
+                std::cerr << "Test 21 FAILED: unremapped svtig printed alt_nodes" << std::endl;
+                return 1;
+            }
+            kept->alt_nodes.clear();
+            if (svtig_header(kept).find("alt_nodes=") != std::string::npos) {
+                std::cerr << "Test 21 FAILED: empty alt_nodes still printed" << std::endl;
+                return 1;
+            }
+            for (auto& s : svtigs)
+                delete s.second;
+            std::cout << "Test 21 passed: alt_nodes filled and printed" << std::endl;
+        }
+
+        for (auto& n : gfa)
+            delete n.second;
+    }
+
     std::cout << "All remap tests passed" << std::endl;
     return 0;
 }
