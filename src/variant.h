@@ -25,6 +25,7 @@ public:
 	bool phased;
 	bool filter = false;
 	std::string	path;
+	int rank = -1; //SR of the node, -1 without tag
 	SVCluster()
 	{
 	}

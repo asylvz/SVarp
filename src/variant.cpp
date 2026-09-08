@@ -67,6 +67,7 @@ int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& g
 			svtig_tmp->node = vars_by_node->first;
 			svtig_tmp->phased = false;
 			svtig_tmp->contig = gfa[vars_by_node->first]->contig;
+			svtig_tmp->rank = gfa[vars_by_node->first]->rank;
 			svtig_tmp->ref_pos = sv->pos_in_ref;			
 			start_pos = sv->pos_in_node;	
 			svtig_tmp->start_pos = sv->pos_in_node;
@@ -104,6 +105,7 @@ int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& g
 					svtig_tmp->node = vars_by_node->first;
 					svtig_tmp->phased = false;
 					svtig_tmp->contig = gfa[vars_by_node->first]->contig;
+					svtig_tmp->rank = gfa[vars_by_node->first]->rank;
 					svtig_tmp->ref_pos = sv->pos_in_ref;
 
 					start_pos = sv->pos_in_node;

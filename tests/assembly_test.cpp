@@ -108,6 +108,31 @@ int main() {
         for (auto& kv : svtigs) delete kv.second;
     }
 
+    // Test 6: expected depth per cluster. Alt nodes take the genome-wide depth,
+    // reference nodes their contig's; a contig at genome depth counts as
+    // reference when the graph has no SR tags.
+    {
+        std::map<std::string, Contig*> depth;
+        depth["overall"] = new Contig(); depth["overall"]->coverage = 16.0;
+        depth["CHM13#0#chr1"] = new Contig(); depth["CHM13#0#chr1"]->coverage = 20.0;
+        depth["CHM13#0#chrX"] = new Contig(); depth["CHM13#0#chrX"]->coverage = 9.0;
+        depth["NA20805#1#CM091884.1"] = new Contig(); depth["NA20805#1#CM091884.1"]->coverage = 0.25;
+
+        SVCluster ref; ref.contig = "CHM13#0#chr1"; ref.rank = 0;
+        SVCluster alt; alt.contig = "NA20805#1#CM091884.1"; alt.rank = 1;
+        SVCluster alt_notag; alt_notag.contig = "NA20805#1#CM091884.1"; alt_notag.rank = -1;
+        SVCluster chrx_notag; chrx_notag.contig = "CHM13#0#chrX"; chrx_notag.rank = -1;
+        SVCluster low; low.contig = "CHM13#0#chr1"; low.rank = 0; depth["CHM13#0#chr1"]->coverage = 2.0;
+
+        if (Assembly::cluster_depth(&alt, depth) != 16.0) { std::cerr << "Test 6: alt node should use genome depth" << std::endl; return 1; }
+        if (Assembly::cluster_depth(&alt_notag, depth) != 16.0) { std::cerr << "Test 6: untagged donor contig should use genome depth" << std::endl; return 1; }
+        if (Assembly::cluster_depth(&chrx_notag, depth) != 9.0) { std::cerr << "Test 6: untagged chromosome should use its own depth" << std::endl; return 1; }
+        if (Assembly::cluster_depth(&low, depth) != 5.0) { std::cerr << "Test 6: floor of 5 expected" << std::endl; return 1; }
+        depth["CHM13#0#chr1"]->coverage = 20.0;
+        if (Assembly::cluster_depth(&ref, depth) != 20.0) { std::cerr << "Test 6: reference node should use its contig depth" << std::endl; return 1; }
+        for (auto& kv : depth) delete kv.second;
+    }
+
     std::cout << "assembly test passed" << std::endl;
     return 0;
 }

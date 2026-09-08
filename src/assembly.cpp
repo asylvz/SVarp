@@ -442,15 +442,29 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
 }
 
 
+// Expected depth for a cluster. Reference nodes (SR 0) use their contig's depth;
+// alt nodes use the genome-wide depth, since a donor contig's own depth only
+// counts reads on its nodes. Without SR tags a contig at genome depth is taken
+// as reference.
+double Assembly::cluster_depth(const SVCluster* sv, std::map <std::string, Contig*>& depth)
+{
+    double overall = depth.count("overall") ? depth["overall"]->coverage : 0.0;
+    double contig = depth.count(sv->contig) ? depth[sv->contig]->coverage : 0.0;
+    double lambda = overall;
+    if (sv->rank == 0 || (sv->rank < 0 && contig >= 0.5 * overall))
+        lambda = contig;
+    if (lambda < 5)
+        lambda = 5;
+    return lambda;
+}
+
 int Assembly::assemble_clusters(parameters &params, faidx_t *&fasta_index, std::vector<SVCluster *> &sv_cluster, std::map<std::string, Contig *> &depth, std::map<std::string, SVtig *> &final_svtigs)
 {
 	int initial_svtigs_cnt = 0;
 	// Iterating over SV clusters of a contig
 	for (auto &sv : sv_cluster)
 	{
-		double contig_depth = depth[sv->contig]->coverage;
-		if (contig_depth < 5)
-			contig_depth = 5;
+		double contig_depth = cluster_depth(sv, depth);
 
 		std::string svtig_name;
 		if ((params.phase_tags).empty())
@@ -505,9 +519,7 @@ void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> 
 	{
 		for (auto &sv : itr->second)
 		{
-			double contig_depth = depth[sv->contig]->coverage;
-			if (contig_depth < 5)
-				contig_depth = 5;
+			double contig_depth = cluster_depth(sv, depth);
 
 			std::string svtig_name;
 			if ((params.phase_tags).empty())
