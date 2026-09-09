@@ -3,6 +3,8 @@
 
 #include <string>
 #include <set>
+#include <map>
+#include <vector>
 #include "common.h"
 
 typedef struct _contig
@@ -51,7 +53,17 @@ public:
 
 
 int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, Gaf& line);
-int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing);
+//GFA link seen from one node: the other node and the L-line orientations (from, to).
+//'+' leaves a node through its forward end and enters the next through its forward start.
+struct Edge
+{
+	std::string node;
+	char from = '+';
+	char to = '+';
+};
+typedef std::map<std::string, std::vector<Edge>> EdgeMap;
+
+int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, EdgeMap& incoming, EdgeMap& outgoing);
 
 
 #endif

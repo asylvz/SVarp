@@ -20,7 +20,7 @@ int main()
         std::string s2 = "S\ts2\tTGCATGCA\tLN:i:8\tSN:Z:chr1\tSO:i:8\tSR:i:0\n";
         std::string s3 = "S\ts3\tAAAATTTT\tLN:i:8\tSN:Z:chr2\tSO:i:0\tSR:i:0\n";
         std::string l1 = "L\ts1\t+\ts2\t+\t0M\n";
-        std::string l2 = "L\ts2\t+\ts3\t+\t0M\n";
+        std::string l2 = "L\ts2\t+\ts3\t-\t0M\n";
 
         gzwrite(gz, s1.c_str(), s1.size());
         gzwrite(gz, s2.c_str(), s2.size());
@@ -34,7 +34,7 @@ int main()
 
         std::map<std::string, Contig*> ref;
         std::map<std::string, gfaNode*> gfa;
-        std::map<std::string, std::vector<std::string>> incoming, outgoing;
+        EdgeMap incoming, outgoing;
 
         int rc = read_gfa(params, ref, gfa, incoming, outgoing);
         if (rc != RETURN_SUCCESS) { std::cerr << "Test 1: read_gfa failed" << std::endl; return 1; }
@@ -56,11 +56,14 @@ int main()
         if (ref["overall"]->contig_length != 24) { std::cerr << "Test 1: overall len should be 24, got " << ref["overall"]->contig_length << std::endl; return 1; }
 
         // Verify links
-        if (outgoing.find("s1") == outgoing.end() || outgoing["s1"][0] != "s2") {
+        if (outgoing.find("s1") == outgoing.end() || outgoing["s1"][0].node != "s2") {
             std::cerr << "Test 1: s1->s2 link missing" << std::endl; return 1;
         }
-        if (incoming.find("s2") == incoming.end() || incoming["s2"][0] != "s1") {
+        if (incoming.find("s2") == incoming.end() || incoming["s2"][0].node != "s1") {
             std::cerr << "Test 1: s2<-s1 incoming missing" << std::endl; return 1;
+        }
+        if (incoming["s3"][0].node != "s2" || incoming["s3"][0].from != '+' || incoming["s3"][0].to != '-') {
+            std::cerr << "Test 1: s2+ -> s3- orientations not kept" << std::endl; return 1;
         }
 
         std::remove(gfa_path);
@@ -82,7 +85,7 @@ int main()
 
         std::map<std::string, Contig*> ref;
         std::map<std::string, gfaNode*> gfa;
-        std::map<std::string, std::vector<std::string>> incoming, outgoing;
+        EdgeMap incoming, outgoing;
 
         int rc = read_gfa(params, ref, gfa, incoming, outgoing);
         if (rc != RETURN_SUCCESS) { std::cerr << "Test 2: read_gfa failed on plain file" << std::endl; return 1; }
@@ -110,7 +113,7 @@ int main()
 
         std::map<std::string, Contig*> ref;
         std::map<std::string, gfaNode*> gfa;
-        std::map<std::string, std::vector<std::string>> incoming, outgoing;
+        EdgeMap incoming, outgoing;
 
         int rc = read_gfa(params, ref, gfa, incoming, outgoing);
         if (rc != RETURN_SUCCESS) { std::cerr << "Test 3: read_gfa failed on long line" << std::endl; return 1; }
@@ -134,7 +137,7 @@ int main()
 
         std::map<std::string, Contig*> ref;
         std::map<std::string, gfaNode*> gfa;
-        std::map<std::string, std::vector<std::string>> incoming, outgoing;
+        EdgeMap incoming, outgoing;
 
         int rc = read_gfa(params, ref, gfa, incoming, outgoing);
         if (rc != RETURN_SUCCESS) { std::cerr << "Test 4: read_gfa failed on empty" << std::endl; return 1; }
@@ -159,7 +162,7 @@ int main()
 
         std::map<std::string, Contig*> ref;
         std::map<std::string, gfaNode*> gfa;
-        std::map<std::string, std::vector<std::string>> incoming, outgoing;
+        EdgeMap incoming, outgoing;
 
         int rc = read_gfa(params, ref, gfa, incoming, outgoing);
         if (rc != RETURN_SUCCESS) { std::cerr << "Test 5: read_gfa failed" << std::endl; return 1; }
@@ -186,7 +189,7 @@ int main()
 
         std::map<std::string, Contig*> ref;
         std::map<std::string, gfaNode*> gfa;
-        std::map<std::string, std::vector<std::string>> incoming, outgoing;
+        EdgeMap incoming, outgoing;
 
         int rc = read_gfa(params, ref, gfa, incoming, outgoing);
         if (rc != RETURN_SUCCESS) { std::cerr << "Test 6: read_gfa failed" << std::endl; return 1; }

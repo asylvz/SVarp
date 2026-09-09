@@ -19,9 +19,9 @@ public:
 	std::set <std::string> reads_h1;
 	std::set <std::string> reads_h2;
 	std::set <std::string> reads_untagged;
-	int start_pos;
-	int end_pos;
-	int ref_pos;
+	int start_pos = 0;
+	int end_pos = 0; //largest position or deletion end among the signals
+	int ref_pos = 0;
 	bool phased;
 	bool filter = false;
 	std::string	path;
@@ -59,14 +59,14 @@ class Variant
 private:
 public:
 		
-	char sv_type; // For intra: "DELETION" or "INSERTION"
-	char type; 	// "INTER" or "INTRA"
-	int sv_size;
-	int pos_in_node;
-	int pos_in_node_end;
-	int pos_in_ref;
-	int pos_in_ref_end;
-	int node_count;
+	char sv_type = 0; // For intra: "DELETION" or "INSERTION"
+	char type = 0; 	// "INTER" or "INTRA"
+	int sv_size = 0;
+	int pos_in_node = 0;
+	int pos_in_node_end = 0;
+	int pos_in_ref = 0;
+	int pos_in_ref_end = 0;
+	int node_count = 0;
 	std::string contig;
 	std::string genotype;
 	std::set <std::string> reads_h1;	
@@ -87,9 +87,9 @@ public:
 
 
 Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const int base_pos, int var_len, char sv_type);
-int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::map<std::string, std::vector<SVCluster*>>& final_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing);
+int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::map<std::string, std::vector<SVCluster*>>& final_svtigs, EdgeMap& incoming, EdgeMap& outgoing);
 
-int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<SVCluster*>>& init_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing);
+int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<SVCluster*>>& init_svtigs, EdgeMap& incoming, EdgeMap& outgoing);
 
 int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<std::string, Variant*>& variations_inter, int min_end = MIN_READ_START_END_WINDOW);
 int find_deletions(parameters* params, std::map<std::string, std::vector<SVCluster*>> deletions);

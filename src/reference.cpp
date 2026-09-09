@@ -85,7 +85,7 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 	return RETURN_ERROR;
 }
 
-int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing)
+int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, EdgeMap& incoming, EdgeMap& outgoing)
 {
 
 	// Read the S lines in the GFA file
@@ -100,8 +100,6 @@ int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<
         std::cerr << "Error opening '"<<params.ref_graph<< std::endl;
         return RETURN_ERROR;
     }
-
-	std::map<std::string, std::vector<std::string>>::iterator it;
 
 	//For overall coverage
 	Contig *c = new Contig();
@@ -133,18 +131,12 @@ int read_gfa(parameters& params, std::map <std::string, Contig*>& ref, std::map<
 
 		if (tokens[0] != "S")
 		{
-			if (tokens[0] == "L" && tokens.size() >= 4)
+			if (tokens[0] == "L" && tokens.size() >= 5)
 			{
-				// Only the two node names are kept. The orientation fields say
-				// which end of each node the edge joins, which merge_neighbor_nodes
-				// would need to measure the distance across a reverse traversal.
-				// Add incoming: use insert with hint to avoid redundant lookups
-				auto [it_in, inserted_in] = incoming.insert({tokens[3], {}});
-				it_in->second.push_back(tokens[1]);
-
-				// Add outgoing: same pattern
-				auto [it_out, inserted_out] = outgoing.insert({tokens[1], {}});
-				it_out->second.push_back(tokens[3]);
+				char from = tokens[2].empty() ? '+' : tokens[2][0];
+				char to = tokens[4].empty() ? '+' : tokens[4][0];
+				incoming[tokens[3]].push_back({tokens[1], from, to});
+				outgoing[tokens[1]].push_back({tokens[3], from, to});
 			}
 			line.clear();
 			continue;

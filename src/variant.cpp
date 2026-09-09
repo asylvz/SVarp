@@ -71,6 +71,7 @@ int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& g
 			svtig_tmp->ref_pos = sv->pos_in_ref;			
 			start_pos = sv->pos_in_node;	
 			svtig_tmp->start_pos = sv->pos_in_node;
+			svtig_tmp->end_pos = std::max(sv->pos_in_node, sv->pos_in_node_end);
 			(svtig_tmp->reads_untagged).insert((sv->reads_untagged).begin(), (sv->reads_untagged).end());
 
 			first = false;
@@ -81,6 +82,7 @@ int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& g
 			{
 				(svtig_tmp->reads_untagged).insert((sv->reads_untagged).begin(), (sv->reads_untagged).end());
 				start_pos = sv->pos_in_node;
+				svtig_tmp->end_pos = std::max(svtig_tmp->end_pos, std::max(sv->pos_in_node, sv->pos_in_node_end));
 			}
 			else
 			{
@@ -93,7 +95,10 @@ int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& g
 				std::set_intersection((svtig_tmp->reads_untagged).begin(), (svtig_tmp->reads_untagged).end(), (sv->reads_untagged).begin(), (sv->reads_untagged).end(), std::inserter(sets_intersect, sets_intersect.end()));
 
 				if(sets_intersect.size() == sv->reads_untagged.size())
+				{
 					start_pos = sv->pos_in_node;
+					svtig_tmp->end_pos = std::max(svtig_tmp->end_pos, std::max(sv->pos_in_node, sv->pos_in_node_end));
+				}
 				else
 				{
 					if(svtig_tmp->reads_untagged.size() > 0)
@@ -110,6 +115,7 @@ int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& g
 
 					start_pos = sv->pos_in_node;
 					svtig_tmp->start_pos = sv->pos_in_node;
+					svtig_tmp->end_pos = std::max(sv->pos_in_node, sv->pos_in_node_end);
 					(svtig_tmp->reads_untagged).insert((sv->reads_untagged).begin(), (sv->reads_untagged).end());
 					first = false;
 				}
@@ -130,70 +136,41 @@ int merge_svs_within_node(parameters& params, std::map<std::string, gfaNode*>& g
 }
 
 
-int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<SVCluster*>>& init_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& /*outgoing*/)
+//Merge clusters that lie within dist_threshold of each other across a link. The link
+//orientations say which node ends meet, so the gap is measured from the right end of each
+//cluster. The merged cluster is dropped from its own node.
+int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<SVCluster*>>& init_svtigs, EdgeMap& incoming, EdgeMap& /*outgoing*/)
 {
-	std::map<std::string, std::vector<std::string>>::iterator it_nodes;
-	std::map<std::string, std::vector<SVCluster*>>::iterator it_neighbors;
-	for (auto &nd: init_svtigs)
+	for (auto &nd : init_svtigs)
 	{
-		if (nd.second.empty())
-		{
-			std::cout<<"Empty...\n";
+		EdgeMap::iterator it_edges = incoming.find(nd.first);
+		if (nd.second.empty() || it_edges == incoming.end() || gfa.count(nd.first) == 0)
 			continue;
-		}
-		//For each node, get the SV at the front and at the back of the vector.
-		//This can be done since they are sorted based on the position within the node
-		//These may need to be merged with the SVs in the neighboring nodes
-		SVCluster* svtig_front = nd.second.front();
-		//SVCluster* svtig_back = nd.second.back();
+		int len_to = gfa[nd.first]->len;
 
-		// This cluster has already been merged into a successor and will be
-		// dropped, so anything folded into it now would go with it.
-		if (svtig_front->filter)
-			continue;
-
-		//First check the svtigs at the front of the vector of svs for this node
-		if (svtig_front->start_pos < params.dist_threshold)
+		for (const Edge& e : it_edges->second)
 		{
-			it_nodes = incoming.find(nd.first);
-			if (it_nodes != incoming.end())
+			if (e.node == nd.first)
+				continue;
+			auto it_from = init_svtigs.find(e.node);
+			if (it_from == init_svtigs.end() || it_from->second.empty() || gfa.count(e.node) == 0)
+				continue;
+
+			//the cluster of each node closest to the shared end
+			SVCluster* to = (e.to == '+') ? nd.second.front() : nd.second.back();
+			SVCluster* from = (e.from == '+') ? it_from->second.back() : it_from->second.front();
+			if (to->filter) //already merged away, anything added now would go with it
+				continue;
+
+			int gap_to = (e.to == '+') ? to->start_pos : len_to - to->end_pos;
+			int gap_from = (e.from == '+') ? gfa[e.node]->len - from->end_pos : from->start_pos;
+			if (std::max(gap_to, 0) + std::max(gap_from, 0) < params.dist_threshold)
 			{
-				// A boundary cluster on an incoming node X that feeds several
-				// successors (X->Y, X->Z) is merged into each successor's front
-				// cluster, so a shared breakpoint is represented on every branch
-				// of the bubble.
-				for(auto &incoming_node: it_nodes->second)
-				{
-					it_neighbors = init_svtigs.find(incoming_node);
-					if(it_neighbors != init_svtigs.end())
-					{
-						SVCluster* svtig_incoming = it_neighbors->second.back();
-
-						if (gfa.count(incoming_node) == 0)
-							continue;
-						// Measured from the far end of the incoming node, which
-						// holds while the edge is traversed forward. read_gfa
-						// drops the L-line orientations, so a reverse traversal
-						// is measured from the wrong end.
-						int node_len = gfa[incoming_node]->len;
-						if ((node_len - svtig_incoming->start_pos + svtig_front->start_pos) < params.dist_threshold)
-						{
-							(svtig_front->reads_untagged).insert((svtig_incoming->reads_untagged).begin(), (svtig_incoming->reads_untagged).end());	
-							//std::string svtig_name = nd.first + ":" + std::to_string(svtig_front->start_pos);
-							//svtig_front->name = svtig_name;
-							svtig_incoming->filter = true;
-							//std::cout<<"(FRONT) Adding "<<svtig_incoming->start_pos <<" (node-len = "<<node_len<< ") to "<< svtig_name<<"\n";
-							//std::cout<<"Adding "<< svtig_incoming->reads_untagged.size() <<" reads to "<< svtig_front->reads_untagged.size() <<"\n\n";
-						}
-					}
-				}
+				to->reads_untagged.insert(from->reads_untagged.begin(), from->reads_untagged.end());
+				from->filter = true;
 			}
 		}
-		//Omitted this because if there is an incoming svtig X to Y, we don't need to check Y to Z because when we process Z, we still merge Y with Z
-		//Only missing check is the first and last nodes. To be added...
-
 	}
-
 	return RETURN_SUCCESS;
 }
 
@@ -238,7 +215,7 @@ int find_final_svtigs(parameters& params, std::map<std::string, std::vector<SVCl
 //We don't do this while iterating the GAF file in alignment.cpp because we want to 
 //find the SV O(1) using "contig_name:start_end" in order to add reads to the
 //read set of the variant during the GAF processing
-int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::map<std::string, std::vector<SVCluster*>>& final_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing)
+int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::map<std::string, std::vector<SVCluster*>>& final_svtigs, EdgeMap& incoming, EdgeMap& outgoing)
 {	
 	std::map<std::string, std::vector<Variant*>>::iterator it;
 	std::map<std::string, std::vector<Variant*>> vars_by_node;

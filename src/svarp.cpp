@@ -18,7 +18,7 @@ int main(int argc, char** argv)
 
 	std::map <std::string, Variant*> tmp_var;
 	std::map <std::string, gfaNode*> gfa;
-	std::map <std::string, std::vector<std::string>> incoming, outgoing;
+	EdgeMap incoming, outgoing;
 
 	std::map <std::string, phase*> phased_reads;
 	std::map <std::string, std::vector<SVCluster*>> vars;

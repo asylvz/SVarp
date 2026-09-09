@@ -39,7 +39,7 @@ int main() {
     vars.insert({"node1:50", v3});
 
     std::map<std::string, std::vector<SVCluster*>> final_svtigs;
-    std::map<std::string, std::vector<std::string>> incoming, outgoing;
+    EdgeMap incoming, outgoing;
     int rc = merge_svs(params, gfa, vars, final_svtigs, incoming, outgoing);
     if (rc != RETURN_SUCCESS) { std::cerr << "merge_svs_within_node returned error" << std::endl; return 1; }
 
@@ -54,6 +54,10 @@ int main() {
     // Check second cluster contains r3
     auto &reads1 = vclusters[1]->reads_untagged;
     if (reads1.find("r3") == reads1.end()) { std::cerr << "Second cluster did not include r3" << std::endl; return 1; }
+
+    // Cluster extents follow the first and last signal
+    if (vclusters[0]->start_pos != 10 || vclusters[0]->end_pos != 15) { std::cerr << "First cluster extent should be 10-15, got " << vclusters[0]->start_pos << "-" << vclusters[0]->end_pos << std::endl; return 1; }
+    if (vclusters[1]->start_pos != 50 || vclusters[1]->end_pos != 50) { std::cerr << "Second cluster extent should be 50-50" << std::endl; return 1; }
 
     // Cleanup
     delete v1; delete v2; delete v3;
