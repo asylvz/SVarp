@@ -4,6 +4,7 @@
 #include <iosfwd>
 #include "logfile.h"
 #include <string>
+#include <mutex>
 #include <vector>
 #include <map>
 #include <chrono>
@@ -59,6 +60,7 @@ typedef struct _parameters
 	int support = 0;
 	int dist_threshold = 0;
 	int min_clip = MIN_CLIP_SIGNAL; //clipped read end that counts as a breakpoint
+	int asm_jobs = 0; //clusters assembled in parallel
 	double min_map_ratio = 0; //Used in filtering
 
 	//Read type: ont, hifi, clr
@@ -135,6 +137,8 @@ public:
 	}
 
 };
+
+extern std::mutex g_log_mtx; //guards stdout and the log files across assembly threads
 
 int decompose_cigars(const std::string& cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp);
 std::string exec(const std::string& command, bool return_out); 

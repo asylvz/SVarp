@@ -15,6 +15,8 @@
 #endif
 
 
+std::mutex g_log_mtx;
+
 int parse_gaf_line(std::string& line, Gaf& gafline)
 {
 	//Gaf gafline;	
@@ -132,7 +134,7 @@ int run_and_log(const std::string& cmd, parameters& params,
                 const std::string& label, int retries,
                 int backoff_seconds, bool fatal)
 {
-	if (params.debug && params.fp_logs.is_open()) {
+	if (std::lock_guard<std::mutex> lk(g_log_mtx); params.debug && params.fp_logs.is_open()) {
         params.fp_logs << "[run_and_log] " << label << " CMD: " << cmd << "\n";
     }
     int attempt = 0;
@@ -141,7 +143,7 @@ int run_and_log(const std::string& cmd, parameters& params,
         int rc = system(cmd.c_str());
         if (rc == 0) return 0;
 
-        if (params.fp_logs.is_open()) {
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open()) {
             if (rc == -1) {
                 params.fp_logs << "Failed to run '" << label << "' (" << cmd
                                << ") system() error: " << strerror(errno) << "\n";
@@ -166,7 +168,7 @@ int run_and_log(const std::string& cmd, parameters& params,
 
         if (attempt < retries) {
             int sleep_seconds = backoff_seconds * (1 << attempt);
-            if (params.fp_logs.is_open())
+            if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
                 params.fp_logs << "Retrying in " << sleep_seconds
                                << " seconds... (attempt "
                                << (attempt + 1) << ")\n";
@@ -176,7 +178,7 @@ int run_and_log(const std::string& cmd, parameters& params,
         }
 
         if (fatal) {
-            if (params.fp_logs.is_open())
+            if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
                 params.fp_logs << "Fatal: command '" << cmd
                                << "' failed after " << (attempt + 1)
                                << " attempts\n";

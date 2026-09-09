@@ -10,7 +10,24 @@
 #include <cmath>
 #include <unistd.h>
 #include <vector>
+#include <thread>
+#include <atomic>
+#include <mutex>
 #include "assembly.h"
+
+// Removes a cluster's work directory on every exit path; in debug mode the
+// read FASTA is kept under in/ first.
+struct JobDir
+{
+	std::string dir, fasta, keep;
+	~JobDir()
+	{
+		std::error_code ec;
+		if (!keep.empty() && std::filesystem::exists(fasta, ec))
+			std::filesystem::copy_file(fasta, keep, std::filesystem::copy_options::overwrite_existing, ec);
+		std::filesystem::remove_all(dir, ec);
+	}
+};
 
 
 
@@ -81,13 +98,11 @@ int Assembly::write_svtigs(std::string &f_path, const std::string &f_name, int p
 	return contig_cnt;
 }
 
-int Assembly::merge_svtigs(parameters &params)
+int Assembly::merge_svtigs(parameters &params, const std::string &dir)
 {
 	int cnt = 0;
-	std::string asm_folder_path = params.log_path + "tmp/";
-
-	// Find the files ending with ".cns.fa"
-	for (const auto &entry : std::filesystem::directory_iterator(asm_folder_path))
+	std::lock_guard<std::mutex> lk(mtx);
+	for (const auto &entry : std::filesystem::directory_iterator(dir))
 	{
 		if (entry.path().extension() == ".fa" && entry.path().stem().extension() == ".cns")
 		{
@@ -103,8 +118,8 @@ int Assembly::merge_svtigs(parameters &params)
 
 			if (params.debug)
 			{
-				std::string tmp_cmd = "cp " + file_path + " " + params.log_path + "out/";
-				run_and_log(tmp_cmd, params, "copy tmp assembly", 0, 1, false);
+				std::error_code ec;
+				std::filesystem::copy_file(file_path, params.log_path + "out/" + entry.path().filename().string(), std::filesystem::copy_options::overwrite_existing, ec);
 			}
 		}
 	}
@@ -132,7 +147,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
                              std::string& svtig_name,
                              double& contig_depth,
                              SVCluster*& sv,
-                             std::map<std::string, SVtig*>& final_svtigs)
+                             std::map<std::string, SVtig*>& final_svtigs, int threads)
 {
     unsigned int support_threshold = static_cast<unsigned int>(params.support) / 2;
     if (support_threshold < 3) support_threshold = 3;
@@ -151,29 +166,29 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
 
     if (contig_depth * 2 < cluster_reads)
     {
-        this->filter_hicov++;
-        if (params.fp_asm_log.is_open())
+        { std::lock_guard<std::mutex> lk(mtx); this->filter_hicov++; }
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_asm_log.is_open())
             params.fp_asm_log << svtig_name << "\tFILTERED\treason=high_coverage\treads=" << read_set.size() << "\tcluster_reads=" << cluster_reads << "\tcontig_depth=" << contig_depth << "\tzscore=" << zscore << "\n";
         return 0;
     }
     else if (contig_depth > 5 * cluster_reads)
     {
-        this->filter_lowcov++;
-        if (params.fp_asm_log.is_open())
+        { std::lock_guard<std::mutex> lk(mtx); this->filter_lowcov++; }
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_asm_log.is_open())
             params.fp_asm_log << svtig_name << "\tFILTERED\treason=low_coverage\treads=" << read_set.size() << "\tcluster_reads=" << cluster_reads << "\tcontig_depth=" << contig_depth << "\tzscore=" << zscore << "\n";
         return 0;
     }
     else if (read_set.size() < support_threshold)
     {
-        this->filter_support++;
-        if (params.fp_asm_log.is_open())
+        { std::lock_guard<std::mutex> lk(mtx); this->filter_support++; }
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_asm_log.is_open())
             params.fp_asm_log << svtig_name << "\tFILTERED\treason=low_support\treads=" << read_set.size() << "\tthreshold=" << support_threshold << "\tzscore=" << zscore << "\n";
         return 0;
     }
     else if (contig_depth > MAX_CONTIG_DEPTH)
     {
-        this->filter_hicov++;
-        if (params.fp_asm_log.is_open())
+        { std::lock_guard<std::mutex> lk(mtx); this->filter_hicov++; }
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_asm_log.is_open())
             params.fp_asm_log << svtig_name << "\tFILTERED\treason=max_contig_depth\treads=" << read_set.size() << "\tcontig_depth=" << contig_depth << "\tzscore=" << zscore << "\n";
         return 0;
     }
@@ -185,11 +200,15 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         tmp->pos = sv->ref_pos;
         (tmp->reads).insert(read_set.begin(), read_set.end());
         tmp->contig = sv->contig;
+        std::lock_guard<std::mutex> lk(mtx);
         final_svtigs.insert(std::pair<std::string, SVtig*>(tmp->name, tmp));
     }
 
-    std::string file_path   = params.log_path + "tmp/" + svtig_name + ".fasta";
-    std::string output_path = params.log_path + "tmp/" + svtig_name;
+    std::string job_dir     = params.log_path + "tmp/" + svtig_name + "/";
+    std::filesystem::create_directories(job_dir);
+    std::string file_path   = job_dir + svtig_name + ".fasta";
+    std::string output_path = job_dir + svtig_name;
+    JobDir guard{job_dir, file_path, params.debug ? params.log_path + "in/" + svtig_name + ".fasta" : ""};
 
     generate_fasta_file(params, fasta_index, read_set, file_path);
 
@@ -223,18 +242,19 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         if (wtpoa_bin.empty())    msg += "wtpoa-cns ";
         if (minimap2_bin.empty()) msg += "minimap2 ";
         if (samtools_bin.empty()) msg += "samtools ";
-        if (params.fp_logs.is_open()) params.fp_logs << msg << std::endl;
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open()) params.fp_logs << msg << std::endl;
         error(msg.c_str());
     }
 
-    int threads     = params.threads;
+    if (threads < 0)
+        threads = params.threads;
 #if defined(__APPLE__) && defined(__aarch64__)
     // wtdbg2 + sse2neon crashes with multiple threads on macOS ARM
     int wtdbg2_threads = 1;
 #else
     int wtdbg2_threads = threads;
 #endif
-    int smt_threads = (threads < 4 ? 4 : threads);
+    int smt_threads = (threads < 1 ? 1 : threads);
     std::string genome_opt = std::to_string(var_size) + "m";
 
     // Set presets based on read type
@@ -294,13 +314,13 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     if (rc != 0)
     {
         const char* reason = (WEXITSTATUS(rc) == 124) ? " (timeout)" : "";
-        if (params.fp_logs.is_open())
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
             params.fp_logs << "[warning] wtdbg2 assembly failed for "
                            << svtig_name << " (rc=" << rc << ")"
                            << reason << std::endl;
-        std::cout << "[warning] wtdbg2 assembly failed for "
-                  << svtig_name << reason << std::endl;
-        if (params.fp_asm_log.is_open()) {
+        { std::lock_guard<std::mutex> lk(g_log_mtx); std::cout << "[warning] wtdbg2 assembly failed for "
+                  << svtig_name << reason << std::endl; }
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_asm_log.is_open()) {
             params.fp_asm_log << svtig_name << "\tFAILED\tstep=wtdbg2\trc=" << rc
                               << reason
                               << "\treads=" << read_set.size() << "\n";
@@ -317,8 +337,8 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         std::filesystem::file_size(layout_gz) == 0 ||
         !layout_has_contigs(layout_gz))
     {
-        this->no_contig_cnt++;
-        if (params.fp_asm_log.is_open())
+        { std::lock_guard<std::mutex> lk(mtx); this->no_contig_cnt++; }
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_asm_log.is_open())
             params.fp_asm_log << svtig_name << "\tFAILED\tstep=wtdbg2\treason=no_contig"
                               << "\treads=" << read_set.size() << "\n";
         return 0;
@@ -334,12 +354,12 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     rc = run_and_log(cns_raw_cmd, params, "wtpoa_raw", 0, 1, false);
     if (rc != 0 || !std::filesystem::exists(raw_fa) || std::filesystem::file_size(raw_fa) == 0)
     {
-        if (params.fp_logs.is_open())
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
             params.fp_logs << "[warning] wtpoa-cns raw consensus failed for "
                            << svtig_name << " (rc=" << rc << ")" << std::endl;
-        std::cout << "[warning] wtpoa-cns raw consensus failed for "
-                  << svtig_name << std::endl;
-        if (params.fp_asm_log.is_open()) {
+        { std::lock_guard<std::mutex> lk(g_log_mtx); std::cout << "[warning] wtpoa-cns raw consensus failed for "
+                  << svtig_name << std::endl; }
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_asm_log.is_open()) {
             params.fp_asm_log << svtig_name << "\tFAILED\tstep=wtpoa-raw\trc=" << rc
                               << "\treads=" << read_set.size() << "\n";
             if (std::filesystem::exists(stderr_file)) {
@@ -360,7 +380,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         " -r2k " + raw_fa + " " + file_path +
         " | " +
         samtools_bin +
-        " sort -m 2g -@" + std::to_string(smt_threads) +
+        " sort -m 512m -@" + std::to_string(smt_threads) +
         " -o " + bam_path;
     std::string map_sort_cmd =
         quiet + TIMEOUT_MM2_SORT + "sh -c \"" + inner_mm + "\"" + out_redir;
@@ -368,12 +388,12 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     rc = run_and_log(map_sort_cmd, params, "mm2_samtools", 0, 1, false);
     if (rc != 0 || !std::filesystem::exists(bam_path))
     {
-        if (params.fp_logs.is_open())
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
             params.fp_logs << "[warning] minimap2+samtools sort failed for "
                            << svtig_name << " (rc=" << rc << ")" << std::endl;
-        std::cout << "[warning] minimap2+samtools sort failed for "
-                  << svtig_name << std::endl;
-        if (params.fp_asm_log.is_open())
+        { std::lock_guard<std::mutex> lk(g_log_mtx); std::cout << "[warning] minimap2+samtools sort failed for "
+                  << svtig_name << std::endl; }
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_asm_log.is_open())
             params.fp_asm_log << svtig_name << "\tFAILED\tstep=mm2+samtools\trc=" << rc
                               << "\treads=" << read_set.size() << "\n";
         return 0;
@@ -395,21 +415,21 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
 
     if (rc != 0 || !std::filesystem::exists(cns_fa) || std::filesystem::file_size(cns_fa) == 0)
     {
-        if (params.fp_logs.is_open())
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
             params.fp_logs << "[warning] wtdbg2 pipeline failed for "
                            << svtig_name << " (rc=" << rc << ", empty="
                            << (std::filesystem::exists(cns_fa) && std::filesystem::file_size(cns_fa) == 0)
                            << ")" << std::endl;
-        std::cout << "[warning] wtdbg2 pipeline failed for "
-                  << svtig_name << std::endl;
-        if (params.fp_asm_log.is_open())
+        { std::lock_guard<std::mutex> lk(g_log_mtx); std::cout << "[warning] wtdbg2 pipeline failed for "
+                  << svtig_name << std::endl; }
+        if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_asm_log.is_open())
             params.fp_asm_log << svtig_name << "\tFAILED\tstep=polish\trc=" << rc
                               << "\treads=" << read_set.size() << "\n";
         return 0;
     }
 
     auto asm_t2 = std::chrono::steady_clock::now();
-    if (params.fp_asm_log.is_open()) {
+    if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_asm_log.is_open()) {
         std::string contig_name = (sv != nullptr) ? sv->contig : "unknown";
         int pos = (sv != nullptr) ? sv->ref_pos : 0;
         params.fp_asm_log << svtig_name << "\tOK"
@@ -421,22 +441,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
                           << "\n";
     }
 	
-    //Write the assembly to the tmp fasta file
-    svtig_tmp_cnt = merge_svtigs(params);
-
-    //Remove the files in the folder
-    for (const auto& entry : std::filesystem::directory_iterator(params.log_path + "tmp/")) 
-    {
-        if(params.debug)
-        {
-            if (entry.path() == file_path)
-            {
-                std::string tmp_cmd = "mv " + file_path + " " + params.log_path + "in/";
-                run_and_log(tmp_cmd, params, "mv tmp assembly to in/", 0, 1, false);
-            }
-        }
-        std::filesystem::remove_all(entry.path());
-    }
+    svtig_tmp_cnt = merge_svtigs(params, job_dir);
 
     return svtig_tmp_cnt;
 }
@@ -458,40 +463,6 @@ double Assembly::cluster_depth(const SVCluster* sv, std::map <std::string, Conti
     return lambda;
 }
 
-int Assembly::assemble_clusters(parameters &params, faidx_t *&fasta_index, std::vector<SVCluster *> &sv_cluster, std::map<std::string, Contig *> &depth, std::map<std::string, SVtig *> &final_svtigs)
-{
-	int initial_svtigs_cnt = 0;
-	// Iterating over SV clusters of a contig
-	for (auto &sv : sv_cluster)
-	{
-		double contig_depth = cluster_depth(sv, depth);
-
-		std::string svtig_name;
-		if ((params.phase_tags).empty())
-		{
-			// Create Svtigs for untagged reads
-			svtig_name = sv->node + "_" + std::to_string(sv->start_pos);
-			initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_untagged, svtig_name, contig_depth, sv, final_svtigs);
-		}
-		else
-		{
-			svtig_name = "H1-" + sv->node + "_" + std::to_string(sv->start_pos);
-			initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_h1, svtig_name, contig_depth, sv, final_svtigs);
-
-			svtig_name = "H2-" + sv->node + "_" + std::to_string(sv->start_pos);
-			initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_h2, svtig_name, contig_depth, sv, final_svtigs);
-
-			if (!params.skip_untagged)
-			{
-				svtig_name = "None-" + sv->node + "_" + std::to_string(sv->start_pos);
-				initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_untagged, svtig_name, contig_depth, sv, final_svtigs);
-			}
-		}
-	}
-
-	return initial_svtigs_cnt;
-}
-
 void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> &depth, std::map<std::string, std::vector<SVCluster *>> &vars, std::set<std::string> &unmapped, std::map<std::string, SVtig *> &final_svtigs)
 {
 	int initial_svtigs_cnt = 0;
@@ -508,49 +479,62 @@ void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> 
 	if (!fasta_index)
 		error("Error loading FASTA index: file not found or corrupted");
 
-	// Count total clusters for progress reporting
-	int total_clusters = 0;
+	// One job per cluster and haplotype; clusters are assembled in parallel,
+	// each job running the external tools with threads/asm_jobs threads.
+	struct Job { SVCluster* sv; std::set<std::string>* reads; std::string name; double depth; };
+	std::vector<Job> jobs;
 	for (itr = vars.begin(); itr != vars.end(); ++itr)
-		total_clusters += itr->second.size();
-
-	// Iterating over contigs; i.e., check SV clusters of each contig
-	int processed_clusters = 0;
-	for (itr = vars.begin(); itr != vars.end(); ++itr)
-	{
 		for (auto &sv : itr->second)
 		{
-			double contig_depth = cluster_depth(sv, depth);
-
-			std::string svtig_name;
+			double d = cluster_depth(sv, depth);
+			std::string base = sv->node + "_" + std::to_string(sv->start_pos);
 			if ((params.phase_tags).empty())
-			{
-				svtig_name = sv->node + "_" + std::to_string(sv->start_pos);
-				initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_untagged, svtig_name, contig_depth, sv, final_svtigs);
-			}
+				jobs.push_back({sv, &sv->reads_untagged, base, d});
 			else
 			{
-				svtig_name = "H1-" + sv->node + "_" + std::to_string(sv->start_pos);
-				initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_h1, svtig_name, contig_depth, sv, final_svtigs);
-
-				svtig_name = "H2-" + sv->node + "_" + std::to_string(sv->start_pos);
-				initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_h2, svtig_name, contig_depth, sv, final_svtigs);
-
+				jobs.push_back({sv, &sv->reads_h1, "H1-" + base, d});
+				jobs.push_back({sv, &sv->reads_h2, "H2-" + base, d});
 				if (!params.skip_untagged)
-				{
-					svtig_name = "None-" + sv->node + "_" + std::to_string(sv->start_pos);
-					initial_svtigs_cnt += final_assembly(params, fasta_index, sv->reads_untagged, svtig_name, contig_depth, sv, final_svtigs);
-				}
-			}
-
-			processed_clusters++;
-			if (processed_clusters % 100 == 0)
-			{
-				std::cout << "\r--> assembled " << processed_clusters << "/" << total_clusters << " clusters" << std::flush;
+					jobs.push_back({sv, &sv->reads_untagged, "None-" + base, d});
 			}
 		}
+	int n_jobs = params.asm_jobs > 0 ? params.asm_jobs : 1;
+	if (n_jobs > (int) jobs.size()) n_jobs = jobs.size() > 0 ? jobs.size() : 1;
+	int job_threads = params.threads / n_jobs;
+	if (job_threads < 1) job_threads = 1;
+	{
+		std::lock_guard<std::mutex> lk(g_log_mtx);
+		std::cout << "--> " << jobs.size() << " assembly jobs, " << n_jobs << " in parallel, " << job_threads << " thread(s) each" << std::endl;
 	}
-	if (total_clusters >= 100)
-		std::cout << "\r--> assembled " << total_clusters << "/" << total_clusters << " clusters\n";
+
+	std::atomic<size_t> next{0};
+	std::atomic<int> done{0};
+	std::atomic<int> produced{0};
+	auto worker = [&]() {
+		faidx_t *idx = fai_load((params.fasta).c_str());
+		if (!idx)
+			error("Error loading FASTA index: file not found or corrupted");
+		while (true)
+		{
+			size_t i = next.fetch_add(1);
+			if (i >= jobs.size()) break;
+			Job &j = jobs[i];
+			produced += final_assembly(params, idx, *j.reads, j.name, j.depth, j.sv, final_svtigs, job_threads);
+			int k = ++done;
+			if (k % 100 == 0)
+			{
+				std::lock_guard<std::mutex> lk(g_log_mtx);
+				std::cout << "\r--> assembled " << k << "/" << jobs.size() << " jobs" << std::flush;
+			}
+		}
+		fai_destroy(idx);
+	};
+	std::vector<std::thread> pool;
+	for (int t = 0; t < n_jobs; t++) pool.emplace_back(worker);
+	for (auto &t : pool) t.join();
+	initial_svtigs_cnt += produced;
+	if (jobs.size() >= 100)
+		std::cout << "\r--> assembled " << jobs.size() << "/" << jobs.size() << " jobs\n";
 
 	// Assemble unmapped reads
 	double unmapped_count = static_cast<double>(unmapped.size());
@@ -571,25 +555,25 @@ void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> 
 
 	std::cout << "--> " << (filter_hicov) + (this->filter_lowcov) + (this->filter_support) << " filtered (" << this->filter_hicov << " high, " << this->filter_lowcov << " low coverage read clusters and " << this->filter_support << " low read support)\n";
 
-	if (params.fp_logs.is_open())
+	if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
 		params.fp_logs << "--> " << (this->filter_hicov) + (this->filter_lowcov) + (this->filter_support) << " filtered (" << this->filter_hicov << " high, " << this->filter_lowcov << " low coverage read clusters and " << this->filter_support << " low read support)\n";
 
 	std::cout << "--> " << this->no_contig_cnt << " clusters produced no contig (too few or too short reads)\n";
-	if (params.fp_logs.is_open())
+	if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
 		params.fp_logs << "--> " << this->no_contig_cnt << " clusters produced no contig (too few or too short reads)\n";
 
 	std::cout << "--> " << unassembled_cnt << " clusters cannot be assembled\n";
-	if (params.fp_logs.is_open())
+	if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
 		params.fp_logs << "--> " << unassembled_cnt << " clusters cannot be assembled\n";
 
 	std::cout << "--> " << initial_svtigs_cnt << " svtigs before final filtering\n";
-	if (params.fp_logs.is_open())
+	if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
 		params.fp_logs << "--> " << initial_svtigs_cnt << " svtigs before final filtering\n";
 
 	auto t2 = std::chrono::steady_clock::now();
 	std::string asm_dur = format_duration(std::chrono::duration<double>(t2 - t1).count());
 
 	std::cout << "--> assembly execution time: " << asm_dur << "\n";
-	if (params.fp_logs.is_open())
+	if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
 		params.fp_logs << "--> assembly execution time: " << asm_dur << "\n";
 }
