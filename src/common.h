@@ -22,6 +22,7 @@
 #define TEST_SAMPLE_SIZE 250000000
 #define MAX_FETCH_LEN 1000000
 #define MIN_READ_START_END_WINDOW 200
+#define MIN_CLIP_SIGNAL 500 //unaligned read end that counts as a breakpoint on a single alignment
 #define MAX_CONTIG_DEPTH 100 //>100X coverage for a contig is unexpected (e.g., MT)
 #define MIN_DUP_OVERLAP 0.9
 
@@ -57,6 +58,7 @@ typedef struct _parameters
 	int threads = 0;
 	int support = 0;
 	int dist_threshold = 0;
+	int min_clip = MIN_CLIP_SIGNAL; //clipped read end that counts as a breakpoint
 	double min_map_ratio = 0; //Used in filtering
 
 	//Read type: ont, hifi, clr

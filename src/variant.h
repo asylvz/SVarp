@@ -89,7 +89,7 @@ int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map
 
 int merge_neighbor_nodes(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map<std::string, std::vector<SVCluster*>>& init_svtigs, std::map <std::string, std::vector<std::string>>& incoming, std::map <std::string, std::vector<std::string>>& outgoing);
 
-int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<std::string, Variant*>& variations_inter);
+int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<std::string, Variant*>& variations_inter, int min_end = MIN_READ_START_END_WINDOW);
 int find_deletions(parameters* params, std::map<std::string, std::vector<SVCluster*>> deletions);
 
 #endif

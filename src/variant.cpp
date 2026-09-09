@@ -281,7 +281,7 @@ int merge_svs(parameters& params, std::map<std::string, gfaNode*>& gfa, std::map
 }
 
 
-int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<std::string, Variant*>& variations_inter)
+int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<std::string, Variant*>& variations_inter, int min_end)
 {
 	bool skip_start = false, skip_end = false;
 	const std::string &path = line.path;
@@ -291,9 +291,9 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 	int node_count = 0, br1_start = -1, br2_end = -1, node_map_size = 0;
 	
 	
-	if (line.query_start < MIN_READ_START_END_WINDOW)
+	if (line.query_start < min_end)
 		skip_start = true;
-	if ((line.query_length - line.query_end) < MIN_READ_START_END_WINDOW)
+	if ((line.query_length - line.query_end) < min_end)
 		skip_end = true;
 	if (skip_start && skip_end)
 		return 0;

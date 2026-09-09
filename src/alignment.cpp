@@ -66,7 +66,7 @@ int is_alignment_valid(Gaf& line)
 	return RETURN_SUCCESS;
 }
 
-int find_var(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, Gaf& line, std::map <std::string, int>& read_freq, std::set <std::string>& unmapped)
+int find_var(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, Gaf& line, std::map <std::string, int>& read_freq, std::set <std::string>& unmapped, int min_clip)
 {
 	std::vector<int> cigarLen;
 	std::vector<char> cigarOp;
@@ -84,10 +84,13 @@ int find_var(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode
 	else
 		primary_cnt++;
 	
-	//If the read has multiple mappings, then the ends are putative SV loci
-	std::map<std::string, int>::iterator it = read_freq.find(line.query_name);
-	if (it != read_freq.end())
+	//Read ends left unaligned are putative SV loci. A read split into several
+	//alignments reports both ends; a single alignment only a clip of min_clip
+	//or more, so ordinary low-quality read ends do not count.
+	if (read_freq.find(line.query_name) != read_freq.end())
 		inter_cnt += mapping_start_end(gfa, line, vars);
+	else if (line.query_start >= min_clip || (line.query_length - line.query_end) >= min_clip)
+		inter_cnt += mapping_start_end(gfa, line, vars, min_clip);
 	
 	cigarLen.clear();
 	cigarOp.clear();
@@ -223,7 +226,7 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 			if (parse_gaf_line(line, g) != RETURN_SUCCESS)
 				continue;
 			
-            find_var(ref, gfa, vars, g, read_freq, unmapped);
+            find_var(ref, gfa, vars, g, read_freq, unmapped, params.min_clip);
 			
 			if(line_count > TEST_SAMPLE_SIZE)
 			{
@@ -309,7 +312,7 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 			
             line_count++;
 
-			find_var(ref, gfa, vars, g, read_freq, unmapped);
+			find_var(ref, gfa, vars, g, read_freq, unmapped, params.min_clip);
 			
 			if(line_count > TEST_SAMPLE_SIZE)
 				break;

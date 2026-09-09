@@ -9,7 +9,7 @@
 int parse_command_line(int argc, char** argv, parameters& params)
 {
 	int index, o;
-	std::string support, dist_threshold, threads, as, pc, map_ratio;
+	std::string support, dist_threshold, threads, as, pc, map_ratio, min_clip;
 	
 	static struct option long_options[] = 
 	{	
@@ -24,6 +24,7 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		{"skip-untagged" , no_argument, 0, 'j'},
 		{"asm" , no_argument, NULL, 'm'},
 		{"map-ratio" , required_argument, NULL, 'n'},
+		{"min-clip" , required_argument, NULL, 'k'},
 		{"out" , required_argument, NULL, 'o'},
 		{"phase" , required_argument, NULL, 'p'},
 		{"no-remap" , no_argument, 0, 'r'},
@@ -36,7 +37,7 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		{NULL, 0, NULL, 0}
 	};
 
-	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jmn:o:p:rs:t:uvw:", long_options, &index)) != -1)
+	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jk:mn:o:p:rs:t:uvw:", long_options, &index)) != -1)
 	{
 		switch(o)
 		{
@@ -72,6 +73,9 @@ int parse_command_line(int argc, char** argv, parameters& params)
 				break;
 			case 'n':
 				map_ratio = optarg;
+				break;
+			case 'k':
+				min_clip = optarg;
 				break;	
 			case 'o':
 				params.output_path = optarg;
@@ -214,6 +218,21 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		}
 	}
 
+	if(!min_clip.empty())
+	{
+		try {
+			params.min_clip = stoi(min_clip);
+		} catch (const std::exception&) {
+			std::cerr << "[SVARP CMDLINE ERROR] min_clip must be an integer: " << min_clip << std::endl;
+			return RETURN_ERROR;
+		}
+		if (params.min_clip < 0)
+		{
+			std::cerr << "[SVARP CMDLINE ERROR] min_clip must be >= 0" << std::endl;
+			return RETURN_ERROR;
+		}
+	}
+
 	if(map_ratio.empty())
 		params.min_map_ratio = 0.90;
 	else
@@ -346,6 +365,7 @@ void init_logs(parameters& params)
 	std::cout << "  Minimum read support: " << params.support << "\n";
 	std::cout << "  Minimum distance threshold: " << params.dist_threshold << "\n";
 	std::cout << "  Minimum map ratio: " << params.min_map_ratio << "\n";
+	std::cout << "  Minimum clip for a breakpoint: " << params.min_clip << "\n";
 	std::cout << "  Precise clipping (GraphAligner): " << params.min_precise_clipping << "\n";
 	std::cout << "  Alignment score (GraphAligner): " << params.min_alignment_score << "\n";
 	std::cout << "  Read type: " << params.read_type << "\n";
@@ -368,6 +388,7 @@ void init_logs(parameters& params)
 		params.fp_logs << "  Minimum read support: " << params.support << "\n";
 		params.fp_logs << "  Minimum distance threshold: " << params.dist_threshold << "\n";
 		params.fp_logs << "  Minimum map ratio: " << params.min_map_ratio << "\n";
+		params.fp_logs << "  Minimum clip for a breakpoint: " << params.min_clip << "\n";
 		params.fp_logs << "  Precise clipping (GraphAligner): " << params.min_precise_clipping << "\n";
 		params.fp_logs << "  Alignment score (GraphAligner): " << params.min_alignment_score << "\n";
 		params.fp_logs << "  Read type: " << params.read_type << "\n";
@@ -412,6 +433,7 @@ void print_help()
 	std::cerr << "\t--skip-untagged             : Output only phased variants (~30\% faster)"<<std::endl;
 	std::cerr << "\t--no-remap (-r)             : Skip remapping (not suggested)"<<std::endl;
 	std::cerr << "\t--map-ratio                 : Minimum fraction of an svtig that must map back to the graph (default=0.90)"<<std::endl;
+	std::cerr << "\t--min-clip                  : Unaligned read end (bp) that counts as a breakpoint on a single alignment (default=500)"<<std::endl;
 	std::cerr << "\t--as                        : GraphAligner minimum alignment score for remapping (default=5000)"<<std::endl;
 	std::cerr << "\t--pc                        : GraphAligner minimum precise clipping ratio for remapping (default=0.97)"<<std::endl;
 	std::cerr << "\t--debug (-u)                : Output multiple log files for debugging purpose"<<std::endl;
