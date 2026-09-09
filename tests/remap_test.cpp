@@ -394,7 +394,7 @@ int main() {
         s->remap_path = ">s1000<s1001";
         s->map_ratio = 0.75;
         std::string mapped = svtig_header(s);
-        if (mapped != ">H1-s1000_400 contig=chr1 pos=1234567 support=2 path=>s1000<s1001 graph_cov=0.75 max_gap=0 max_indel=0") {
+        if (mapped != ">H1-s1000_400 contig=chr1 pos=1234567 support=2 path=>s1000<s1001 graph_cov=0.75 max_gap=0 max_indel=0 graph_explained=no") {
             std::cerr << "Test 16 FAILED: unexpected header with remapping: " << mapped << std::endl;
             return 1;
         }
@@ -638,26 +638,29 @@ int main() {
 
         Read full; full.svtig_size = 10000; full.ivals = {{0, 6000}, {5500, 10000}};
         graph_fit(&full);
-        if (full.cov != 1.0 || full.max_gap != 0 || !explained_by_graph(&full, 0.9)) { std::cerr << "Test 27 FAILED: fully covered svtig not explained" << std::endl; return 1; }
+        if (full.cov != 1.0 || full.max_gap != 0 || !explained_by_graph(&full)) { std::cerr << "Test 27 FAILED: fully covered svtig not explained" << std::endl; return 1; }
         std::cout << "Test 27 passed: covered svtig explained" << std::endl;
 
         Read gap; gap.svtig_size = 10000; gap.ivals = {{0, 4000}, {4600, 10000}};
         graph_fit(&gap);
-        if (gap.max_gap != 600 || explained_by_graph(&gap, 0.9)) { std::cerr << "Test 28 FAILED: 600 bp hole should keep the svtig" << std::endl; return 1; }
+        if (gap.max_gap != 600 || explained_by_graph(&gap)) { std::cerr << "Test 28 FAILED: 600 bp hole means the graph lacks the allele" << std::endl; return 1; }
         Read ind; ind.svtig_size = 10000; ind.ivals = {{0, 10000}}; ind.max_indel = 120;
         graph_fit(&ind);
-        if (explained_by_graph(&ind, 0.9)) { std::cerr << "Test 28 FAILED: 120 bp indel should keep the svtig" << std::endl; return 1; }
+        if (explained_by_graph(&ind)) { std::cerr << "Test 28 FAILED: 120 bp indel means the graph lacks the allele" << std::endl; return 1; }
+        // coverage is the output gate, not part of the explained decision
         Read ends; ends.svtig_size = 10000; ends.ivals = {{2000, 8000}};
         graph_fit(&ends);
-        if (ends.cov != 0.6 || explained_by_graph(&ends, 0.9)) { std::cerr << "Test 28 FAILED: 60% coverage should keep the svtig" << std::endl; return 1; }
+        if (ends.cov != 0.6 || !explained_by_graph(&ends)) { std::cerr << "Test 28 FAILED: 60% coverage is a gate matter, the aligned part is explained" << std::endl; return 1; }
+        parameters gate; if (ends.cov >= gate.min_graph_cov) { std::cerr << "Test 28 FAILED: 60% coverage should fail the default gate" << std::endl; return 1; }
         Read none; none.svtig_size = 10000;
         graph_fit(&none);
-        if (none.cov != 0 || explained_by_graph(&none, 0.9)) { std::cerr << "Test 28 FAILED: uncovered svtig explained" << std::endl; return 1; }
-        std::cout << "Test 28 passed: holes, indels and low coverage keep the svtig" << std::endl;
+        if (none.cov != 0 || none.cov >= gate.min_graph_cov) { std::cerr << "Test 28 FAILED: uncovered svtig passed the gate" << std::endl; return 1; }
+        if (gate.min_svtig_len != 5000 || !gate.skip_untagged) { std::cerr << "Test 28 FAILED: default gate values" << std::endl; return 1; }
+        std::cout << "Test 28 passed: holes and indels mark novel alleles, coverage gates the output" << std::endl;
 
         Read small; small.svtig_size = 10000; small.ivals = {{0, 5000}, {5040, 10000}}; small.max_indel = 49;
         graph_fit(&small);
-        if (!explained_by_graph(&small, 0.9)) { std::cerr << "Test 29 FAILED: sub-SV hole and indel should not keep the svtig" << std::endl; return 1; }
+        if (!explained_by_graph(&small)) { std::cerr << "Test 29 FAILED: sub-SV hole and indel should count as explained" << std::endl; return 1; }
         std::cout << "Test 29 passed: sub-SV differences do not count" << std::endl;
     }
 

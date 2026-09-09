@@ -42,7 +42,7 @@ typedef struct _parameters
 	bool asm_mode = false;
 	bool debug = false;
 	bool no_remap = false;
-	bool skip_untagged = false;
+	bool skip_untagged = true; //clusters of untagged reads are assembled and written only with --keep-untagged
 	bool write_unmapped = false; //list reads without a GAF record
 	bool keep_remap = false; //keep svtigs_tmp.fa and the remap GAF
 	std::string fasta;
@@ -62,7 +62,8 @@ typedef struct _parameters
 	int dist_threshold = 0;
 	int min_clip = MIN_CLIP_SIGNAL; //clipped read end that counts as a breakpoint
 	int asm_jobs = 0; //clusters assembled in parallel
-	double min_map_ratio = 0; //svtig fraction covered by graph alignments that counts as explained
+	double min_graph_cov = 0.90; //svtig fraction covered by graph alignments needed to keep it
+	int min_svtig_len = 5000; //shortest svtig written (bp)
 	double min_identity = 0.90; //remap records below this identity do not count as coverage
 
 	//Read type: ont, hifi, clr

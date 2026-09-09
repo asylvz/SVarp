@@ -51,6 +51,7 @@ public:
 	int max_indel = 0; //largest indel inside a graph alignment (bp)
 	//Non-reference nodes on remap_path, "first-last:contig" joined by ';'
 	std::string alt_nodes;
+	bool graph_explained = false; //the graph holds this sequence without an SV-sized difference
 };
 
 

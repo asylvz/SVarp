@@ -129,7 +129,8 @@ std::string svtig_header(const SVtig* svtig)
 
 	if (svtig->map_ratio >= 0)
 	{
-		out << " path=" << svtig->remap_path << " graph_cov=" << svtig->map_ratio << " max_gap=" << svtig->max_gap << " max_indel=" << svtig->max_indel;
+		out << " path=" << svtig->remap_path << " graph_cov=" << svtig->map_ratio << " max_gap=" << svtig->max_gap << " max_indel=" << svtig->max_indel
+		    << " graph_explained=" << (svtig->graph_explained ? "yes" : "no");
 		if (!svtig->alt_nodes.empty())
 			out << " alt_nodes=" << svtig->alt_nodes;
 	}
@@ -223,11 +224,11 @@ void graph_fit(Read* r)
 }
 
 
-// The graph explains the svtig when its alignments cover at least min_cov of
-// it without leaving an SV-sized hole or opening an SV-sized indel.
-bool explained_by_graph(const Read* r, double min_cov)
+// The graph explains a kept svtig when its alignments leave no SV-sized hole and
+// open no SV-sized indel; coverage itself is the output gate (min_graph_cov).
+bool explained_by_graph(const Read* r)
 {
-	return r->cov >= min_cov && r->max_gap < MINSVSIZE && r->max_indel < MINSVSIZE;
+	return r->max_gap < MINSVSIZE && r->max_indel < MINSVSIZE;
 }
 
 
@@ -322,6 +323,7 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 						tmp->map_ratio = r->cov;
 						tmp->max_gap = r->max_gap;
 						tmp->max_indel = r->max_indel;
+						tmp->graph_explained = r->explained;
 						final_svtigs.insert(std::pair<std::string, SVtig*>(r->rname, tmp));
 						extra_added++;
 					}
@@ -338,6 +340,7 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 						it_dup->second->map_ratio = r->cov;
 						it_dup->second->max_gap = r->max_gap;
 						it_dup->second->max_indel = r->max_indel;
+						it_dup->second->graph_explained = r->explained;
 					}
 					else
 						std::cerr<<"Error - SVtig= "<<r->rname<<" not found...\n";
@@ -499,21 +502,31 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 		}
 	}
 
+	// Output gate: long enough and anchored in the graph; whether the graph also
+	// holds the SV allele is recorded, not filtered.
 	std::vector <Read*> tmp_svtig;
-	int explained = 0, unaligned = 0;
+	int unaligned = 0, too_short = 0, low_cov = 0;
 
 	for (auto &t: reads)
 	{
 		Read* r = t.second;
 		graph_fit(r);
-		if (explained_by_graph(r, params.min_map_ratio))
+		if (r->svtig_size < params.min_svtig_len)
 		{
-			explained++;
+			too_short++;
 			if (params.fp_remap_log.is_open())
-				params.fp_remap_log << t.first << "\tFILTERED\treason=explained_by_graph\tcov=" << r->cov << "\tmax_gap=" << r->max_gap << "\tmax_indel=" << r->max_indel << "\n";
+				params.fp_remap_log << t.first << "\tFILTERED\treason=short\tsize=" << r->svtig_size << "\n";
+			continue;
 		}
-		else
-			tmp_svtig.push_back(r);
+		if (r->cov < params.min_graph_cov)
+		{
+			low_cov++;
+			if (params.fp_remap_log.is_open())
+				params.fp_remap_log << t.first << "\tFILTERED\treason=low_graph_cov\tcov=" << r->cov << "\tmax_gap=" << r->max_gap << "\tmax_indel=" << r->max_indel << "\tsize=" << r->svtig_size << "\n";
+			continue;
+		}
+		r->explained = explained_by_graph(r);
+		tmp_svtig.push_back(r);
 	}
 
 	// svtigs without any alignment are dropped, but counted
@@ -537,13 +550,17 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 			if (r->duplicate)
 				params.fp_remap_log << r->rname << "\tDUPLICATE\tnode=" << r->node << "\tstart=" << r->start << "\tend=" << r->end << "\tsize=" << r->svtig_size << "\n";
 			else
-				params.fp_remap_log << r->rname << "\tKEPT\tcov=" << r->cov << "\tmax_gap=" << r->max_gap << "\tmax_indel=" << r->max_indel << "\tnode=" << r->node << "\tsize=" << r->svtig_size << "\n";
+				params.fp_remap_log << r->rname << "\tKEPT\tgraph_explained=" << (r->explained ? "yes" : "no") << "\tcov=" << r->cov << "\tmax_gap=" << r->max_gap << "\tmax_indel=" << r->max_indel << "\tnode=" << r->node << "\tsize=" << r->svtig_size << "\n";
 		}
 	}
 
-	std::cout<<"--> "<< explained << " explained by the graph, " << unaligned << " unaligned, " << dup_legit.first << " duplicate\n";
+	int kept = 0, in_graph = 0;
+	for (auto &r : tmp_svtig)
+		if (!r->duplicate) { kept++; in_graph += r->explained; }
+
+	std::cout << "--> " << kept << " svtigs kept (" << in_graph << " present in the graph, " << kept - in_graph << " not); filtered: " << too_short << " short, " << low_cov << " low graph coverage, " << unaligned << " without alignment, " << dup_legit.first << " duplicate\n";
 	if (params.fp_logs.is_open()) {
-		params.fp_logs << "--> " << explained << " explained by the graph, " << unaligned << " unaligned, " << dup_legit.first << " duplicate\n";
+		params.fp_logs << "--> " << kept << " svtigs kept (" << in_graph << " present in the graph, " << kept - in_graph << " not); filtered: " << too_short << " short, " << low_cov << " low graph coverage, " << unaligned << " without alignment, " << dup_legit.first << " duplicate\n";
 		params.fp_logs << "--> " << primary << " primary, " << secondary << " secondary mappings, " << lowmq << " low MAPQ(<" << MINMAPQREMAP << "); svtigs from multiple contig assemblies = " << extra_added << "\n";
 	}
 

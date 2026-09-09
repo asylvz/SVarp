@@ -29,6 +29,7 @@ typedef struct _read
 	int max_indel = 0; //largest merged indel in any counted record
 	double cov = 0; //fraction of the svtig covered by ivals
 	int max_gap = 0; //largest uncovered stretch inside the covered range
+	bool explained = false; //no SV-sized gap or indel against the graph
 
 }Read;
 
@@ -37,7 +38,7 @@ std::pair<int, int> remove_duplicates(std::vector<Read*>& tmp_svtig, std::map<st
 int merged_indel(const std::string& cigar, int max_gap = 20);
 bool cigar_has_sv(const std::string& cigar);
 void graph_fit(Read* r);
-bool explained_by_graph(const Read* r, double min_cov);
+bool explained_by_graph(const Read* r);
 void update_read(Read* r, const Gaf& g, bool good, bool has_sv, double map_ratio);
 std::string collect_alt_nodes(const std::string& path, std::map<std::string, gfaNode*>& gfa);
 void fill_alt_nodes(std::map<std::string, SVtig*>& final_svtigs, std::map<std::string, gfaNode*>& gfa);

@@ -110,15 +110,38 @@ build/svarp \
 	Optional arguments:
 	--sample (-i)               : Sample name.
 	--out (-o)                  : Output folder.
-	--debug                     : Output multiple log files for debugging purpose.
-	--skip-untagged             : Output only phased variants (~30% faster).
-	--dist-threshold (-d)       : Distance threshold to merge SV breakpoints (default=100)
 	--phase (-p)                : WhatsHap haplotag file in .tsv (https://whatshap.readthedocs.io/en/latest/guide.html#whatshap-haplotag)
-	--reads (-w)                : Read type: ont (default), hifi, or clr. Sets wtdbg2 preset and assembly parameters.
 	--support (-s)              : A cluster is assembled only if it has MORE than this many reads (default=5 for diploid samples)
+	--dist-threshold (-d)       : Distance threshold to merge SV breakpoints (default=100)
+	--reads (-w)                : Read type: ont (default), hifi, or clr. Sets wtdbg2 preset and assembly parameters.
 	--threads (-t)              : Number of threads for assembly and realignment (default=16)
+	--asm-jobs                  : Clusters assembled in parallel (default=min(threads, 8))
+	--keep-untagged             : Also assemble and write clusters of untagged reads (off by default)
+	--min-clip                  : Unaligned read end (bp) that counts as a breakpoint on a single alignment (default=500)
+	--min-graph-cov             : Fraction of an svtig covered by graph alignments (identity >= --min-identity) needed to keep it (default=0.90)
+	--min-svtig-len             : Shortest svtig written, in bp (default=5000)
+	--min-identity              : Remap records below this identity do not count as graph coverage (default=0.90)
+	--as                        : GraphAligner minimum alignment score for remapping (default=1000)
+	--pc                        : GraphAligner --precise-clipping for remapping (default: GraphAligner default)
+	--no-remap (-r)             : Skip remapping (not suggested)
+	--keep-remap                : Keep <sample>_svtigs_tmp.fa and <sample>_remap.gaf (the inputs of the final filter)
+	--write-unmapped            : Write the names of reads without a GAF record to <out>/<sample>_unmapped_reads.txt
+	--debug (-u)                : Keep all intermediate files and log every command
 	--version (-v)              : Print version
 	--help (-h)                 : Print this help menu
+
+## Output
+
+Svtigs are written per haplotype (`<sample>_svtigs_H1.fa`, `_H2.fa`; `_untagged.fa` with `--keep-untagged`).
+Each header carries the cluster locus and read support plus the result of remapping the svtig onto the graph:
+
+	>H1-s1065813_569 contig=CHM13#0#chr16 pos=4106 support=6 path=>s1065813>s1065814 graph_cov=0.998 max_gap=0 max_indel=12 graph_explained=yes
+
+`graph_cov` is the fraction of the svtig covered by graph alignments, `max_gap` the largest uncovered stretch and
+`max_indel` the largest indel inside an alignment (bp). `graph_explained=yes` means the graph already holds this
+sequence without an SV-sized (>=50 bp) difference; `no` marks an allele the graph lacks. Only svtigs anchored in the
+graph (`graph_cov` >= `--min-graph-cov`) and at least `--min-svtig-len` long are written; every dropped svtig is listed
+with its reason in `<sample>_remap.log`, every cluster in `<sample>_assembly.log`.
 
 ## Citation
 

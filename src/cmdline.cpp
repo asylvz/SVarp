@@ -9,7 +9,7 @@
 int parse_command_line(int argc, char** argv, parameters& params)
 {
 	int index, o;
-	std::string support, dist_threshold, threads, as, pc, map_ratio, min_clip, asm_jobs, min_identity;
+	std::string support, dist_threshold, threads, as, pc, map_ratio, min_clip, asm_jobs, min_identity, min_svtig_len;
 	
 	static struct option long_options[] = 
 	{	
@@ -21,9 +21,10 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		{"fasta" , required_argument, NULL, 'f'},
 		{"graph" , required_argument, NULL, 'g'},
 		{"help"   , no_argument, 0, 'h'},
-		{"skip-untagged" , no_argument, 0, 'j'},
+		{"keep-untagged" , no_argument, 0, 'j'},
 		{"asm" , no_argument, NULL, 'm'},
-		{"map-ratio" , required_argument, NULL, 'n'},
+		{"min-graph-cov" , required_argument, NULL, 'n'},
+		{"min-svtig-len" , required_argument, NULL, 'q'},
 		{"min-clip" , required_argument, NULL, 'k'},
 		{"asm-jobs" , required_argument, NULL, 'l'},
 		{"min-identity" , required_argument, NULL, 'y'},
@@ -41,7 +42,7 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		{NULL, 0, NULL, 0}
 	};
 
-	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jk:l:mn:o:p:rs:t:uvw:xy:z", long_options, &index)) != -1)
+	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jk:l:mn:o:p:q:rs:t:uvw:xy:z", long_options, &index)) != -1)
 	{
 		switch(o)
 		{
@@ -70,7 +71,10 @@ int parse_command_line(int argc, char** argv, parameters& params)
 				params.sample_name = optarg;
 				break;
 			case 'j':
-				params.skip_untagged = true;
+				params.skip_untagged = false;
+				break;
+			case 'q':
+				min_svtig_len = optarg;
 				break;
 			case 'x':
 				params.write_unmapped = true;
@@ -279,19 +283,32 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		}
 	}
 
-	if(map_ratio.empty())
-		params.min_map_ratio = 0.90;
-	else
+	if(!map_ratio.empty())
 	{
 		try {
-			params.min_map_ratio = stod(map_ratio);
+			params.min_graph_cov = stod(map_ratio);
 		} catch (const std::exception&) {
-			std::cerr << "[SVARP CMDLINE ERROR] map_ratio must be a float: " << map_ratio << std::endl;
+			std::cerr << "[SVARP CMDLINE ERROR] min_graph_cov must be a float: " << map_ratio << std::endl;
 			return RETURN_ERROR;
 		}
-		if (params.min_map_ratio < 0 || params.min_map_ratio > 1)
+		if (params.min_graph_cov < 0 || params.min_graph_cov > 1)
 		{
-			std::cerr << "[SVARP CMDLINE ERROR] map_ratio must be in [0, 1]" << std::endl;
+			std::cerr << "[SVARP CMDLINE ERROR] min_graph_cov must be in [0, 1]" << std::endl;
+			return RETURN_ERROR;
+		}
+	}
+
+	if(!min_svtig_len.empty())
+	{
+		try {
+			params.min_svtig_len = stoi(min_svtig_len);
+		} catch (const std::exception&) {
+			std::cerr << "[SVARP CMDLINE ERROR] min_svtig_len must be an integer: " << min_svtig_len << std::endl;
+			return RETURN_ERROR;
+		}
+		if (params.min_svtig_len < 0)
+		{
+			std::cerr << "[SVARP CMDLINE ERROR] min_svtig_len must be >= 0" << std::endl;
 			return RETURN_ERROR;
 		}
 	}
@@ -440,7 +457,9 @@ void init_logs(parameters& params)
 	std::cout << "\nParameters:\n";
 	std::cout << "  Minimum read support: " << params.support << "\n";
 	std::cout << "  Minimum distance threshold: " << params.dist_threshold << "\n";
-	std::cout << "  Minimum map ratio: " << params.min_map_ratio << "\n";
+	std::cout << "  Minimum graph coverage of an svtig: " << params.min_graph_cov << "\n";
+	std::cout << "  Minimum svtig length: " << params.min_svtig_len << "\n";
+	std::cout << "  Untagged svtigs: " << (params.skip_untagged ? "skipped" : "kept") << "\n";
 	std::cout << "  Minimum clip for a breakpoint: " << params.min_clip << "\n";
 	std::cout << "  Parallel assembly jobs: " << params.asm_jobs << "\n";
 	std::cout << "  Precise clipping (GraphAligner): " << (params.min_precise_clipping > 0 ? std::to_string(params.min_precise_clipping) : std::string("default")) << "\n";
@@ -467,7 +486,9 @@ void init_logs(parameters& params)
 		params.fp_logs << "\nParameters:\n";
 		params.fp_logs << "  Minimum read support: " << params.support << "\n";
 		params.fp_logs << "  Minimum distance threshold: " << params.dist_threshold << "\n";
-		params.fp_logs << "  Minimum map ratio: " << params.min_map_ratio << "\n";
+		params.fp_logs << "  Minimum graph coverage of an svtig: " << params.min_graph_cov << "\n";
+		params.fp_logs << "  Minimum svtig length: " << params.min_svtig_len << "\n";
+		params.fp_logs << "  Untagged svtigs: " << (params.skip_untagged ? "skipped" : "kept") << "\n";
 		params.fp_logs << "  Minimum clip for a breakpoint: " << params.min_clip << "\n";
 		params.fp_logs << "  Parallel assembly jobs: " << params.asm_jobs << "\n";
 		params.fp_logs << "  Precise clipping (GraphAligner): " << (params.min_precise_clipping > 0 ? std::to_string(params.min_precise_clipping) : std::string("default")) << "\n";
@@ -513,10 +534,11 @@ void print_help()
 	std::cerr << "\t--dist-threshold (-d)       : Distance threshold to merge SV breakpoints (default=100)"<<std::endl;
 	std::cerr << "\t--reads (-w)                : Read type: ont, hifi, or clr (default=ont)"<<std::endl;
 	std::cerr << "\t--threads (-t)              : Number of threads for assembly and realignment (default=16)"<<std::endl;
-	std::cerr << "\t--skip-untagged             : Output only phased variants (~30\% faster)"<<std::endl;
+	std::cerr << "\t--keep-untagged             : Also assemble and write clusters of untagged reads (off by default)"<<std::endl;
 	std::cerr << "\t--no-remap (-r)             : Skip remapping (not suggested)"<<std::endl;
 	std::cerr << "\t--write-unmapped            : Write the names of reads without a GAF record to <out>/<sample>_unmapped_reads.txt"<<std::endl;
-	std::cerr << "\t--map-ratio                 : Fraction of an svtig covered by graph alignments at which it counts as explained and is dropped (default=0.90)"<<std::endl;
+	std::cerr << "\t--min-graph-cov             : Fraction of an svtig covered by graph alignments (identity >= --min-identity) needed to keep it (default=0.90)"<<std::endl;
+	std::cerr << "\t--min-svtig-len             : Shortest svtig written, in bp (default=5000)"<<std::endl;
 	std::cerr << "\t--min-clip                  : Unaligned read end (bp) that counts as a breakpoint on a single alignment (default=500)"<<std::endl;
 	std::cerr << "\t--asm-jobs                  : Clusters assembled in parallel (default=min(threads, 8))"<<std::endl;
 	std::cerr << "\t--min-identity              : Remap records below this identity do not count as graph coverage (default=0.90)"<<std::endl;
