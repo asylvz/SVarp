@@ -37,10 +37,11 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		{"version" , no_argument, NULL, 'v'},
 		{"reads" , required_argument, NULL, 'w'},
 		{"write-unmapped" , no_argument, NULL, 'x'},
+		{"keep-remap" , no_argument, NULL, 'z'},
 		{NULL, 0, NULL, 0}
 	};
 
-	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jk:l:mn:o:p:rs:t:uvw:xy:", long_options, &index)) != -1)
+	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jk:l:mn:o:p:rs:t:uvw:xy:z", long_options, &index)) != -1)
 	{
 		switch(o)
 		{
@@ -73,6 +74,9 @@ int parse_command_line(int argc, char** argv, parameters& params)
 				break;
 			case 'x':
 				params.write_unmapped = true;
+				break;
+			case 'z':
+				params.keep_remap = true;
 				break;
 			case 'm':
 				params.asm_mode = true;
@@ -427,10 +431,8 @@ void init_logs(parameters& params)
 	}
 	params.fp_logs.open(params.log_path + params.sample_name + ".log");
 
-	if (params.debug) {
-		params.fp_asm_log.open(params.log_path + params.sample_name + "_assembly.log");
-		params.fp_remap_log.open(params.log_path + params.sample_name + "_remap.log");
-	}
+	params.fp_asm_log.open(params.log_path + params.sample_name + "_assembly.log");
+	params.fp_remap_log.open(params.log_path + params.sample_name + "_remap.log");
 
 	params.remap_gaf_path = params.log_path + params.sample_name + "_remap.gaf";
 
@@ -446,6 +448,8 @@ void init_logs(parameters& params)
 	std::cout << "  Alignment score (GraphAligner): " << params.min_alignment_score << "\n";
 	std::cout << "  Read type: " << params.read_type << "\n";
 	std::cout << "  Threads: " << params.threads << "\n";
+	if (params.keep_remap)
+		std::cout << "  Keep remap files: yes\n";
 	if (params.debug)
 		std::cout << "  Debug: yes\n";
 	std::cout << "\nInput files:\n";
@@ -471,6 +475,7 @@ void init_logs(parameters& params)
 		params.fp_logs << "  Alignment score (GraphAligner): " << params.min_alignment_score << "\n";
 		params.fp_logs << "  Read type: " << params.read_type << "\n";
 		params.fp_logs << "  Threads: " << params.threads << "\n";
+		params.fp_logs << "  Keep remap files: " << (params.keep_remap ? "yes" : "no") << "\n";
 		params.fp_logs << "  Debug: " << (params.debug ? "yes" : "no") << "\n";
 		params.fp_logs << "\nInput files:\n";
 		params.fp_logs << "  GAF:   " << params.gaf << "\n";
@@ -517,7 +522,8 @@ void print_help()
 	std::cerr << "\t--min-identity              : Remap records below this identity do not count as graph coverage (default=0.90)"<<std::endl;
 	std::cerr << "\t--as                        : GraphAligner minimum alignment score for remapping (default=1000)"<<std::endl;
 	std::cerr << "\t--pc                        : GraphAligner --precise-clipping for remapping (default: GraphAligner default)"<<std::endl;
-	std::cerr << "\t--debug (-u)                : Output multiple log files for debugging purpose"<<std::endl;
+	std::cerr << "\t--keep-remap                : Keep <sample>_svtigs_tmp.fa and <sample>_remap.gaf (the inputs of the final filter)"<<std::endl;
+	std::cerr << "\t--debug (-u)                : Keep all intermediate files and log every command"<<std::endl;
 	//std::cerr << "\t--assembler                 : (Experimental) Assembler can be either \"Shasta\", \"wtdbg2\" or \"bsalign\" (default:wtdbg2) "<<std::endl;
 	//std::cerr << "\t--asm                       : (Experimental) Runs in assembly mode. You can provide assembly to find the variations. This outputs exact breakpoints instead of SVtigs"<<std::endl;
 	std::cerr << "\t--help                      : Print this help menu"<<std::endl;

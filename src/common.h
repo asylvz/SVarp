@@ -44,6 +44,7 @@ typedef struct _parameters
 	bool no_remap = false;
 	bool skip_untagged = false;
 	bool write_unmapped = false; //list reads without a GAF record
+	bool keep_remap = false; //keep svtigs_tmp.fa and the remap GAF
 	std::string fasta;
 	std::string phase_tags;
 	std::string output_path;
@@ -144,6 +145,7 @@ extern std::mutex g_log_mtx; //guards stdout and the log files across assembly t
 
 int decompose_cigars(const std::string& cigar, std::vector<int>& cigarLen, std::vector<char>& cigarOp);
 std::string exec(const std::string& command, bool return_out); 
+std::string tool_version(const std::string& bin, const std::string& flag = "--version");
 void error(const char* const msg);
 double overlap_ratio(int x_start, int x_end, int y_start, int y_end);
 int parse_gaf_line(std::string& line, Gaf& gafline);

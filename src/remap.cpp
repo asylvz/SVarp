@@ -621,6 +621,8 @@ static void remap_and_flag(parameters& params, std::map<std::string, gfaNode*>& 
 		(params.min_precise_clipping > 0 ? " --precise-clipping " + std::to_string(params.min_precise_clipping) : std::string("")) +
 		ga_redir;
 		
+	if (params.fp_logs.is_open())
+		params.fp_logs << "--> GraphAligner " << tool_version(graphaligner_bin) << "\n--> " << graphaligner_cmd << "\n";
 	run_and_log(graphaligner_cmd, params, "GraphAligner", 2, 2, true);
 		
 	if (std::filesystem::is_empty(params.remap_gaf_path))
@@ -695,7 +697,7 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 	}
 	fai_destroy(fasta_index);
 
-	if (!params.debug)
+	if (!params.debug && !params.keep_remap)
 	{
 		if(std::filesystem::exists(svtigs_tmp_path))
 			std::filesystem::remove_all(svtigs_tmp_path);
@@ -703,6 +705,9 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 			std::filesystem::remove_all(svtigs_tmp_path + ".fai");
 		if(std::filesystem::exists(params.remap_gaf_path))
 			std::filesystem::remove_all(params.remap_gaf_path);
+	}
+	if (!params.debug)
+	{
 		if(std::filesystem::exists(params.log_path + "in/"))
 			std::filesystem::remove_all(params.log_path + "in/");
 		if(std::filesystem::exists(params.log_path + "out/"))

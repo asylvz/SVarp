@@ -36,6 +36,9 @@ int main()
     if (parse({"--support", "3", "--threads", "4", "--min-identity", "0.8", "--map-ratio", "0.95", "--pc", "0.9"}, params) != RETURN_SUCCESS || params.support != 3 || params.threads != 4 || params.asm_jobs != 4) {
         std::cerr << "Test 2: valid values rejected" << std::endl; return 1;
     }
+    if (parse({"--keep-remap", "--write-unmapped"}, params) != RETURN_SUCCESS || !params.keep_remap || !params.write_unmapped) {
+        std::cerr << "Test 2: flags not set" << std::endl; return 1;
+    }
     std::vector<std::vector<std::string>> bad = {
         {"--support", "-1"}, {"--threads", "0"}, {"--dist-threshold", "-5"}, {"--as", "-10"},
         {"--min-identity", "1.5"}, {"--map-ratio", "-0.1"}, {"--pc", "0"}, {"--pc", "1.2"}, {"--asm-jobs", "0"}, {"--support", "five"},

@@ -111,6 +111,35 @@ double overlap_ratio(int x_start, int x_end, int y_start, int y_end)
 }
 
 
+//First line of `bin flag`; tools that answer with their usage (old samtools) are run bare and
+//their "Version" line is taken. "unknown" when nothing useful is printed.
+std::string tool_version(const std::string& bin, const std::string& flag)
+{
+	if (bin.empty())
+		return "unknown";
+	auto first_line = [](const std::string& out) {
+		std::string::size_type b = out.find_first_not_of(" \t\r\n");
+		if (b == std::string::npos)
+			return std::string();
+		std::string::size_type e = out.find('\n', b);
+		return out.substr(b, e == std::string::npos ? std::string::npos : e - b);
+	};
+	std::string line = first_line(exec(bin + " " + flag + " 2>&1", true));
+	bool usage = line.rfind("Usage", 0) == 0 || line.rfind("Program", 0) == 0 || line.rfind("[main]", 0) == 0 || line.find("unrecognized") != std::string::npos || line.find("invalid option") != std::string::npos;
+	if (usage)
+	{
+		std::istringstream in(exec(bin + " 2>&1", true));
+		std::string l; line.clear();
+		while (std::getline(in, l))
+			if (l.find("ersion") != std::string::npos) { line = first_line(l); break; }
+	}
+	if (line.empty() || line.find("not found") != std::string::npos || line.find("No such file") != std::string::npos)
+		return "unknown";
+	if (line.size() > 100)
+		line.resize(100);
+	return line;
+}
+
 void error(const char* const msg)
 {
 	std::cerr<<msg<<std::endl;

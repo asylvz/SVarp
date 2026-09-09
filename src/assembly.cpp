@@ -31,6 +31,14 @@ struct JobDir
 
 
 
+//Bundled binaries first, then PATH
+static std::string tool_bin(const std::string& name)
+{
+    static const std::vector<std::string> extra_dirs = {"third_party/wtdbg2", "dep/wtdbg2", "dep/minimap2", "dep/samtools"};
+    std::string bin = find_executable(name, extra_dirs);
+    return bin.empty() ? find_executable(name) : bin;
+}
+
 void Assembly::generate_fasta_file(parameters &params, faidx_t *&fasta_index, std::set<std::string> &reads, std::string file_path)
 {
 	std::ofstream fp_write(file_path);
@@ -218,24 +226,10 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     int var_size = 4;
 
     // wtdbg2 -> wtpoa-cns (raw) -> minimap2 | samtools sort -> wtpoa-cns (polish)
-    std::vector<std::string> extra_dirs = {"third_party/wtdbg2", "dep/wtdbg2", "dep/minimap2", "dep/samtools"};
-
-    // Prefer bundled binaries over PATH
-    std::string wtdbg2_bin = find_executable("wtdbg2", extra_dirs);
-    if (wtdbg2_bin.empty())
-        wtdbg2_bin = find_executable("wtdbg2");
-
-    std::string wtpoa_bin = find_executable("wtpoa-cns", extra_dirs);
-    if (wtpoa_bin.empty())
-        wtpoa_bin = find_executable("wtpoa-cns");
-
-    std::string minimap2_bin = find_executable("minimap2", extra_dirs);
-    if (minimap2_bin.empty())
-        minimap2_bin = find_executable("minimap2");
-
-    std::string samtools_bin = find_executable("samtools", extra_dirs);
-    if (samtools_bin.empty())
-        samtools_bin = find_executable("samtools");
+    std::string wtdbg2_bin = tool_bin("wtdbg2");
+    std::string wtpoa_bin = tool_bin("wtpoa-cns");
+    std::string minimap2_bin = tool_bin("minimap2");
+    std::string samtools_bin = tool_bin("samtools");
 
     if (wtdbg2_bin.empty() || wtpoa_bin.empty() ||
         minimap2_bin.empty() || samtools_bin.empty())
@@ -474,6 +468,13 @@ void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> 
 	auto t1 = std::chrono::steady_clock::now();
 	std::cout << "\nAssembly..." << std::endl;
 	std::cout << "--> assembling reads using " << params.assembler << std::endl;
+	if (params.fp_logs.is_open())
+	{
+		params.fp_logs << "--> wtdbg2 " << tool_version(tool_bin("wtdbg2"), "-V") << "\n";
+		params.fp_logs << "--> wtpoa-cns " << tool_version(tool_bin("wtpoa-cns"), "-V") << "\n";
+		params.fp_logs << "--> minimap2 " << tool_version(tool_bin("minimap2")) << "\n";
+		params.fp_logs << "--> samtools " << tool_version(tool_bin("samtools")) << "\n";
+	}
 
 	std::string svtigs_tmp_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
 	params.fp_svtigs.open(svtigs_tmp_path);

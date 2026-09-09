@@ -72,6 +72,13 @@ int main() {
         if (rc != "AAACCCGGGTTT") { std::cerr << "Test 10: Expected AAACCCGGGTTT, got " << rc << std::endl; return 1; }
     }
 
+    // Test 11: tool_version keeps the first line of `--version`, "unknown" without output or binary
+    {
+        if (tool_version("echo") != "--version" || tool_version("echo", "-V") != "-V") { std::cerr << "Test 11: expected the flag echoed back, got " << tool_version("echo") << std::endl; return 1; }
+        if (tool_version("samtools").rfind("Usage", 0) == 0 || tool_version("samtools").rfind("[main]", 0) == 0) { std::cerr << "Test 11: usage text taken as a version" << std::endl; return 1; }
+        if (tool_version("true") != "unknown" || tool_version("") != "unknown" || tool_version("no_such_tool_svarp") != "unknown") { std::cerr << "Test 11: expected unknown" << std::endl; return 1; }
+    }
+
     std::cout << "common_utils test passed" << std::endl;
     return 0;
 }
