@@ -19,7 +19,6 @@ int main(int argc, char** argv)
 	std::map <std::string, Variant*> tmp_var;
 	std::map <std::string, gfaNode*> gfa;
 	std::map <std::string, std::vector<std::string>> incoming, outgoing;
-	std::set <std::string> unmapped_reads;
 
 	std::map <std::string, phase*> phased_reads;
 	std::map <std::string, std::vector<SVCluster*>> vars;
@@ -37,7 +36,7 @@ int main(int argc, char** argv)
 		return RETURN_ERROR;
 
 	log_step(params.fp_logs, "Reading alignments");
-	if (read_alignments(params, depth, gfa, tmp_var, unmapped_reads) != RETURN_SUCCESS)
+	if (read_alignments(params, depth, gfa, tmp_var) != RETURN_SUCCESS)
 		return RETURN_ERROR;
 
 	log_step(params.fp_logs, "Merging SV signals");
@@ -54,7 +53,7 @@ int main(int argc, char** argv)
 
 	log_step(params.fp_logs, "Assembly");
 	Assembly s;
-	s.run_assembly(params, depth, vars, unmapped_reads, svtigs);
+	s.run_assembly(params, depth, vars, svtigs);
 
 	log_step(params.fp_logs, "Filtering svtigs (GraphAligner remapping)");
 	//Filter SVtigs by remapping to the graph

@@ -36,10 +36,11 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		{"debug" , no_argument, NULL, 'u'},
 		{"version" , no_argument, NULL, 'v'},
 		{"reads" , required_argument, NULL, 'w'},
+		{"write-unmapped" , no_argument, NULL, 'x'},
 		{NULL, 0, NULL, 0}
 	};
 
-	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jk:l:mn:o:p:rs:t:uvw:y:", long_options, &index)) != -1)
+	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jk:l:mn:o:p:rs:t:uvw:xy:", long_options, &index)) != -1)
 	{
 		switch(o)
 		{
@@ -69,6 +70,9 @@ int parse_command_line(int argc, char** argv, parameters& params)
 				break;
 			case 'j':
 				params.skip_untagged = true;
+				break;
+			case 'x':
+				params.write_unmapped = true;
 				break;
 			case 'm':
 				params.asm_mode = true;
@@ -471,6 +475,7 @@ void print_help()
 	std::cerr << "\t--threads (-t)              : Number of threads for assembly and realignment (default=16)"<<std::endl;
 	std::cerr << "\t--skip-untagged             : Output only phased variants (~30\% faster)"<<std::endl;
 	std::cerr << "\t--no-remap (-r)             : Skip remapping (not suggested)"<<std::endl;
+	std::cerr << "\t--write-unmapped            : Write the names of reads without a GAF record to <out>/<sample>_unmapped_reads.txt"<<std::endl;
 	std::cerr << "\t--map-ratio                 : Fraction of an svtig covered by graph alignments at which it counts as explained and is dropped (default=0.90)"<<std::endl;
 	std::cerr << "\t--min-clip                  : Unaligned read end (bp) that counts as a breakpoint on a single alignment (default=500)"<<std::endl;
 	std::cerr << "\t--asm-jobs                  : Clusters assembled in parallel (default=min(threads, 8))"<<std::endl;

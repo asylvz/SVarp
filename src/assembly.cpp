@@ -463,7 +463,7 @@ double Assembly::cluster_depth(const SVCluster* sv, std::map <std::string, Conti
     return lambda;
 }
 
-void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> &depth, std::map<std::string, std::vector<SVCluster *>> &vars, std::set<std::string> &unmapped, std::map<std::string, SVtig *> &final_svtigs)
+void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> &depth, std::map<std::string, std::vector<SVCluster *>> &vars, std::map<std::string, SVtig *> &final_svtigs)
 {
 	int initial_svtigs_cnt = 0;
 	std::map<std::string, std::vector<SVCluster *>>::iterator itr;
@@ -535,16 +535,6 @@ void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> 
 	initial_svtigs_cnt += produced;
 	if (jobs.size() >= 100)
 		std::cout << "\r--> assembled " << jobs.size() << "/" << jobs.size() << " jobs\n";
-
-	// Assemble unmapped reads
-	double unmapped_count = static_cast<double>(unmapped.size());
-	// std::cout <<"Size of unmapped is "<<unmapped_count<<"\n";
-	if (unmapped_count > 0)
-	{
-		SVCluster *tmp = nullptr;
-		std::string svtig_name = "None-unmapped_" + std::to_string(0);
-		initial_svtigs_cnt += final_assembly(params, fasta_index, unmapped, svtig_name, unmapped_count, tmp, final_svtigs);
-	}
 
 	if (std::filesystem::exists(params.log_path + "tmp/"))
 		std::filesystem::remove_all(params.log_path + "tmp/");

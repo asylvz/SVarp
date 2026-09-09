@@ -44,6 +44,7 @@ typedef struct _parameters
 	bool debug = false;
 	bool no_remap = false;
 	bool skip_untagged = false;
+	bool write_unmapped = false; //list reads without a GAF record
 	std::string fasta;
 	std::string phase_tags;
 	std::string output_path;

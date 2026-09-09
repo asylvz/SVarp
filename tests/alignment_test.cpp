@@ -81,13 +81,6 @@ int main() {
     if (vars.size() != 1) { std::cerr << "Test 6: Expected 1 variant, got " << vars.size() << std::endl; return 1; }
     if (var1->reads_untagged.find("read_001") == var1->reads_untagged.end()) { std::cerr << "Test 6: Expected read_001 in variant reads" << std::endl; return 1; }
     
-    // Test 7: Verify unmapped reads set
-    std::set<std::string> unmapped;
-    unmapped.insert("read_999");
-    unmapped.insert("read_998");
-    
-    if (unmapped.size() != 2) { std::cerr << "Test 7: Expected 2 unmapped reads, got " << unmapped.size() << std::endl; return 1; }
-    
     // Cleanup
     delete node1;
     delete node2;
@@ -95,13 +88,12 @@ int main() {
     delete contig1;
     delete var1;
     
-    // Test 8: a single alignment clipped at the read start yields a breakpoint signal
+    // Test 7: a single alignment clipped at the read start yields a breakpoint signal
     {
         std::map<std::string, gfaNode*> g2;
         std::map<std::string, Contig*> ref2;
         std::map<std::string, Variant*> vars2, vars3;
         std::map<std::string, int> freq;
-        std::set<std::string> unm;
         g2["nl"] = new gfaNode("nl", std::string(5000, 'A'), 5000, "c2", 0);
         ref2["c2"] = new Contig();
         ref2["overall"] = new Contig();
@@ -110,18 +102,18 @@ int main() {
         a.query_name = "clipped"; a.query_length = 6000; a.query_start = 1000; a.query_end = 6000;
         a.strand = "+"; a.path = ">nl"; a.path_length = 5000; a.path_start = 0; a.path_end = 5000;
         a.mapping_quality = 60; a.is_primary = true; a.cigar = "5000="; a.aln_score = 0;
-        find_var(ref2, g2, vars2, a, freq, unm, 500);
-        if (vars2.empty()) { std::cerr << "Test 8: clipped single alignment gave no breakpoint" << std::endl; return 1; }
+        find_var(ref2, g2, vars2, a, freq, 500);
+        if (vars2.empty()) { std::cerr << "Test 7: clipped single alignment gave no breakpoint" << std::endl; return 1; }
 
         Gaf b = a;
         b.query_name = "full"; b.query_start = 0; b.query_length = 5000; b.query_end = 5000;
-        find_var(ref2, g2, vars3, b, freq, unm, 500);
-        if (!vars3.empty()) { std::cerr << "Test 8: unclipped single alignment gave a breakpoint" << std::endl; return 1; }
+        find_var(ref2, g2, vars3, b, freq, 500);
+        if (!vars3.empty()) { std::cerr << "Test 7: unclipped single alignment gave a breakpoint" << std::endl; return 1; }
 
         Gaf c = a;
         c.query_name = "short_clip"; c.query_start = 300; c.query_length = 5300;
-        find_var(ref2, g2, vars3, c, freq, unm, 500);
-        if (!vars3.empty()) { std::cerr << "Test 8: a 300 bp clip on a single alignment gave a breakpoint" << std::endl; return 1; }
+        find_var(ref2, g2, vars3, c, freq, 500);
+        if (!vars3.empty()) { std::cerr << "Test 7: a 300 bp clip on a single alignment gave a breakpoint" << std::endl; return 1; }
 
         for (auto& p : vars2) delete p.second;
         for (auto& p : g2) delete p.second;

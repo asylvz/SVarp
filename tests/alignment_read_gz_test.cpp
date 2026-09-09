@@ -63,16 +63,36 @@ int main()
         gzwrite(gz, line5.c_str(), line5.size());
         gzclose(gz);
 
+        // FASTA with reads 1-6; read3 and read6 have no GAF record
+        const char* fa_path = "/tmp/test_svarp_read_gz.fa";
+        {
+            std::ofstream fa(fa_path);
+            for (int i = 1; i <= 6; i++) fa << ">read" << i << "\n" << std::string(100, 'A') << "\n";
+        }
+
         parameters params;
         params.gaf = gz_path;
+        params.fasta = fa_path;
+        params.write_unmapped = true;
+        params.log_path = "/tmp/";
+        params.sample_name = "test_svarp_read_gz";
         params.fp_logs.open("/tmp/test_read_gz.log");
 
         std::map<std::string, Variant*> vars;
-        std::set<std::string> unmapped;
         std::map<std::string, int> read_freq;
 
-        int rc = read_gz(params, ref, gfa, vars, unmapped, read_freq);
+        int rc = read_gz(params, ref, gfa, vars, read_freq);
         if (rc != RETURN_SUCCESS) { std::cerr << "Test 1: read_gz failed" << std::endl; return 1; }
+
+        // read3 and read6 have no record (line3 is read1's second alignment); read4 (low MAPQ) and read5 (secondary) do
+        {
+            std::ifstream un("/tmp/test_svarp_read_gz_unmapped_reads.txt");
+            std::string name; std::vector<std::string> names;
+            while (un >> name) names.push_back(name);
+            if (names.size() != 2 || names[0] != "read3" || names[1] != "read6") {
+                std::cerr << "Test 1: expected read3 and read6 in the unmapped list, got " << names.size() << " names" << std::endl; return 1;
+            }
+        }
 
         // read1 appears twice -> should be in read_freq
         if (read_freq.find("read1") == read_freq.end()) {
@@ -95,6 +115,9 @@ int main()
 
         params.fp_logs.close();
         std::remove(gz_path);
+        std::remove(fa_path);
+        std::remove("/tmp/test_svarp_read_gz.fa.fai");
+        std::remove("/tmp/test_svarp_read_gz_unmapped_reads.txt");
         std::remove("/tmp/test_read_gz.log");
 
         for (auto &kv : vars) delete kv.second;
@@ -120,10 +143,9 @@ int main()
         params.fp_logs.open("/tmp/test_empty_gz.log");
 
         std::map<std::string, Variant*> vars;
-        std::set<std::string> unmapped;
         std::map<std::string, int> read_freq;
 
-        int rc = read_gz(params, ref, gfa, vars, unmapped, read_freq);
+        int rc = read_gz(params, ref, gfa, vars, read_freq);
         if (rc != RETURN_SUCCESS) { std::cerr << "Test 2: read_gz failed on empty file" << std::endl; return 1; }
         if (!vars.empty()) { std::cerr << "Test 2: Expected no variants" << std::endl; return 1; }
         if (primary_cnt != 0) { std::cerr << "Test 2: Expected 0 primary" << std::endl; return 1; }

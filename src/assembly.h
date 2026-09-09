@@ -26,7 +26,7 @@ public:
 		std::mutex mtx; //final_svtigs, counters and the svtig output file
 
 		static double cluster_depth(const SVCluster* sv, std::map <std::string, Contig*>& depth);
-		void run_assembly(parameters& params, std::map <std::string, Contig*>& depth, std::map<std::string, std::vector<SVCluster*>>& vars, std::set <std::string>& unmapped, std::map <std::string, SVtig*>& final_svtigs);
+		void run_assembly(parameters& params, std::map <std::string, Contig*>& depth, std::map<std::string, std::vector<SVCluster*>>& vars, std::map <std::string, SVtig*>& final_svtigs);
 		void generate_fasta_file(parameters& params, faidx_t*& fasta_index, std::set <std::string>& reads, std::string file_path);
 		int write_svtigs(std::string& f_path, const std::string& f_name, int pos, std::string& contig, int coverage, std::ostream& fp_write);
 		int merge_svtigs(parameters& params, const std::string& dir);

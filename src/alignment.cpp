@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <zlib.h>
 #include <chrono>
+#include <htslib/faidx.h>
 #include "alignment.h"
 #include "variant.h"
 
@@ -66,18 +67,50 @@ int is_alignment_valid(Gaf& line)
 	return RETURN_SUCCESS;
 }
 
-int find_var(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, Gaf& line, std::map <std::string, int>& read_freq, std::set <std::string>& unmapped, int min_clip)
+//Reads in the FASTA that have no GAF record at all
+static void report_unmapped(parameters& params, const std::map <std::string, int>& seen)
+{
+	if (params.fasta.empty())
+		return;
+
+	faidx_t* fai = fai_load((params.fasta).c_str());
+	if (!fai)
+	{
+		std::cerr << "Warning: cannot index " << params.fasta << ", reads without a GAF record are not counted\n";
+		return;
+	}
+
+	std::ofstream fp_out;
+	if (params.write_unmapped)
+		fp_out.open(params.log_path + params.sample_name + "_unmapped_reads.txt");
+
+	long long cnt = 0, bases = 0;
+	int n = faidx_nseq(fai);
+	for (int i = 0; i < n; i++)
+	{
+		const char* name = faidx_iseq(fai, i);
+		if (seen.count(name))
+			continue;
+		cnt++;
+		bases += faidx_seq_len64(fai, name);
+		if (fp_out.is_open())
+			fp_out << name << "\n";
+	}
+	fai_destroy(fai);
+
+	std::cout << "--> " << cnt << " of " << n << " reads have no GAF record (" << bases / 1000000.0 << " Mb)\n";
+	if (params.fp_logs.is_open())
+		params.fp_logs << "--> " << cnt << " of " << n << " reads have no GAF record (" << bases / 1000000.0 << " Mb)\n";
+}
+
+int find_var(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, Gaf& line, std::map <std::string, int>& read_freq, int min_clip)
 {
 	std::vector<int> cigarLen;
 	std::vector<char> cigarOp;
 	
-	//Check if the read is unmapped
+	//Unmapped record
 	if ((line.query_start == 0) && (line.query_end == 0))
-	{
-		
-		unmapped.insert(line.query_name);
 		return RETURN_SUCCESS;
-	}
 
 	if(is_alignment_valid(line) == RETURN_ERROR)
 		return RETURN_ERROR;
@@ -119,7 +152,7 @@ int find_var(std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode
 	return RETURN_SUCCESS;
 }
 
-int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::set <std::string>& unmapped, std::map <std::string, int>& read_freq)
+int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::map <std::string, int>& read_freq)
 {
 
 	std::map<std::string, int>::iterator it;	
@@ -166,15 +199,9 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 				continue;
 			}
 
-			if(is_alignment_valid(g) == RETURN_ERROR)
-				continue;
-		
-			
-			it = read_freq_tmp.find(g.query_name);
-			if (it != read_freq_tmp.end())
-				it->second++;
-			else
-				read_freq_tmp.insert(std::pair<std::string, int>(g.query_name, 1));
+			int& n = read_freq_tmp[g.query_name];
+			if (is_alignment_valid(g) == RETURN_SUCCESS)
+				n++;
 		}
     	offset = std::copy(cur, end, buffer);
 	}
@@ -184,6 +211,7 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 		if (it->second > 1)
 			read_freq.insert(std::pair<std::string, int>(it->first, it->second));
 	}
+	report_unmapped(params, read_freq_tmp);
 	read_freq_tmp.clear();
 
 	int line_count = 0;
@@ -226,7 +254,7 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 			if (parse_gaf_line(line, g) != RETURN_SUCCESS)
 				continue;
 			
-            find_var(ref, gfa, vars, g, read_freq, unmapped, params.min_clip);
+            find_var(ref, gfa, vars, g, read_freq, params.min_clip);
 			
 			if(line_count > TEST_SAMPLE_SIZE)
 			{
@@ -247,7 +275,7 @@ int read_gz(parameters& params, std::map <std::string, Contig*>& ref, std::map<s
 }
 
 
-int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars, std::set <std::string>& unmapped)
+int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, std::map<std::string, gfaNode*>& gfa, std::map<std::string, Variant*>& vars)
 {
 	std::cout<<"Reading the GAF file"<<std::endl;
 	auto t1 = std::chrono::steady_clock::now();
@@ -257,7 +285,7 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 	std::filesystem::path gaf_path = params.gaf;
 	
 	if (gaf_path.extension() == ".gz")
-		read_gz(params, ref, gfa, vars, unmapped, read_freq);
+		read_gz(params, ref, gfa, vars, read_freq);
 	else
 	{
 		std::string line;
@@ -280,17 +308,9 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 				continue;
             }
 			
-			if(is_alignment_valid(g) == RETURN_ERROR)
-            {
-                //std::cout<<"Alignment not valid\n";
-				continue;
-            }
-			
-            it = read_freq_tmp.find(g.query_name);
-			if (it != read_freq_tmp.end())
-				it->second++;
-			else
-				read_freq_tmp.insert(std::pair<std::string, int>(g.query_name, 1));
+			int& n = read_freq_tmp[g.query_name];
+			if (is_alignment_valid(g) == RETURN_SUCCESS)
+				n++;
 		}
 		
 		for (it=read_freq_tmp.begin(); it != read_freq_tmp.end(); ++it)
@@ -298,6 +318,7 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 			if (it->second > 1)
 				read_freq.insert(std::pair<std::string, int>(it->first, it->second));
 		}
+		report_unmapped(params, read_freq_tmp);
 		read_freq_tmp.clear();
 
 		int line_count = 0;
@@ -312,7 +333,7 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 			
             line_count++;
 
-			find_var(ref, gfa, vars, g, read_freq, unmapped, params.min_clip);
+			find_var(ref, gfa, vars, g, read_freq, params.min_clip);
 			
 			if(line_count > TEST_SAMPLE_SIZE)
 				break;
@@ -324,13 +345,11 @@ int read_alignments(parameters& params, std::map <std::string, Contig*>& ref, st
 	std::cout<<"--> execution time: "<<format_duration(std::chrono::duration<double>(t2 - t1).count())<<"\n";
 	std::cout<<"--> "<<primary_cnt<<" primary mappings and "<<insertion_cnt<<" insertion, "<<deletion_cnt<<" deletion loci in the cigar\n";
 	std::cout<<"--> "<<inter_cnt + intra_cnt<<" SV signal (" <<inter_cnt<< " inter alignment and "<<intra_cnt<<" intra alignment)\n";
-	std::cout<<"--> "<<unmapped.size()<<" unmapped alignments\n";
 
 	if (params.fp_logs.is_open()) {
 		params.fp_logs << "--> execution time: " << format_duration(std::chrono::duration<double>(t2 - t1).count()) << "\n";
 		params.fp_logs << "--> " << primary_cnt << " primary mappings and " << insertion_cnt << " insertion, " << deletion_cnt << " deletion loci in the cigar\n";
 		params.fp_logs << "--> " << inter_cnt + intra_cnt << " SV signal (" << inter_cnt << " inter alignment and " << intra_cnt << " intra alignment)\n";
-		params.fp_logs << "--> " << unmapped.size() << " unmapped alignments\n";
 	}
 
 	std::map<std::string, Contig*>::iterator it2;
