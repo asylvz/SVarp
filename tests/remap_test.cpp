@@ -585,6 +585,47 @@ int main() {
             delete n.second;
     }
 
+    // Tests 22-25: update_read picks the representative record
+    {
+        auto gaf = [](int qs, int qe, const std::string& path, int ps, int pe) {
+            Gaf g; g.query_start = qs; g.query_end = qe; g.query_length = 10000;
+            g.path = path; g.path_start = ps; g.path_end = pe; return g;
+        };
+        // 22: a later primary record with an SV sets sv_in_cigar; freq counts primaries
+        Read r; r.freq = 0; r.highest_map_ratio = 0;
+        update_read(&r, gaf(0, 4000, ">a", 0, 4000), true, false, 0.4);
+        update_read(&r, gaf(4000, 9000, ">b", 0, 5000), true, true, 0.5);
+        if (!r.sv_in_cigar || r.freq != 2 || r.node != ">b" || r.highest_map_ratio != 0.5) {
+            std::cerr << "Test 22 FAILED: later primary record not folded in" << std::endl; return 1;
+        }
+        std::cout << "Test 22 passed: later primary record updates sv_in_cigar" << std::endl;
+        // 23: a low-MAPQ record never overrides a primary one
+        update_read(&r, gaf(0, 9900, ">c", 0, 9900), false, true, 0.99);
+        if (r.node != ">b" || r.highest_map_ratio != 0.5 || r.freq != 2) {
+            std::cerr << "Test 23 FAILED: low-MAPQ record overrode the primary" << std::endl; return 1;
+        }
+        std::cout << "Test 23 passed: low-MAPQ record ignored" << std::endl;
+        // 24: low-MAPQ records stand in while nothing better exists, then yield
+        Read q; q.freq = 0; q.highest_map_ratio = 0;
+        update_read(&q, gaf(0, 9900, ">c", 0, 9900), false, true, 0.99);
+        if (q.node != ">c" || q.freq != 0 || q.sv_in_cigar) {
+            std::cerr << "Test 24 FAILED: fallback record not recorded as expected" << std::endl; return 1;
+        }
+        update_read(&q, gaf(0, 3000, ">d", 0, 3000), true, false, 0.3);
+        if (q.node != ">d" || q.highest_map_ratio != 0.3 || q.freq != 1) {
+            std::cerr << "Test 24 FAILED: primary record did not replace the fallback" << std::endl; return 1;
+        }
+        std::cout << "Test 24 passed: fallback yields to primary" << std::endl;
+        // 25: the representative is the longest query span, not the longest path span
+        Read w; w.freq = 0; w.highest_map_ratio = 0;
+        update_read(&w, gaf(0, 3000, ">e", 0, 8000), true, false, 0.3);
+        update_read(&w, gaf(3000, 9000, ">f", 0, 6000), true, false, 0.6);
+        if (w.node != ">f" || w.start != 0 || w.end != 6000) {
+            std::cerr << "Test 25 FAILED: representative chosen by path span" << std::endl; return 1;
+        }
+        std::cout << "Test 25 passed: representative by query span" << std::endl;
+    }
+
     std::cout << "All remap tests passed" << std::endl;
     return 0;
 }

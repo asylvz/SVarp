@@ -312,7 +312,10 @@ void wfa_align(std::map<std::string, gfaNode*>& gfa, std::string& cigar, std::st
 		p = q;
 
 		if (gfa.count(node_name) == 0)
-			continue;
+		{
+			cigar.clear(); //unknown node: no reference to align against
+			return;
+		}
 
 		if (strand == '>')
 			ref_tmp += gfa[node_name]->sequence;
@@ -342,6 +345,39 @@ void wfa_align(std::map<std::string, gfaNode*>& gfa, std::string& cigar, std::st
 
 	aligner.alignEnd2End(query, ref); // Align
 	cigar = aligner.getCIGAR(true);
+}
+
+
+// Primary records with MAPQ >= MINMAPQREMAP decide the representative alignment
+// (longest query span), the map ratio and the SV evidence. Low-MAPQ or secondary
+// records only stand in while no such record exists.
+void update_read(Read* r, const Gaf& g, bool good, bool has_sv, double map_ratio)
+{
+	int span = g.query_end - g.query_start;
+	if (good)
+	{
+		if (!r->has_good)
+		{
+			r->has_good = true;
+			r->span = 0;
+			r->highest_map_ratio = 0;
+			r->sv_in_cigar = false;
+		}
+		r->freq++;
+		r->sv_in_cigar = r->sv_in_cigar || has_sv;
+	}
+	else if (r->has_good)
+		return;
+
+	if (map_ratio > r->highest_map_ratio)
+		r->highest_map_ratio = map_ratio;
+	if (span > r->span)
+	{
+		r->span = span;
+		r->node = g.path;
+		r->start = g.path_start;
+		r->end = g.path_end;
+	}
 }
 
 
@@ -390,62 +426,24 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 		
 
 		std::string cigar;
-
-		//Use the cigar of WFA realignment
 		wfa_align(gfa, cigar, g.query_name, g.query_start, g.query_end, g.path, g.path_start, g.path_end, aligner, fasta_index);
-
 		hasSV = cigar_has_sv(cigar);
-
 		map_ratio = static_cast<double> ((double) g.query_end - g.query_start) / g.query_length;
 
 		it = reads.find(g.query_name);
+		Read* r;
 		if (it != reads.end())
-		{
-			if(LowMQ || !g.is_primary)
-			{
-				if((it->second)->sv_in_cigar == false && hasSV)
-				{
-					(it->second)->sv_in_cigar = true;
-				
-					if(map_ratio > (it->second)->highest_map_ratio)
-						(it->second)->highest_map_ratio = map_ratio;
-
-					(it->second)->start = g.path_start;
-					(it->second)->end = g.path_end;
-					(it->second)->node = g.path;
-				}
-			}
-			else
-			{
-				if(map_ratio > (it->second)->highest_map_ratio)
-					(it->second)->highest_map_ratio = map_ratio;
-
-				if(((it->second)->end - (it->second)->start) < (g.path_end - g.path_start))
-				{
-					(it->second)->start = g.path_start;
-					(it->second)->end = g.path_end;
-					(it->second)->node = g.path;
-				}
-
-				(it->second)->freq++;
-			}
-		}
+			r = it->second;
 		else
-		{	
-			Read *r = new Read();
-			r->highest_map_ratio = map_ratio;
-			// freq counts the good alignments of this svtig, and later records
-			// only add to it when they are primary and pass MINMAPQREMAP, so the
-			// first record has to be weighed the same way.
-			r->freq = (LowMQ || !g.is_primary) ? 0 : 1;
+		{
+			r = new Read();
 			r->rname = g.query_name;
-			r->node = g.path;
-			r->start = g.path_start;
-			r->end = g.path_end;
-			r->sv_in_cigar = hasSV;
 			r->svtig_size = g.query_length;
+			r->freq = 0;
+			r->highest_map_ratio = 0;
 			reads.insert(std::pair<std::string, Read*>(g.query_name, r));
 		}
+		update_read(r, g, g.is_primary && !LowMQ, hasSV, map_ratio);
 	}
 
 	std::vector <Read*> tmp_svtig;
