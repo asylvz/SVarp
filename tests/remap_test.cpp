@@ -327,7 +327,7 @@ int main() {
         int extra = 0;
 
         Read* r = make_read("H1-s800_1", ">s800<s801", 100, 1100, 500);
-        r->highest_map_ratio = 0.42;
+        r->cov = 0.42;
         reads.push_back(r);
 
         svtigs["H1-s800_1"] = make_svtig("H1-s800_1");
@@ -356,7 +356,7 @@ int main() {
 
         reads.push_back(make_read("H1-s900_1", ">s900", 100, 1100, 600));
         Read* frag = make_read("H1-s900_1_2", ">s901", 5000, 6000, 300);
-        frag->highest_map_ratio = 0.33;
+        frag->cov = 0.33;
         reads.push_back(frag);
 
         svtigs["H1-s900_1"] = make_svtig("H1-s900_1");
@@ -391,7 +391,7 @@ int main() {
         s->remap_path = ">s1000<s1001";
         s->map_ratio = 0.75;
         std::string mapped = svtig_header(s);
-        if (mapped != ">H1-s1000_400 contig=chr1 pos=1234567 support=2 path=>s1000<s1001 map_ratio=0.75") {
+        if (mapped != ">H1-s1000_400 contig=chr1 pos=1234567 support=2 path=>s1000<s1001 graph_cov=0.75 max_gap=0 max_indel=0") {
             std::cerr << "Test 16 FAILED: unexpected header with remapping: " << mapped << std::endl;
             return 1;
         }
@@ -624,6 +624,38 @@ int main() {
             std::cerr << "Test 25 FAILED: representative chosen by path span" << std::endl; return 1;
         }
         std::cout << "Test 25 passed: representative by query span" << std::endl;
+    }
+
+    // Tests 26-29: merged indels and the explained-by-graph decision
+    {
+        if (merged_indel("100=30I5=25I100=") != 55) { std::cerr << "Test 26 FAILED: split insertion not merged" << std::endl; return 1; }
+        if (merged_indel("100=30I30=25I100=") != 30) { std::cerr << "Test 26 FAILED: distant insertions merged" << std::endl; return 1; }
+        if (merged_indel("100=30I5=25D100=") != 30) { std::cerr << "Test 26 FAILED: insertion and deletion merged" << std::endl; return 1; }
+        std::cout << "Test 26 passed: merged indel" << std::endl;
+
+        Read full; full.svtig_size = 10000; full.ivals = {{0, 6000}, {5500, 10000}};
+        graph_fit(&full);
+        if (full.cov != 1.0 || full.max_gap != 0 || !explained_by_graph(&full, 0.9)) { std::cerr << "Test 27 FAILED: fully covered svtig not explained" << std::endl; return 1; }
+        std::cout << "Test 27 passed: covered svtig explained" << std::endl;
+
+        Read gap; gap.svtig_size = 10000; gap.ivals = {{0, 4000}, {4600, 10000}};
+        graph_fit(&gap);
+        if (gap.max_gap != 600 || explained_by_graph(&gap, 0.9)) { std::cerr << "Test 28 FAILED: 600 bp hole should keep the svtig" << std::endl; return 1; }
+        Read ind; ind.svtig_size = 10000; ind.ivals = {{0, 10000}}; ind.max_indel = 120;
+        graph_fit(&ind);
+        if (explained_by_graph(&ind, 0.9)) { std::cerr << "Test 28 FAILED: 120 bp indel should keep the svtig" << std::endl; return 1; }
+        Read ends; ends.svtig_size = 10000; ends.ivals = {{2000, 8000}};
+        graph_fit(&ends);
+        if (ends.cov != 0.6 || explained_by_graph(&ends, 0.9)) { std::cerr << "Test 28 FAILED: 60% coverage should keep the svtig" << std::endl; return 1; }
+        Read none; none.svtig_size = 10000;
+        graph_fit(&none);
+        if (none.cov != 0 || explained_by_graph(&none, 0.9)) { std::cerr << "Test 28 FAILED: uncovered svtig explained" << std::endl; return 1; }
+        std::cout << "Test 28 passed: holes, indels and low coverage keep the svtig" << std::endl;
+
+        Read small; small.svtig_size = 10000; small.ivals = {{0, 5000}, {5040, 10000}}; small.max_indel = 49;
+        graph_fit(&small);
+        if (!explained_by_graph(&small, 0.9)) { std::cerr << "Test 29 FAILED: sub-SV hole and indel should not keep the svtig" << std::endl; return 1; }
+        std::cout << "Test 29 passed: sub-SV differences do not count" << std::endl;
     }
 
     std::cout << "All remap tests passed" << std::endl;

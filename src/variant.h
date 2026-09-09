@@ -46,7 +46,9 @@ public:
 	bool output = false; //Whether to output after remapping (filtered if false)
 	std::string seq; //svtig genomic sequence
 	std::string remap_path; //Graph path this svtig aligns to, from remapping
-	double map_ratio = -1; //Fraction of the svtig aligned to the graph; -1 if not remapped
+	double map_ratio = -1; //Fraction of the svtig covered by graph alignments; -1 if not remapped
+	int max_gap = 0; //largest uncovered stretch between graph alignments (bp)
+	int max_indel = 0; //largest indel inside a graph alignment (bp)
 	//Non-reference nodes on remap_path, "first-last:contig" joined by ';'
 	std::string alt_nodes;
 };

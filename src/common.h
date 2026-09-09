@@ -61,7 +61,8 @@ typedef struct _parameters
 	int dist_threshold = 0;
 	int min_clip = MIN_CLIP_SIGNAL; //clipped read end that counts as a breakpoint
 	int asm_jobs = 0; //clusters assembled in parallel
-	double min_map_ratio = 0; //Used in filtering
+	double min_map_ratio = 0; //svtig fraction covered by graph alignments that counts as explained
+	double min_identity = 0.90; //remap records below this identity do not count as coverage
 
 	//Read type: ont, hifi, clr
 	std::string read_type;
@@ -95,6 +96,7 @@ public:
 	bool is_primary;
 	std::string cigar;
 	float aln_score;
+	float identity = -1; //id:f tag, -1 when absent
 	
 	Gaf(std::string& _query_name, int& _query_length, int& _query_start, int& _query_end, std::string& _strand, std::string& _path, 
 			int& _path_length, int& _path_start, int& _path_end, int& _residue_matches, int& _alignment_block_length, int& _mapping_quality, 

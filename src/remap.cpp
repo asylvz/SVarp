@@ -14,10 +14,10 @@
 #include <cstdlib>
 #include "common.h"
 #include "remap.h"
+#include "bindings/cpp/WFAligner.hpp"
 #include "alignment.h"
 #include "variant.h"
 #include "reference.h"
-#include "bindings/cpp/WFAligner.hpp"
 
 
 
@@ -129,7 +129,7 @@ std::string svtig_header(const SVtig* svtig)
 
 	if (svtig->map_ratio >= 0)
 	{
-		out << " path=" << svtig->remap_path << " map_ratio=" << svtig->map_ratio;
+		out << " path=" << svtig->remap_path << " graph_cov=" << svtig->map_ratio << " max_gap=" << svtig->max_gap << " max_indel=" << svtig->max_indel;
 		if (!svtig->alt_nodes.empty())
 			out << " alt_nodes=" << svtig->alt_nodes;
 	}
@@ -160,22 +160,71 @@ int write_final_svtigs_fasta(faidx_t*& fasta_index, SVtig* svtig, std::ostream& 
 }
 
 
-// An svtig still carries an SV when its realignment to the graph diverges by at
-// least MINSVSIZE, the same bound the CIGAR walk applies when the signal is
-// first picked up from the reads.
+// Largest indel in a CIGAR, merging runs of the same operation that are separated
+// by at most max_gap matched bases (an aligner splits a long indel in repeats).
+int merged_indel(const std::string& cigar, int max_gap)
+{
+	std::vector<int> len;
+	std::vector<char> op;
+	int n = decompose_cigars(cigar, len, op);
+	int best = 0, cur = 0, gap = 0;
+	char cur_op = 0;
+	for (int i = 0; i < n; i++)
+	{
+		if (op[i] == INSERTION || op[i] == DELETION)
+		{
+			if (op[i] == cur_op && gap <= max_gap)
+				cur += len[i];
+			else
+			{
+				cur_op = op[i];
+				cur = len[i];
+			}
+			gap = 0;
+			if (cur > best) best = cur;
+		}
+		else
+			gap += len[i];
+	}
+	return best;
+}
+
+
 bool cigar_has_sv(const std::string& cigar)
 {
-	std::vector<int> cigar_len;
-	std::vector<char> cigar_op;
+	return merged_indel(cigar) >= MINSVSIZE;
+}
 
-	int cigar_cnt = decompose_cigars(cigar, cigar_len, cigar_op);
-	for (int c = 0; c < cigar_cnt; c++)
+
+// Coverage of the svtig by its counted graph alignments: union of query
+// intervals, largest uncovered stretch between them, largest indel inside them.
+void graph_fit(Read* r)
+{
+	r->cov = 0; r->max_gap = 0;
+	if (r->ivals.empty() || r->svtig_size <= 0) return;
+	std::sort(r->ivals.begin(), r->ivals.end());
+	long covered = 0; int cs = r->ivals[0].first, ce = r->ivals[0].second;
+	for (size_t i = 1; i < r->ivals.size(); i++)
 	{
-		if ((cigar_op[c] == INSERTION || cigar_op[c] == DELETION || cigar_op[c] == MISMATCH)
-		    && cigar_len[c] >= MINSVSIZE)
-			return true;
+		int s = r->ivals[i].first, e = r->ivals[i].second;
+		if (s <= ce) { if (e > ce) ce = e; }
+		else
+		{
+			covered += ce - cs;
+			if (s - ce > r->max_gap) r->max_gap = s - ce;
+			cs = s; ce = e;
+		}
 	}
-	return false;
+	covered += ce - cs;
+	r->cov = static_cast<double>(covered) / r->svtig_size;
+}
+
+
+// The graph explains the svtig when its alignments cover at least min_cov of
+// it without leaving an SV-sized hole or opening an SV-sized indel.
+bool explained_by_graph(const Read* r, double min_cov)
+{
+	return r->cov >= min_cov && r->max_gap < MINSVSIZE && r->max_indel < MINSVSIZE;
 }
 
 
@@ -267,7 +316,9 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 						tmp->contig = it_svtigs->second->contig;
 						tmp->output = true;
 						tmp->remap_path = r->node;
-						tmp->map_ratio = r->highest_map_ratio;
+						tmp->map_ratio = r->cov;
+						tmp->max_gap = r->max_gap;
+						tmp->max_indel = r->max_indel;
 						final_svtigs.insert(std::pair<std::string, SVtig*>(r->rname, tmp));
 						extra_added++;
 					}
@@ -281,7 +332,9 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 					{
 						it_dup->second->output = true;
 						it_dup->second->remap_path = r->node;
-						it_dup->second->map_ratio = r->highest_map_ratio;
+						it_dup->second->map_ratio = r->cov;
+						it_dup->second->max_gap = r->max_gap;
+						it_dup->second->max_indel = r->max_indel;
 					}
 					else
 						std::cerr<<"Error - SVtig= "<<r->rname<<" not found...\n";
@@ -386,49 +439,38 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 	int secondary = 0, primary = 0, lowmq = 0, extra_added = 0;
 
 	std::string line;
-	std::vector <std::string> tokens;
 	std::ifstream fp;
-	
+
 	std::cout<<"--> reading remappings from "<< params.remap_gaf_path <<std::endl;
 	fp.open(params.remap_gaf_path);
-
 	if(!fp.good())
 	{
 		std::cerr << "Error opening '"<<params.remap_gaf_path << std::endl;
-        return RETURN_ERROR;
-    }
+		return RETURN_ERROR;
+	}
 
-	//Read the gaf once to find the largest mappings of the svtigs. If that's more than half of the svtig, get it	
 	std::map<std::string, Read*>::iterator it;
 	std::map <std::string, Read*> reads;
-	std::map <std::string, std::string> non_dup_by_pos, non_dup_by_rname;
-	
+
 	wfa::WFAlignerGapAffine aligner(4, 6, 2, wfa::WFAligner::Alignment, wfa::WFAligner::MemoryMed);
-	
-	double map_ratio = 0.0;
+
 	while(getline(fp, line))
 	{
 		Gaf g;
-		parse_gaf_line(line, g);
-		
-		bool hasSV = false, LowMQ = false;	
-		
-		if(g.mapping_quality < MINMAPQREMAP)
-		{
-			lowmq++;
-			LowMQ = true;
-		}
+		if (parse_gaf_line(line, g) != RETURN_SUCCESS)
+			continue;
 
-		if (!g.is_primary)
-			secondary++;
-		else if (g.is_primary && !LowMQ)
-			primary++;
-		
+		bool LowMQ = g.mapping_quality < MINMAPQREMAP;
+		if (LowMQ) lowmq++;
+		if (!g.is_primary) secondary++;
+		else if (!LowMQ) primary++;
 
-		std::string cigar;
-		wfa_align(gfa, cigar, g.query_name, g.query_start, g.query_end, g.path, g.path_start, g.path_end, aligner, fasta_index);
-		hasSV = cigar_has_sv(cigar);
-		map_ratio = static_cast<double> ((double) g.query_end - g.query_start) / g.query_length;
+		// largest indel from the aligner's CIGAR and from a gap-affine realignment
+		// of the same segment; either one may keep a split indel in one piece
+		std::string wfa_cigar;
+		wfa_align(gfa, wfa_cigar, g.query_name, g.query_start, g.query_end, g.path, g.path_start, g.path_end, aligner, fasta_index);
+		int indel = std::max(merged_indel(g.cigar), merged_indel(wfa_cigar));
+		double map_ratio = static_cast<double> ((double) g.query_end - g.query_start) / g.query_length;
 
 		it = reads.find(g.query_name);
 		Read* r;
@@ -443,39 +485,48 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 			r->highest_map_ratio = 0;
 			reads.insert(std::pair<std::string, Read*>(g.query_name, r));
 		}
-		update_read(r, g, g.is_primary && !LowMQ, hasSV, map_ratio);
+		update_read(r, g, g.is_primary && !LowMQ, indel >= MINSVSIZE, map_ratio);
+
+		// every record at or above the identity floor counts as coverage, low MAPQ
+		// included: a multimapping svtig is present in the graph, not absent
+		if (g.identity < 0 || g.identity >= params.min_identity)
+		{
+			r->ivals.push_back(std::make_pair(g.query_start, g.query_end));
+			if (indel > r->max_indel) r->max_indel = indel;
+		}
 	}
 
 	std::vector <Read*> tmp_svtig;
-	int filtered = 0;
-	
+	int explained = 0, unaligned = 0;
+
 	for (auto &t: reads)
 	{
-		if(t.second->highest_map_ratio > 0)
+		Read* r = t.second;
+		graph_fit(r);
+		if (explained_by_graph(r, params.min_map_ratio))
 		{
-			if(t.second->freq > 1)
-				tmp_svtig.push_back(t.second);
-			else if(t.second->highest_map_ratio < params.min_map_ratio)
-				tmp_svtig.push_back(t.second);
-			else if (t.second->sv_in_cigar)
-				tmp_svtig.push_back(t.second);
-			else {
-				filtered++;
-				if (params.fp_remap_log.is_open())
-					params.fp_remap_log << t.first << "\tFILTERED\treason=high_map_ratio\tmap_ratio=" << t.second->highest_map_ratio << "\tno_sv_in_cigar\n";
-			}
-		}
-		else {
-			filtered++;
+			explained++;
 			if (params.fp_remap_log.is_open())
-				params.fp_remap_log << t.first << "\tFILTERED\treason=no_mapping\n";
+				params.fp_remap_log << t.first << "\tFILTERED\treason=explained_by_graph\tcov=" << r->cov << "\tmax_gap=" << r->max_gap << "\tmax_indel=" << r->max_indel << "\n";
+		}
+		else
+			tmp_svtig.push_back(r);
+	}
+
+	// svtigs without any alignment are dropped, but counted
+	int nseq = faidx_nseq(fasta_index);
+	for (int i = 0; i < nseq; i++)
+	{
+		const char* nm = faidx_iseq(fasta_index, i);
+		if (nm && reads.find(nm) == reads.end())
+		{
+			unaligned++;
+			if (params.fp_remap_log.is_open())
+				params.fp_remap_log << nm << "\tFILTERED\treason=no_alignment\n";
 		}
 	}
-	//If an svtig is in tmp_svtig, check if it is a duplicate. If not set "->output=true"
-	//Check the unmapped svtigs and add them tooo
-	std::pair<int, int> dup_legit = remove_duplicates(tmp_svtig, final_svtigs, extra_added);
 
-	//Done here, not in remove_duplicates, which has no graph to look nodes up in
+	std::pair<int, int> dup_legit = remove_duplicates(tmp_svtig, final_svtigs, extra_added);
 	fill_alt_nodes(final_svtigs, gfa);
 
 	if (params.fp_remap_log.is_open()) {
@@ -483,15 +534,13 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 			if (r->duplicate)
 				params.fp_remap_log << r->rname << "\tDUPLICATE\tnode=" << r->node << "\tstart=" << r->start << "\tend=" << r->end << "\tsize=" << r->svtig_size << "\n";
 			else
-				params.fp_remap_log << r->rname << "\tKEPT\tnode=" << r->node << "\tmap_ratio=" << r->highest_map_ratio << "\tsv_in_cigar=" << (r->sv_in_cigar ? "yes" : "no") << "\tsize=" << r->svtig_size << "\n";
+				params.fp_remap_log << r->rname << "\tKEPT\tcov=" << r->cov << "\tmax_gap=" << r->max_gap << "\tmax_indel=" << r->max_indel << "\tnode=" << r->node << "\tsize=" << r->svtig_size << "\n";
 		}
 	}
 
-	std::cout<<"--> "<< filtered << " filtered - " << dup_legit.first<<" duplicate\n";
-	// Detailed mapping stats only in log file
-
+	std::cout<<"--> "<< explained << " explained by the graph, " << unaligned << " unaligned, " << dup_legit.first << " duplicate\n";
 	if (params.fp_logs.is_open()) {
-		params.fp_logs << "--> " << filtered << " filtered - " << dup_legit.first << " duplicate\n";
+		params.fp_logs << "--> " << explained << " explained by the graph, " << unaligned << " unaligned, " << dup_legit.first << " duplicate\n";
 		params.fp_logs << "--> " << primary << " primary, " << secondary << " secondary mappings, " << lowmq << " low MAPQ(<" << MINMAPQREMAP << "); svtigs from multiple contig assemblies = " << extra_added << "\n";
 	}
 
@@ -568,10 +617,10 @@ static void remap_and_flag(parameters& params, std::map<std::string, gfaNode*>& 
 		" -a " + params.remap_gaf_path +
 		" -t " + std::to_string(params.threads) +
 		" -x vg"
-		" --precise-clipping " + std::to_string(params.min_precise_clipping) +
 		" --min-alignment-score " + std::to_string(params.min_alignment_score) +
-		" --multimap-score-fraction 0.9"
-		+ ga_redir;
+		" --multimap-score-fraction 0.9" +
+		(params.min_precise_clipping > 0 ? " --precise-clipping " + std::to_string(params.min_precise_clipping) : std::string("")) +
+		ga_redir;
 		
 	run_and_log(graphaligner_cmd, params, "GraphAligner", 2, 2, true);
 		

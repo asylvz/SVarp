@@ -63,6 +63,11 @@ int parse_gaf_line(std::string& line, Gaf& gafline)
 		}
 		else if (tok.rfind("cg:Z:", 0) == 0)
 			gafline.cigar = tok.substr(5);
+		else if (tok.rfind("id:f:", 0) == 0)
+		{
+			try { gafline.identity = std::stof(tok.substr(5)); }
+			catch (const std::exception&) { return RETURN_ERROR; }
+		}
 	}
 
 	return RETURN_SUCCESS;
