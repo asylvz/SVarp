@@ -204,6 +204,11 @@ int parse_command_line(int argc, char** argv, parameters& params)
 			std::cerr << "[SVARP CMDLINE ERROR] dist_threshold must be an integer: " << dist_threshold << std::endl;
 			return RETURN_ERROR;
 		}
+		if (params.dist_threshold < 0)
+		{
+			std::cerr << "[SVARP CMDLINE ERROR] dist_threshold must be >= 0" << std::endl;
+			return RETURN_ERROR;
+		}
 	}
 	
 	if(as.empty())
@@ -216,6 +221,11 @@ int parse_command_line(int argc, char** argv, parameters& params)
 			std::cerr << "[SVARP CMDLINE ERROR] alignment_score must be an integer: " << as << std::endl;
 			return RETURN_ERROR;
 		}
+		if (params.min_alignment_score < 0)
+		{
+			std::cerr << "[SVARP CMDLINE ERROR] alignment_score must be >= 0" << std::endl;
+			return RETURN_ERROR;
+		}
 	}
 
 	if(pc.empty())
@@ -226,6 +236,11 @@ int parse_command_line(int argc, char** argv, parameters& params)
 			params.min_precise_clipping = stod(pc);
 		} catch (const std::exception&) {
 			std::cerr << "[SVARP CMDLINE ERROR] precise_clipping must be a float: " << pc << std::endl;
+			return RETURN_ERROR;
+		}
+		if (params.min_precise_clipping <= 0 || params.min_precise_clipping > 1)
+		{
+			std::cerr << "[SVARP CMDLINE ERROR] precise_clipping must be in (0, 1]" << std::endl;
 			return RETURN_ERROR;
 		}
 	}
@@ -253,6 +268,11 @@ int parse_command_line(int argc, char** argv, parameters& params)
 			std::cerr << "[SVARP CMDLINE ERROR] min_identity must be a float: " << min_identity << std::endl;
 			return RETURN_ERROR;
 		}
+		if (params.min_identity < 0 || params.min_identity > 1)
+		{
+			std::cerr << "[SVARP CMDLINE ERROR] min_identity must be in [0, 1]" << std::endl;
+			return RETURN_ERROR;
+		}
 	}
 
 	if(map_ratio.empty())
@@ -263,6 +283,11 @@ int parse_command_line(int argc, char** argv, parameters& params)
 			params.min_map_ratio = stod(map_ratio);
 		} catch (const std::exception&) {
 			std::cerr << "[SVARP CMDLINE ERROR] map_ratio must be a float: " << map_ratio << std::endl;
+			return RETURN_ERROR;
+		}
+		if (params.min_map_ratio < 0 || params.min_map_ratio > 1)
+		{
+			std::cerr << "[SVARP CMDLINE ERROR] map_ratio must be in [0, 1]" << std::endl;
 			return RETURN_ERROR;
 		}
 	}
@@ -278,6 +303,11 @@ int parse_command_line(int argc, char** argv, parameters& params)
 			params.support = stoi(support);
 		} catch (const std::exception&) {
 			std::cerr << "[SVARP CMDLINE ERROR] support must be an integer: " << support << std::endl;
+			return RETURN_ERROR;
+		}
+		if (params.support < 0)
+		{
+			std::cerr << "[SVARP CMDLINE ERROR] support must be >= 0" << std::endl;
 			return RETURN_ERROR;
 		}
 	}
@@ -303,6 +333,11 @@ int parse_command_line(int argc, char** argv, parameters& params)
 			params.threads = stoi(threads);
 		} catch (const std::exception&) {
 			std::cerr << "[SVARP CMDLINE ERROR] threads must be an integer: " << threads << std::endl;
+			return RETURN_ERROR;
+		}
+		if (params.threads < 1)
+		{
+			std::cerr << "[SVARP CMDLINE ERROR] threads must be >= 1" << std::endl;
 			return RETURN_ERROR;
 		}
 	}

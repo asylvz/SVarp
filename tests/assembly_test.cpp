@@ -5,6 +5,7 @@
 #include <set>
 #include <fstream>
 #include <cstdlib>
+#include <htslib/faidx.h>
 #include "assembly.h"
 #include "reference.h"
 #include "variant.h"
@@ -131,6 +132,25 @@ int main() {
         depth["CHM13#0#chr1"]->coverage = 20.0;
         if (Assembly::cluster_depth(&ref, depth) != 20.0) { std::cerr << "Test 6: reference node should use its contig depth" << std::endl; return 1; }
         for (auto& kv : depth) delete kv.second;
+    }
+
+    // Test 7: reads are written whole, also above 1 Mb
+    {
+        const char* fa = "/tmp/test_svarp_long_reads.fa";
+        { std::ofstream f(fa); f << ">long\n" << std::string(1000100, 'A') << "\n>short\n" << std::string(100, 'C') << "\n"; }
+        faidx_t* fai = fai_load(fa);
+        if (!fai) { std::cerr << "Test 7: fai_load failed" << std::endl; return 1; }
+        parameters params;
+        Assembly a;
+        std::set<std::string> reads = {"long", "short"};
+        const char* out = "/tmp/test_svarp_long_reads_out.fa";
+        a.generate_fasta_file(params, fai, reads, out);
+        std::map<std::string, long> len; std::string line, cur;
+        std::ifstream in(out);
+        while (std::getline(in, line)) { if (!line.empty() && line[0] == '>') cur = line.substr(1); else len[cur] += line.size(); }
+        fai_destroy(fai);
+        std::remove(fa); std::remove("/tmp/test_svarp_long_reads.fa.fai"); std::remove(out);
+        if (len["long"] != 1000100 || len["short"] != 100) { std::cerr << "Test 7: expected 1000100 and 100 bp, got " << len["long"] << " and " << len["short"] << std::endl; return 1; }
     }
 
     std::cout << "assembly test passed" << std::endl;

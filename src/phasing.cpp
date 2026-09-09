@@ -21,6 +21,7 @@ int read_phase_file(parameters& params, std::map<std::string, phase*>& phased_re
 	}
 	std::vector <std::string> tokens;
 	std::string line;	
+	int duplicates = 0;
 	
 	while(getline(fp, line))
 	{
@@ -43,7 +44,17 @@ int read_phase_file(parameters& params, std::map<std::string, phase*>& phased_re
     	temp->phase_set = tokens[2];
     	temp->contig = tokens[3];
 
-		phased_reads.insert(std::pair<std::string, phase*>(temp->read_name, temp));
+		if (!phased_reads.insert(std::pair<std::string, phase*>(temp->read_name, temp)).second)
+		{
+			delete temp; //repeated read name, the first record stands
+			duplicates++;
+		}
+	}
+	if (duplicates > 0)
+	{
+		std::cout << "[warning] " << duplicates << " repeated read names in the phase file, first record kept" << std::endl;
+		if (params.fp_logs.is_open())
+			params.fp_logs << "[warning] " << duplicates << " repeated read names in the phase file, first record kept\n";
 	}
 	return RETURN_SUCCESS;
 }

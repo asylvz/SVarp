@@ -35,14 +35,17 @@ void Assembly::generate_fasta_file(parameters &params, faidx_t *&fasta_index, st
 {
 	std::ofstream fp_write(file_path);
 
-	int loc_length;
+	hts_pos_t loc_length;
 	std::string line;
 	const size_t line_len = 60;
 	std::set<std::string> read_seqs;
 
 	for (auto &read : reads)
 	{
-		char *tmp = faidx_fetch_seq(fasta_index, read.c_str(), 0, MAX_FETCH_LEN, &loc_length);
+		hts_pos_t n = faidx_seq_len64(fasta_index, read.c_str());
+		if (n <= 0)
+			continue;
+		char *tmp = faidx_fetch_seq64(fasta_index, read.c_str(), 0, n - 1, &loc_length);
 		if (tmp == nullptr)
 			continue;
 
@@ -277,7 +280,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
 
     // In debug mode, capture stderr; otherwise discard.
     //
-    // wtpoa-cns aborts inside glibc on some clusters. The shell system() starts
+    // wtpoa-cns aborts inside glibc on some clusters. The shell that runs the step
     // announces that abort on its OWN stderr, and glibc writes its heap report
     // straight to the terminal, so neither obeys a redirection written inside the
     // command and both surface as if SVarp had crashed. Redirecting the shell
@@ -290,15 +293,15 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
 
     auto asm_t1 = std::chrono::steady_clock::now();
 
-    // Per-step wall-clock caps: wtpoa-cns can hang for a day on one bad
-    // cluster. timeout exits 124, caught below as a failed cluster.
-    const std::string TIMEOUT_WTDBG2     = "timeout 600s ";
-    const std::string TIMEOUT_WTPOA_RAW  = "timeout 120s ";
-    const std::string TIMEOUT_MM2_SORT   = "timeout 300s ";
-    const std::string TIMEOUT_WTPOA_CNS  = "timeout 120s ";
+    // Per-step wall-clock caps (seconds): wtpoa-cns can hang for a day on one bad
+    // cluster. run_and_log kills the step and reports exit 124, caught below.
+    const int TIMEOUT_WTDBG2    = 600;
+    const int TIMEOUT_WTPOA_RAW = 120;
+    const int TIMEOUT_MM2_SORT  = 300;
+    const int TIMEOUT_WTPOA_CNS = 120;
 
     // 1) wtdbg2 assembler
-    std::string asm_cmd = quiet + TIMEOUT_WTDBG2 + wtdbg2_bin +
+    std::string asm_cmd = quiet + wtdbg2_bin +
         std::string(" -t ") + std::to_string(wtdbg2_threads) +
         " -x " + wtdbg2_preset +
         " -g " + genome_opt +
@@ -306,7 +309,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         " -i " + file_path +
         out_redir;
 
-    int rc = run_and_log(asm_cmd, params, "wtdbg2_asm", 0, 1, false);
+    int rc = run_and_log(asm_cmd, params, "wtdbg2_asm", 0, 1, false, TIMEOUT_WTDBG2);
 
     // A non-zero rc is a real failure and is reported per cluster. A clean exit
     // with no usable layout only means too few or too short reads, so it is
@@ -345,13 +348,13 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     }
 
     // 2) raw consensus
-    std::string cns_raw_cmd = quiet + TIMEOUT_WTPOA_RAW + wtpoa_bin +
+    std::string cns_raw_cmd = quiet + wtpoa_bin +
         std::string(" -t ") + std::to_string(threads) +
         " -i " + layout_gz +
         " -fo " + raw_fa +
         out_redir;
 
-    rc = run_and_log(cns_raw_cmd, params, "wtpoa_raw", 0, 1, false);
+    rc = run_and_log(cns_raw_cmd, params, "wtpoa_raw", 0, 1, false, TIMEOUT_WTPOA_RAW);
     if (rc != 0 || !std::filesystem::exists(raw_fa) || std::filesystem::file_size(raw_fa) == 0)
     {
         if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
@@ -372,7 +375,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     }
 
     // 3) minimap2 + samtools sort
-    // Wrapped in sh -c so timeout covers the whole pipeline, not just minimap2.
+    // Wrapped in sh -c so LIBC_FATAL_STDERR_ reaches both commands of the pipeline.
     std::string inner_mm =
         minimap2_bin +
         " -ax " + minimap2_preset +
@@ -383,9 +386,9 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         " sort -m 512m -@" + std::to_string(smt_threads) +
         " -o " + bam_path;
     std::string map_sort_cmd =
-        quiet + TIMEOUT_MM2_SORT + "sh -c \"" + inner_mm + "\"" + out_redir;
+        quiet + "sh -c \"" + inner_mm + "\"" + out_redir;
 
-    rc = run_and_log(map_sort_cmd, params, "mm2_samtools", 0, 1, false);
+    rc = run_and_log(map_sort_cmd, params, "mm2_samtools", 0, 1, false, TIMEOUT_MM2_SORT);
     if (rc != 0 || !std::filesystem::exists(bam_path))
     {
         if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
@@ -409,9 +412,9 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
         " -d " + raw_fa +
         " -i - -fo " + cns_fa;
     std::string polish_cmd =
-        quiet + TIMEOUT_WTPOA_CNS + "sh -c \"" + inner_pol + "\"" + out_redir;
+        quiet + "sh -c \"" + inner_pol + "\"" + out_redir;
 
-    rc = run_and_log(polish_cmd, params, "wtpoa_cns_polish", 0, 1, false);
+    rc = run_and_log(polish_cmd, params, "wtpoa_cns_polish", 0, 1, false, TIMEOUT_WTPOA_CNS);
 
     if (rc != 0 || !std::filesystem::exists(cns_fa) || std::filesystem::file_size(cns_fa) == 0)
     {

@@ -4,6 +4,8 @@
 #include <thread>
 #include <chrono>
 #include <sys/wait.h>
+#include <signal.h>
+#include <spawn.h>
 #include <string.h>
 #include <algorithm>
 #include <sstream>
@@ -14,6 +16,8 @@
 #include <mach-o/dyld.h>
 #endif
 
+
+extern char **environ;
 
 std::mutex g_log_mtx;
 
@@ -135,9 +139,45 @@ std::string exec(const std::string& command, bool return_out)
 }
 
 
+//Run cmd under /bin/sh in its own process group; after timeout_seconds (0 = none) the whole group is
+//killed and the status reads as exit 124, like coreutils timeout. Returns a wait status, -1 on failure.
+//posix_spawn, as in glibc's system(), avoids duplicating the page tables of a large process.
+static int run_shell(const std::string& cmd, int timeout_seconds)
+{
+    posix_spawnattr_t attr;
+    posix_spawnattr_init(&attr);
+    posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
+    posix_spawnattr_setpgroup(&attr, 0);
+    const char* argv[] = {"sh", "-c", cmd.c_str(), nullptr};
+    pid_t pid = -1;
+    int err = posix_spawn(&pid, "/bin/sh", nullptr, &attr, const_cast<char* const*>(argv), environ);
+    posix_spawnattr_destroy(&attr);
+    if (err != 0) {
+        errno = err;
+        return -1;
+    }
+
+    int status = 0;
+    if (timeout_seconds <= 0)
+        return waitpid(pid, &status, 0) == pid ? status : -1;
+
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(timeout_seconds);
+    while (true) {
+        pid_t r = waitpid(pid, &status, WNOHANG);
+        if (r == pid) return status;
+        if (r < 0) return -1;
+        if (std::chrono::steady_clock::now() >= deadline) {
+            kill(-pid, SIGKILL);
+            waitpid(pid, &status, 0);
+            return 124 << 8;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+}
+
 int run_and_log(const std::string& cmd, parameters& params,
                 const std::string& label, int retries,
-                int backoff_seconds, bool fatal)
+                int backoff_seconds, bool fatal, int timeout_seconds)
 {
 	if (std::lock_guard<std::mutex> lk(g_log_mtx); params.debug && params.fp_logs.is_open()) {
         params.fp_logs << "[run_and_log] " << label << " CMD: " << cmd << "\n";
@@ -145,13 +185,13 @@ int run_and_log(const std::string& cmd, parameters& params,
     int attempt = 0;
 
     while (true) {
-        int rc = system(cmd.c_str());
+        int rc = run_shell(cmd, timeout_seconds);
         if (rc == 0) return 0;
 
         if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open()) {
             if (rc == -1) {
                 params.fp_logs << "Failed to run '" << label << "' (" << cmd
-                               << ") system() error: " << strerror(errno) << "\n";
+                               << ") fork/wait error: " << strerror(errno) << "\n";
             }
 #ifdef __unix__
             else if (WIFEXITED(rc)) {

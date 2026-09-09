@@ -8,6 +8,7 @@
 #include "reference.h"
 
 class SVtig;
+struct faidx_t;
 
 
 typedef struct _read
@@ -41,5 +42,7 @@ void update_read(Read* r, const Gaf& g, bool good, bool has_sv, double map_ratio
 std::string collect_alt_nodes(const std::string& path, std::map<std::string, gfaNode*>& gfa);
 void fill_alt_nodes(std::map<std::string, SVtig*>& final_svtigs, std::map<std::string, gfaNode*>& gfa);
 std::string svtig_header(const SVtig* svtig);
+std::string haplotype_of(const std::string& svtig_name);
+int write_final_svtigs(faidx_t*& fasta_index, std::map <std::string, SVtig*>& final_svtigs, std::string& out_file, std::string haplotype);
 
 #endif

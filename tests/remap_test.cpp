@@ -3,6 +3,9 @@
 #include <map>
 #include <vector>
 #include <set>
+#include <fstream>
+#include <cstdio>
+#include <htslib/faidx.h>
 #include "remap.h"
 #include "reference.h"
 #include "variant.h"
@@ -656,6 +659,32 @@ int main() {
         graph_fit(&small);
         if (!explained_by_graph(&small, 0.9)) { std::cerr << "Test 29 FAILED: sub-SV hole and indel should not keep the svtig" << std::endl; return 1; }
         std::cout << "Test 29 passed: sub-SV differences do not count" << std::endl;
+    }
+
+    // Test 34: haplotype comes from the name prefix, not from H1/H2 inside the node name
+    {
+        if (haplotype_of("H1-sH2x_5") != "H1" || haplotype_of("None-sH1_3") != "None" || haplotype_of("H2-s1_1_2") != "H2" || haplotype_of("s1_1") != "") {
+            std::cerr << "Test 34 FAILED: haplotype_of" << std::endl; return 1;
+        }
+        const char* fa = "/tmp/test_svarp_final_svtigs.fa";
+        { std::ofstream f(fa); f << ">H1-sH2x_5\nACGTACGT\n>H2-s1_1\nAAAACCCC\n>None-sH1_3\nGGGGTTTT\n"; }
+        faidx_t* fai = fai_load(fa);
+        if (!fai) { std::cerr << "Test 34 FAILED: fai_load" << std::endl; return 1; }
+        std::map<std::string, SVtig*> svtigs;
+        for (const char* n : {"H1-sH2x_5", "H2-s1_1", "None-sH1_3"}) { svtigs[n] = make_svtig(n); svtigs[n]->output = true; }
+        int ok = 1;
+        for (const char* hap : {"H1", "H2", "None"}) {
+            std::string out = std::string("/tmp/test_svarp_final_") + hap + ".fa";
+            int n = write_final_svtigs(fai, svtigs, out, hap);
+            std::ifstream in(out); std::string line; std::getline(in, line);
+            if (n != 1 || line.rfind(std::string(">") + hap + "-", 0) != 0) { std::cerr << "Test 34 FAILED: " << hap << " file got " << n << " svtigs, first " << line << std::endl; ok = 0; }
+            std::remove(out.c_str());
+        }
+        fai_destroy(fai);
+        std::remove(fa); std::remove("/tmp/test_svarp_final_svtigs.fa.fai");
+        for (auto& p : svtigs) delete p.second;
+        if (!ok) return 1;
+        std::cout << "Test 34 passed: haplotype files follow the name prefix" << std::endl;
     }
 
     std::cout << "All remap tests passed" << std::endl;

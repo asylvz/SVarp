@@ -104,7 +104,7 @@ build/test_logfile: src/logfile.cpp tests/logfile_test.cpp
 	mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -I. -Isrc -Idep/htslib -Idep/wfa src/logfile.cpp tests/logfile_test.cpp -o $@
 
-test-common: build/test_common_parse_gaf build/test_cigar build/test_common_utils build/test_run_and_log build/test_variant build/test_generate_sv_node build/test_merge_neighbor_nodes build/test_assembly build/test_remap build/test_alignment build/test_phasing build/test_variant_mapping build/test_alignment_read_gz build/test_reference build/test_a5_leak build/test_generate_sv_node_revstrand
+test-common: build/test_common_parse_gaf build/test_cigar build/test_common_utils build/test_run_and_log build/test_variant build/test_generate_sv_node build/test_merge_neighbor_nodes build/test_assembly build/test_remap build/test_alignment build/test_phasing build/test_variant_mapping build/test_alignment_read_gz build/test_reference build/test_a5_leak build/test_generate_sv_node_revstrand build/test_cmdline
 	./build/test_common_parse_gaf
 	./build/test_cigar
 	./build/test_common_utils
@@ -121,6 +121,7 @@ test-common: build/test_common_parse_gaf build/test_cigar build/test_common_util
 	./build/test_reference
 	./build/test_a5_leak
 	./build/test_generate_sv_node_revstrand
+	./build/test_cmdline
 
 test-all: test-logfile test-common
 	@echo "=== All tests finished ==="
@@ -139,6 +140,10 @@ build/test_cigar: tests/cigar_test.cpp src/common.cpp src/logfile.cpp
 build/test_common_utils: tests/common_utils_test.cpp src/common.cpp src/logfile.cpp
 	mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/common.cpp src/logfile.cpp tests/common_utils_test.cpp -o $@
+
+build/test_cmdline: tests/cmdline_test.cpp src/cmdline.cpp src/common.cpp src/logfile.cpp
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Isrc -Idep/htslib -Idep/wfa src/cmdline.cpp src/common.cpp src/logfile.cpp tests/cmdline_test.cpp -o $@
 
 build/test_run_and_log: tests/run_and_log_test.cpp src/common.cpp src/logfile.cpp
 	mkdir -p build

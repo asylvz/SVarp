@@ -18,6 +18,7 @@ int main() {
         f << "read_002\tH2\tps_100\tchr1\n";
         f << "read_003\tH1\tps_200\tchr1\n";
         f << "read_004\tnone\tnone\tchr1\n";
+        f << "read_001\tH2\tps_300\tchr1\n";   // repeated name: first record stands
         f.close();
 
         parameters params;
@@ -27,6 +28,7 @@ int main() {
         int rc = read_phase_file(params, phased_reads);
         if (rc != RETURN_SUCCESS) { std::cerr << "Test 1: read_phase_file failed" << std::endl; return 1; }
         if (phased_reads.size() != 4) { std::cerr << "Test 1: Expected 4 reads, got " << phased_reads.size() << std::endl; return 1; }
+        if (phased_reads["read_001"]->phase_set != "ps_100") { std::cerr << "Test 1: repeated read_001 should keep its first record" << std::endl; return 1; }
         if (phased_reads["read_001"]->haplotype != "H1") { std::cerr << "Test 1: read_001 should be H1" << std::endl; return 1; }
         if (phased_reads["read_002"]->haplotype != "H2") { std::cerr << "Test 1: read_002 should be H2" << std::endl; return 1; }
         if (phased_reads["read_004"]->haplotype != "none") { std::cerr << "Test 1: read_004 should be none" << std::endl; return 1; }

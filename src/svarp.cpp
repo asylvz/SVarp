@@ -57,7 +57,8 @@ int main(int argc, char** argv)
 
 	log_step(params.fp_logs, "Filtering svtigs (GraphAligner remapping)");
 	//Filter SVtigs by remapping to the graph
-	filter_svtigs(params, gfa, svtigs);
+	if (filter_svtigs(params, gfa, svtigs) != RETURN_SUCCESS)
+		return RETURN_ERROR;
 
 	auto t_end = std::chrono::steady_clock::now();
 	double total_sec = std::chrono::duration<double>(t_end - t_start).count();

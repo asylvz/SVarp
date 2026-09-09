@@ -141,10 +141,13 @@ std::string svtig_header(const SVtig* svtig)
 int write_final_svtigs_fasta(faidx_t*& fasta_index, SVtig* svtig, std::ostream& fp_write)
 {
 
-	int loc_length;
+	hts_pos_t loc_length;
 	const size_t line_len = 60;
 
-	char *tmp_seq = faidx_fetch_seq(fasta_index, (svtig->name).c_str(), 0, MAX_FETCH_LEN, &loc_length);
+	hts_pos_t n = faidx_seq_len64(fasta_index, (svtig->name).c_str());
+	if (n <= 0)
+		return RETURN_ERROR;
+	char *tmp_seq = faidx_fetch_seq64(fasta_index, (svtig->name).c_str(), 0, n - 1, &loc_length);
 	if (tmp_seq == nullptr)
 		return RETURN_ERROR;
 	std::string seq(tmp_seq);
@@ -231,7 +234,7 @@ bool explained_by_graph(const Read* r, double min_cov)
 // Svtigs assembled from different haplotypes describe different alleles of the
 // same locus, so they are never duplicates of each other. Without a phase file
 // the names carry no prefix and all svtigs fall into one class.
-static std::string haplotype_of(const std::string& svtig_name)
+std::string haplotype_of(const std::string& svtig_name)
 {
 	if (svtig_name.rfind("H1-", 0) == 0)
 		return "H1";
@@ -567,12 +570,8 @@ int write_final_svtigs(faidx_t*& fasta_index, std::map <std::string, SVtig*>& fi
 		if (itr->second->output == true)
 		{
 			file_name = itr->second->name;
-			if (haplotype != "None" && (file_name.find(haplotype) != std::string::npos))
-			{
-				write_final_svtigs_fasta(fasta_index, itr->second, fp_write);
-				cnt++;
-			}
-			else if(haplotype == "None" && (file_name.find("H1") == std::string::npos) && (file_name.find("H2") == std::string::npos))
+			std::string hap = haplotype_of(file_name);
+			if ((haplotype != "None" && hap == haplotype) || (haplotype == "None" && hap != "H1" && hap != "H2"))
 			{
 				write_final_svtigs_fasta(fasta_index, itr->second, fp_write);
 				cnt++;
@@ -626,9 +625,9 @@ static void remap_and_flag(parameters& params, std::map<std::string, gfaNode*>& 
 		
 	if (std::filesystem::is_empty(params.remap_gaf_path))
 	{
-		std::cerr<< "Error: Graphaligner did not run successfully..."<< "\n";
-		std::cerr<< "--->Command: " << graphaligner_cmd << "\n";
-		exit(0);
+		std::cout << "[warning] GraphAligner aligned no svtig; every svtig is reported without an alignment" << std::endl;
+		if (params.fp_logs.is_open())
+			params.fp_logs << "[warning] GraphAligner aligned no svtig: " << graphaligner_cmd << "\n";
 	}
 
 	//Now the ones that we want to output have final_svtigs->output = true	

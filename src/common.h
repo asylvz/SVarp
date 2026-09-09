@@ -21,7 +21,6 @@
 #define MINMAPQ 5
 #define MINMAPQREMAP 5
 #define TEST_SAMPLE_SIZE 250000000
-#define MAX_FETCH_LEN 1000000
 #define MIN_READ_START_END_WINDOW 200
 #define MIN_CLIP_SIGNAL 500 //unaligned read end that counts as a breakpoint on a single alignment
 #define MAX_CONTIG_DEPTH 100 //>100X coverage for a contig is unexpected (e.g., MT)
@@ -148,7 +147,7 @@ std::string exec(const std::string& command, bool return_out);
 void error(const char* const msg);
 double overlap_ratio(int x_start, int x_end, int y_start, int y_end);
 int parse_gaf_line(std::string& line, Gaf& gafline);
-int run_and_log(const std::string& cmd, parameters& params, const std::string& label = "", int retries = 0, int backoff_seconds = 1, bool fatal = false);
+int run_and_log(const std::string& cmd, parameters& params, const std::string& label = "", int retries = 0, int backoff_seconds = 1, bool fatal = false, int timeout_seconds = 0);
 std::string find_executable(const std::string &progname, const std::vector<std::string> &extra_dirs = {});
 
 std::string& reverse_complement(std::string& seq);
