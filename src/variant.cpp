@@ -414,219 +414,86 @@ int mapping_start_end(std::map<std::string, gfaNode*>& gfa, Gaf& line, std::map<
 }
 
 
+//Node and forward-strand coordinate of an intra-alignment SV; 0-based boundary index as in mapping_start_end
 Variant* generate_sv_node(std::map<std::string, gfaNode*>& gfa, Gaf& line, const int base_pos, int var_len, char sv_type)
 {
-	Variant *v = new Variant();
-
 	const std::string &path = line.path;
-    
-	int path_start = line.path_start;
-	int node_count = 0, total_so_far = 0, node_map_size = 0;
-	v->phased = false;
-	v->type = INTRA; 
-	int pos_in_cigar = base_pos;
-	bool del_incomplete = false;
+	int p0 = line.path_start + base_pos - 1; //first deleted base, or the base after the insertion
+	int p1 = (sv_type == DELETION) ? p0 + var_len - 1 : p0; //last deleted base
+	if (p0 < 0)
+		return nullptr;
 
+	//Nodes holding p0 and p1
+	std::string node0, node1;
+	char strand0 = 0, strand1 = 0;
+	int idx0 = -1, idx1 = -1, off0 = 0, off1 = 0, acc = 0, idx = 0;
 	size_t p = 0;
-	while (p < path.size()) 
+	while (p < path.size() && idx1 < 0)
 	{
-		char strand = path[p];
-		++p;
+		char strand = path[p++];
 		size_t q = p;
 		while (q < path.size() && path[q] != '>' && path[q] != '<') ++q;
-		v->node = path.substr(p, q - p);
+		std::string node = path.substr(p, q - p);
 		p = q;
-		node_count++;
 
-		if (gfa.count(v->node) == 0)
-			continue;
-
-		if ((node_count == 1) && (p == path.size())) //means there is only a single node
+		std::map<std::string, gfaNode*>::iterator it = gfa.find(node);
+		if (it == gfa.end())
+			return nullptr;
+		int len = it->second->len;
+		if (idx0 < 0 && p0 < acc + len)
 		{
-			int pos_in_node = path_start + pos_in_cigar;
-			if(strand == '>')
-				v->pos_in_node = pos_in_node; //add +1 after offset because the sequence starts at offset +1
-			else
-			{
-				if (sv_type == DELETION)
-					v->pos_in_node = (gfa[v->node]->len - pos_in_node) - var_len;
-				else
-					v->pos_in_node = gfa[v->node]->len - pos_in_node;
-			}
-		
-			v->pos_in_ref = gfa[v->node]->offset + v->pos_in_node;
-			v->contig = gfa[v->node]->contig;
-			v->node_strand = strand;
-			
-			if (sv_type == INSERTION)
-			{
-				v->pos_in_node_end = v->pos_in_node + 0;
-				v->sv_type = INSERTION;			 
-			}
-			else if (sv_type == DELETION)
-			{
-				v->pos_in_node_end = v->pos_in_node + var_len;
-				v->sv_type = DELETION;			 
-			}
-			return v;	
+			node0 = node; strand0 = strand; idx0 = idx; off0 = p0 - acc;
 		}
-		else if((node_count == 1) && (p < path.size())) //First node
+		if (idx0 >= 0 && p1 < acc + len)
 		{
-			node_map_size = gfa[v->node]->len - path_start;
-			
-			// Positions are 1-based here (add_variant passes base_pos + 1), so a
-			// variant on the node's last base has pos_in_cigar == node_map_size.
-			if ((sv_type != DELETION && pos_in_cigar <= node_map_size) || (strand == '>' && pos_in_cigar <= node_map_size) || (strand == '<' && sv_type == DELETION && pos_in_cigar + var_len <= node_map_size))
-			{
-				int pos_in_node = path_start + pos_in_cigar;
-				
-				if(strand == '>')
-					v->pos_in_node = pos_in_node;
-				else
-				{
-					if (sv_type == DELETION)
-						v->pos_in_node = (gfa[v->node]->len - pos_in_node) - var_len;
-					else
-						v->pos_in_node = gfa[v->node]->len - pos_in_node;
-				}
-				
-				if (v->pos_in_node < 0)
-				{
-					std::cerr<<"ERROR (first node) in addition of SV signal loci "<<v->node <<"\n";
-					std::cout<<"v->pos_in_node = "<< v->pos_in_node<< " node len = "<<gfa[v->node]->len << " path_start = "<<path_start<< " pos_in_cigar = "<<pos_in_cigar<<" var_len = "<<var_len<<" sv_type = "<<sv_type<< " pos_in_node = "<<pos_in_node <<"\n";
-					std::cout <<line.path<<"\t" <<line.path_length<<"\t"<<line.path_start<<"\t"<<line.path_end<<"\n";
-				}
-
-				v->pos_in_ref = gfa[v->node]->offset + v->pos_in_node;
-				v->contig = gfa[v->node]->contig;
-				v->node_strand = strand;
-				if (sv_type == INSERTION)
-				{
-					v->pos_in_node_end = v->pos_in_node + 0;
-					v->sv_type = INSERTION;			 
-				}
-				else if (sv_type == DELETION)
-				{
-					v->pos_in_node_end = v->pos_in_node + var_len;
-					v->sv_type = DELETION;			 
-				}
-
-					return v;	
-			}
-			else
-			{	
-				total_so_far = node_map_size;
-				if (strand == '<' && sv_type == DELETION && pos_in_cigar < node_map_size)
-				{
-					pos_in_cigar += var_len;
-					del_incomplete = true;
-				}
-			}
+			node1 = node; strand1 = strand; idx1 = idx; off1 = p1 - acc;
 		}
-		else if(p == path.size()) //Last node
+		acc += len;
+		idx++;
+	}
+	if (idx1 < 0)
+		return nullptr;
+
+	Variant *v = new Variant();
+	v->phased = false;
+	v->type = INTRA;
+	v->sv_type = sv_type;
+
+	if (sv_type == INSERTION)
+	{
+		v->node = node0;
+		v->node_strand = strand0;
+		v->pos_in_node = (strand0 == '>') ? off0 : gfa[node0]->len - off0;
+	}
+	else if (idx0 == idx1)
+	{
+		v->node = node0;
+		v->node_strand = strand0;
+		v->pos_in_node = (strand0 == '>') ? off0 : gfa[node0]->len - 1 - off1;
+	}
+	else
+	{
+		//Deletion across nodes: report the node whose forward end lies inside it, ties by name
+		bool first = (strand0 == '>'), last = (strand1 == '<');
+		if (first == last)
+			first = (node0 <= node1);
+		if (first)
 		{
-			if ((sv_type != DELETION && pos_in_cigar >= node_map_size) || (del_incomplete && pos_in_cigar >= node_map_size) || (strand == '>' && pos_in_cigar >= node_map_size) || (strand == '<' && sv_type == DELETION && pos_in_cigar + var_len >= node_map_size && del_incomplete == false))
-			{
-				int pos_in_node = pos_in_cigar - total_so_far;
-				
-				if(strand == '>')
-					v->pos_in_node = pos_in_node;
-				else
-				{
-					if (sv_type == DELETION)
-						if (del_incomplete)
-							v->pos_in_node = gfa[v->node]->len - pos_in_node;
-						else
-							v->pos_in_node = (gfa[v->node]->len - pos_in_node) - var_len;
-					else
-						v->pos_in_node = gfa[v->node]->len - pos_in_node;
-				}
-				if (v->pos_in_node < 0)
-				{
-					std::cerr<<"ERROR (last node) in addition of SV signal loci "<<v->node <<"\n";
-					std::cout<<"v->pos_in_node = "<< v->pos_in_node<< "node len = "<<gfa[v->node]->len << " path_start = "<<path_start<< " pos_in_cigar = "<<pos_in_cigar<<" var_len = "<<var_len<<" sv_type = "<<sv_type<< " pos_in_node = "<<pos_in_node <<"\n";
-					std::cout <<line.path<<"\t" <<line.path_length<<"\t"<<line.path_start<<"\t"<<line.path_end<<"\n";
-				}
-
-				v->pos_in_ref = gfa[v->node]->offset + v->pos_in_node;
-				v->contig = gfa[v->node]->contig;
-				v->node_strand = strand;
-				if (sv_type == INSERTION)
-				{
-					v->pos_in_node_end = v->pos_in_node + 0;
-					v->sv_type = INSERTION;			 
-				}
-				else if (sv_type == DELETION)
-				{
-					v->pos_in_node_end = v->pos_in_node + var_len;
-					v->sv_type = DELETION;			 
-				}
-
-					return v;	
-			}
-			else
-				std::cout<<"Size problem in adding SV"<<std::endl;
+			v->node = node0;
+			v->node_strand = strand0;
+			v->pos_in_node = (strand0 == '>') ? off0 : 0;
 		}
-		else //middle node
+		else
 		{
-			node_map_size = total_so_far + gfa[v->node]->len;
-			
-			if ((sv_type != DELETION && pos_in_cigar <= node_map_size) || (del_incomplete && pos_in_cigar <= node_map_size) || (strand == '>' && pos_in_cigar <= node_map_size) || (strand == '<' && sv_type == DELETION && pos_in_cigar + var_len <= node_map_size && del_incomplete == false))
-			{
-				int pos_in_node = pos_in_cigar - total_so_far;
-				
-				if(strand == '>')
-					v->pos_in_node = pos_in_node;
-				else
-				{
-					if (sv_type == DELETION)
-					{
-						if (del_incomplete)
-							v->pos_in_node = gfa[v->node]->len - pos_in_node;
-						else
-							v->pos_in_node = (gfa[v->node]->len - pos_in_node) - var_len;
-					}
-					else
-						v->pos_in_node = gfa[v->node]->len - pos_in_node;
-				}
-	
-				if (v->pos_in_node < 0)
-				{
-					std::cout<<"ERRRORRR middle "<<v->node <<"\n";
-					std::cout<< v->pos_in_node<< "node len = "<<gfa[v->node]->len << " base pos = "<<base_pos<<" pos_in_cigar "<< pos_in_cigar<<" total_so_far = "<<total_so_far<<" var_len = "<<var_len<< "\n";
-					std::cout <<line.path<<"\t" <<line.path_length<<"\t"<<line.path_start<<"\t"<<line.path_end<<"\n";
-				}
-
-				v->pos_in_ref = gfa[v->node]->offset + v->pos_in_node;
-				v->contig = gfa[v->node]->contig;
-				v->node_strand = strand;
-				if (sv_type == INSERTION)
-				{
-					v->pos_in_node_end = v->pos_in_node + 0;
-					v->sv_type = INSERTION;			 
-				}
-				else if (sv_type == DELETION)
-				{
-					v->pos_in_node_end = v->pos_in_node + var_len;
-					v->sv_type = DELETION;			 
-				}
-
-					return v;    
-			}
-		 	else
-			{
-				total_so_far = node_map_size;
-				if (strand == '<' && sv_type == DELETION && pos_in_cigar < node_map_size)
-				{
-					pos_in_cigar += var_len;
-					del_incomplete = true;
-				}
-			}
+			v->node = node1;
+			v->node_strand = strand1;
+			v->pos_in_node = (strand1 == '<') ? gfa[node1]->len - 1 - off1 : 0;
 		}
 	}
-
-	delete v;   // no branch matched; v is not owned
-	return nullptr;
+	v->pos_in_node_end = v->pos_in_node + ((sv_type == DELETION) ? var_len : 0);
+	v->pos_in_ref = gfa[v->node]->offset + v->pos_in_node;
+	v->contig = gfa[v->node]->contig;
+	return v;
 }
 
 
