@@ -158,7 +158,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
                              std::string& svtig_name,
                              double& contig_depth,
                              SVCluster*& sv,
-                             std::map<std::string, SVtig*>& final_svtigs, int threads)
+                             std::map<std::string, SVtig*>& final_svtigs, int threads, bool count_cluster)
 {
     unsigned int support_threshold = static_cast<unsigned int>(params.support) / 2;
     if (support_threshold < 3) support_threshold = 3;
@@ -175,16 +175,18 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
 
     double zscore = (contig_depth > 0) ? (static_cast<double>(read_set.size()) - contig_depth) / std::sqrt(contig_depth) : 0.0;
 
+    // The coverage verdicts hold for every haplotype job of a cluster; they are
+    // counted once, on the cluster's first job. Support is checked per haplotype.
     if (contig_depth * 2 < cluster_reads)
     {
-        { std::lock_guard<std::mutex> lk(mtx); this->filter_hicov++; }
+        if (count_cluster) { std::lock_guard<std::mutex> lk(mtx); this->filter_hicov++; }
         if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_asm_log.is_open())
             params.fp_asm_log << svtig_name << "\tFILTERED\treason=high_coverage\treads=" << read_set.size() << "\tcluster_reads=" << cluster_reads << "\tcontig_depth=" << contig_depth << "\tzscore=" << zscore << "\n";
         return 0;
     }
     else if (contig_depth > 5 * cluster_reads)
     {
-        { std::lock_guard<std::mutex> lk(mtx); this->filter_lowcov++; }
+        if (count_cluster) { std::lock_guard<std::mutex> lk(mtx); this->filter_lowcov++; }
         if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_asm_log.is_open())
             params.fp_asm_log << svtig_name << "\tFILTERED\treason=low_coverage\treads=" << read_set.size() << "\tcluster_reads=" << cluster_reads << "\tcontig_depth=" << contig_depth << "\tzscore=" << zscore << "\n";
         return 0;
@@ -198,7 +200,7 @@ int Assembly::final_assembly(parameters& params, faidx_t*& fasta_index,
     }
     else if (contig_depth > MAX_CONTIG_DEPTH)
     {
-        { std::lock_guard<std::mutex> lk(mtx); this->filter_hicov++; }
+        if (count_cluster) { std::lock_guard<std::mutex> lk(mtx); this->filter_maxdepth++; }
         if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_asm_log.is_open())
             params.fp_asm_log << svtig_name << "\tFILTERED\treason=max_contig_depth\treads=" << read_set.size() << "\tcontig_depth=" << contig_depth << "\tzscore=" << zscore << "\n";
         return 0;
@@ -485,7 +487,7 @@ void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> 
 
 	// One job per cluster and haplotype; clusters are assembled in parallel,
 	// each job running the external tools with threads/asm_jobs threads.
-	struct Job { SVCluster* sv; std::set<std::string>* reads; std::string name; double depth; };
+	struct Job { SVCluster* sv; std::set<std::string>* reads; std::string name; double depth; bool first; };
 	std::vector<Job> jobs;
 	for (itr = vars.begin(); itr != vars.end(); ++itr)
 		for (auto &sv : itr->second)
@@ -493,13 +495,13 @@ void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> 
 			double d = cluster_depth(sv, depth);
 			std::string base = sv->node + "_" + std::to_string(sv->start_pos);
 			if ((params.phase_tags).empty())
-				jobs.push_back({sv, &sv->reads_untagged, base, d});
+				jobs.push_back({sv, &sv->reads_untagged, base, d, true});
 			else
 			{
-				jobs.push_back({sv, &sv->reads_h1, "H1-" + base, d});
-				jobs.push_back({sv, &sv->reads_h2, "H2-" + base, d});
+				jobs.push_back({sv, &sv->reads_h1, "H1-" + base, d, true});
+				jobs.push_back({sv, &sv->reads_h2, "H2-" + base, d, false});
 				if (!params.skip_untagged)
-					jobs.push_back({sv, &sv->reads_untagged, "None-" + base, d});
+					jobs.push_back({sv, &sv->reads_untagged, "None-" + base, d, false});
 			}
 		}
 	int n_jobs = params.asm_jobs > 0 ? params.asm_jobs : 1;
@@ -523,7 +525,7 @@ void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> 
 			size_t i = next.fetch_add(1);
 			if (i >= jobs.size()) break;
 			Job &j = jobs[i];
-			produced += final_assembly(params, idx, *j.reads, j.name, j.depth, j.sv, final_svtigs, job_threads);
+			produced += final_assembly(params, idx, *j.reads, j.name, j.depth, j.sv, final_svtigs, job_threads, j.first);
 			int k = ++done;
 			if (k % 100 == 0)
 			{
@@ -547,10 +549,10 @@ void Assembly::run_assembly(parameters &params, std::map<std::string, Contig *> 
 		params.fp_svtigs.close();
 	fai_destroy(fasta_index);
 
-	std::cout << "--> " << (filter_hicov) + (this->filter_lowcov) + (this->filter_support) << " filtered (" << this->filter_hicov << " high, " << this->filter_lowcov << " low coverage read clusters and " << this->filter_support << " low read support)\n";
+	std::cout << "--> filtered: " << this->filter_hicov << " high and " << this->filter_lowcov << " low coverage clusters, " << this->filter_maxdepth << " above the depth cap, " << this->filter_support << " haplotype clusters with low read support\n";
 
 	if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())
-		params.fp_logs << "--> " << (this->filter_hicov) + (this->filter_lowcov) + (this->filter_support) << " filtered (" << this->filter_hicov << " high, " << this->filter_lowcov << " low coverage read clusters and " << this->filter_support << " low read support)\n";
+		params.fp_logs << "--> filtered: " << this->filter_hicov << " high and " << this->filter_lowcov << " low coverage clusters, " << this->filter_maxdepth << " above the depth cap, " << this->filter_support << " haplotype clusters with low read support\n";
 
 	std::cout << "--> " << this->no_contig_cnt << " clusters produced no contig (too few or too short reads)\n";
 	if (std::lock_guard<std::mutex> lk(g_log_mtx); params.fp_logs.is_open())

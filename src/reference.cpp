@@ -15,7 +15,7 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 	const std::string &path = line.path;
 	
 	int node_count = 0, total_so_far = 0;
-	Contig* credited = nullptr;
+	std::set<Contig*> credited;
 	bool credited_overall = false;
 	int path_start = line.path_start;
 	int path_end = line.path_end;
@@ -41,11 +41,8 @@ int contig_coverage(std::map <std::string, Contig*>& ref, std::map<std::string, 
 
 		// One read stays one read however many nodes its path crosses, so each
 		// contig it touches is credited once and the overall tally once.
-		if (rc != credited)
-		{
+		if (credited.insert(rc).second)
 			rc->mapped_reads++;
-			credited = rc;
-		}
 		if (!credited_overall)
 		{
 			overall->mapped_reads++;

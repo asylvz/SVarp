@@ -20,6 +20,7 @@ public:
 		int filter_hicov = 0;
 		int filter_lowcov = 0;
 		int filter_support = 0;
+		int filter_maxdepth = 0;
 		int unassembled_cnt = 0;
 		int no_contig_cnt = 0;
 		std::set <std::string> raw_svtigs;
@@ -30,7 +31,7 @@ public:
 		void generate_fasta_file(parameters& params, faidx_t*& fasta_index, std::set <std::string>& reads, std::string file_path);
 		int write_svtigs(std::string& f_path, const std::string& f_name, int pos, std::string& contig, int coverage, std::ostream& fp_write);
 		int merge_svtigs(parameters& params, const std::string& dir);
-		int final_assembly(parameters& params, faidx_t*& fasta_index, std::set <std::string>& read_set, std::string& svtig_name, double& contig_depth, SVCluster*& sv, std::map <std::string, SVtig*>& final_svtigs, int threads = -1);
+		int final_assembly(parameters& params, faidx_t*& fasta_index, std::set <std::string>& read_set, std::string& svtig_name, double& contig_depth, SVCluster*& sv, std::map <std::string, SVtig*>& final_svtigs, int threads = -1, bool count_cluster = true);
 
 };
 

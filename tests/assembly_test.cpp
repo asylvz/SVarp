@@ -70,9 +70,16 @@ int main() {
             std::cerr << "Test 4: H1 half judged low coverage against the whole contig depth" << std::endl;
             return 1;
         }
-        if (asm_phased.filter_hicov != 1) {
-            std::cerr << "Test 4: expected the cluster to reach the contig depth check, got hicov="
-                      << asm_phased.filter_hicov << std::endl;
+        if (asm_phased.filter_maxdepth != 1 || asm_phased.filter_hicov != 0) {
+            std::cerr << "Test 4: expected the cluster to reach the contig depth check, got maxdepth="
+                      << asm_phased.filter_maxdepth << " hicov=" << asm_phased.filter_hicov << std::endl;
+            return 1;
+        }
+        // the H2 job of the same cluster hits the same verdict but is not counted again
+        std::string name2 = "H2-s1_100";
+        asm_phased.final_assembly(params, idx, cluster.reads_h2, name2, contig_depth, svp, svtigs, -1, false);
+        if (asm_phased.filter_maxdepth != 1) {
+            std::cerr << "Test 4: cluster-level filter counted once per haplotype job, got " << asm_phased.filter_maxdepth << std::endl;
             return 1;
         }
         for (auto& kv : svtigs) delete kv.second;

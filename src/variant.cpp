@@ -24,7 +24,7 @@ int arrange_variants(std::map<std::string, Variant*>& vars, std::map<std::string
 	for (itr=vars.begin(); itr != vars.end(); ++itr)
 	{
 		//std::cout<<itr->first<<"\n";
-		auto pos = (itr->first).find(':');
+		auto pos = (itr->first).rfind(':'); //key is node:pos, node names may hold ':'
 		if (pos == std::string::npos)
 			continue;
 		std::string node_name = itr->first.substr(0, pos);

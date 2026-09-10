@@ -65,6 +65,22 @@ int main() {
         for (auto s : kv.second) delete s;
     delete node1;
 
+    // A node name holding ':' keeps its full name when variants are grouped by node
+    {
+        std::map<std::string, gfaNode*> g2;
+        g2["chr1:100"] = new gfaNode("chr1:100", "", 100, "contig1", 0);
+        std::map<std::string, Variant*> v2;
+        Variant* a = new Variant(); a->node = "chr1:100"; a->pos_in_node = 10; a->reads_untagged.insert("r1");
+        v2.insert({"chr1:100:10", a});
+        std::map<std::string, std::vector<SVCluster*>> out;
+        EdgeMap in2, out2;
+        merge_svs(params, g2, v2, out, in2, out2);
+        if (out.size() != 1 || out.find("chr1:100") == out.end()) { std::cerr << "Node name with ':' was cut when grouping variants" << std::endl; return 1; }
+        delete a;
+        for (auto &kv : out) for (auto s : kv.second) delete s;
+        delete g2["chr1:100"];
+    }
+
     std::cout << "variant.merge_svs_within_node test passed" << std::endl;
     return 0;
 }

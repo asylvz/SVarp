@@ -630,10 +630,8 @@ int write_final_svtigs(faidx_t*& fasta_index, std::map <std::string, SVtig*>& fi
 			file_name = itr->second->name;
 			std::string hap = haplotype_of(file_name);
 			if ((haplotype != "None" && hap == haplotype) || (haplotype == "None" && hap != "H1" && hap != "H2"))
-			{
-				write_final_svtigs_fasta(fasta_index, itr->second, fp_write);
-				cnt++;
-			}
+				if (write_final_svtigs_fasta(fasta_index, itr->second, fp_write) == RETURN_SUCCESS)
+					cnt++;
 
     		//params.fp_logs << file_name <<" contig="<<itr->second->contig<<" pos="<<itr->second->pos<<" support="<<itr->second->reads.size() << "\n";
 			//for (auto r : itr->second->reads)
@@ -712,9 +710,28 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 		if (params.fp_logs.is_open())
 			params.fp_logs << "--> skipping GraphAligner remapping (--no-remap)\n";
 
-		std::map<std::string, SVtig*>::iterator it;
-		for (it = final_svtigs.begin(); it != final_svtigs.end(); ++it)
+		// Flag what the assembly produced: clusters without a contig never reached
+		// the FASTA, extra contigs of a cluster (<name>_N) exist only there.
+		int nseq = faidx_nseq(fasta_index);
+		for (int i = 0; i < nseq; i++)
+		{
+			std::string nm = faidx_iseq(fasta_index, i);
+			auto it = final_svtigs.find(nm);
+			if (it == final_svtigs.end())
+			{
+				auto us = nm.rfind('_');
+				auto base = (us == std::string::npos) ? final_svtigs.end() : final_svtigs.find(nm.substr(0, us));
+				if (base == final_svtigs.end())
+					continue;
+				SVtig* tmp = new SVtig;
+				tmp->name = nm;
+				tmp->pos = base->second->pos;
+				tmp->reads = base->second->reads;
+				tmp->contig = base->second->contig;
+				it = final_svtigs.insert(std::pair<std::string, SVtig*>(nm, tmp)).first;
+			}
 			it->second->output = true;
+		}
 	}
 	else
 		remap_and_flag(params, gfa, final_svtigs, fasta_index, svtigs_tmp_path);

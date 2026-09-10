@@ -258,6 +258,23 @@ int main()
         for (auto &kv : ref) delete kv.second;
     }
 
+    // Test 9: a read whose path returns to the reference (ref -> alt -> ref) is one read on each contig
+    {
+        std::map<std::string, gfaNode*> gfa;
+        gfa["s1"] = new gfaNode("s1", "", 100, "chr1", 0);
+        gfa["a1"] = new gfaNode("a1", "", 60, "HG002#1#chr1", 5000);
+        gfa["s3"] = new gfaNode("s3", "", 150, "chr1", 100);
+        std::map<std::string, Contig*> ref;
+        ref["chr1"] = new Contig(); ref["HG002#1#chr1"] = new Contig(); ref["overall"] = new Contig();
+        Gaf g; g.path = ">s1>a1>s3"; g.path_start = 0; g.path_end = 310;
+        contig_coverage(ref, gfa, g);
+        if (ref["chr1"]->mapped_reads != 1 || ref["HG002#1#chr1"]->mapped_reads != 1 || ref["overall"]->mapped_reads != 1) {
+            std::cerr << "Test 9: expected one read per contig, got chr1=" << ref["chr1"]->mapped_reads << " alt=" << ref["HG002#1#chr1"]->mapped_reads << std::endl; return 1;
+        }
+        for (auto &kv : gfa) delete kv.second;
+        for (auto &kv : ref) delete kv.second;
+    }
+
     std::cout << "reference test passed" << std::endl;
     return 0;
 }

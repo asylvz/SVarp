@@ -4,6 +4,7 @@
 #include <vector>
 #include <set>
 #include <fstream>
+#include <filesystem>
 #include <cstdio>
 #include <htslib/faidx.h>
 #include "remap.h"
@@ -708,6 +709,28 @@ int main() {
             if (reference_colinear(c.path, gfa) != c.expect) { std::cerr << "Test 35 FAILED: " << c.path << " (" << c.why << ")" << std::endl; return 1; }
         for (auto& kv : gfa) delete kv.second;
         std::cout << "Test 35 passed: reference-colinear paths" << std::endl;
+    }
+
+    // Test 36: --no-remap writes every assembled contig, fragments included, and nothing for clusters that produced none
+    {
+        const std::string dir = "/tmp/svarp_noremap_test/";
+        std::filesystem::create_directories(dir);
+        { std::ofstream f(dir + "T_svtigs_tmp.fa"); f << ">H1-s1_1\nACGTACGT\n>H1-s1_1_2\nGGGGCCCC\n>H2-s2_3\nTTTTAAAA\n"; }
+        parameters params;
+        params.log_path = dir; params.sample_name = "T"; params.no_remap = true; params.phase_tags = "tags.tsv";
+        std::map<std::string, gfaNode*> gfa;
+        std::map<std::string, SVtig*> svtigs;
+        for (const char* n : {"H1-s1_1", "H2-s2_3", "H1-s9_9"}) svtigs[n] = make_svtig(n);   // H1-s9_9 assembled nothing
+        if (filter_svtigs(params, gfa, svtigs) != RETURN_SUCCESS) { std::cerr << "Test 36 FAILED: filter_svtigs" << std::endl; return 1; }
+        auto names = [](const std::string& f) { std::vector<std::string> v; std::ifstream in(f); std::string l; while (std::getline(in, l)) if (!l.empty() && l[0] == '>') v.push_back(l.substr(1, l.find(' ') - 1)); return v; };
+        auto h1 = names(dir + "T_svtigs_H1.fa"), h2 = names(dir + "T_svtigs_H2.fa");
+        if (h1.size() != 2 || h1[0] != "H1-s1_1" || h1[1] != "H1-s1_1_2" || h2.size() != 1 || h2[0] != "H2-s2_3") {
+            std::cerr << "Test 36 FAILED: H1 " << h1.size() << " records, H2 " << h2.size() << std::endl; return 1;
+        }
+        if (svtigs.count("H1-s1_1_2") != 1 || svtigs["H1-s9_9"]->output) { std::cerr << "Test 36 FAILED: fragment missing or failed cluster flagged" << std::endl; return 1; }
+        for (auto& p : svtigs) delete p.second;
+        std::filesystem::remove_all(dir);
+        std::cout << "Test 36 passed: --no-remap output" << std::endl;
     }
 
     std::cout << "All remap tests passed" << std::endl;
