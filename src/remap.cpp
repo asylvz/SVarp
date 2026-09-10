@@ -48,6 +48,40 @@ int get_middle_string(std::string& s)
 
 
 //Non-reference nodes of the remap path as "first-last:contig" blocks; "" if a node is unknown
+//True when the path walks reference nodes (SR 0) only, in reference order, without a skipped
+//node or a change of direction: such a path spells the reference sequence itself. Nodes without
+//an SR tag cannot be judged and give false.
+bool reference_colinear(const std::string& path, std::map<std::string, gfaNode*>& gfa)
+{
+	if (path.empty() || (path[0] != '>' && path[0] != '<'))
+		return false;
+	const gfaNode* prev = nullptr;
+	char dir = path[0];
+	size_t p = 0;
+	while (p < path.size())
+	{
+		char strand = path[p++];
+		size_t q = p;
+		while (q < path.size() && path[q] != '>' && path[q] != '<') ++q;
+		auto it = gfa.find(path.substr(p, q - p));
+		p = q;
+		if (it == gfa.end() || it->second->rank != 0 || strand != dir)
+			return false;
+		const gfaNode* n = it->second;
+		if (prev)
+		{
+			if (prev->contig != n->contig)
+				return false;
+			bool adjacent = (dir == '>') ? prev->offset + prev->len == n->offset : n->offset + n->len == prev->offset;
+			if (!adjacent)
+				return false;
+		}
+		prev = n;
+	}
+	return prev != nullptr;
+}
+
+
 std::string collect_alt_nodes(const std::string& path, std::map<std::string, gfaNode*>& gfa)
 {
 	//GAF also allows a stable sequence name ("chr21:100-900"), which has no nodes
@@ -505,7 +539,7 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 	// Output gate: long enough and anchored in the graph; whether the graph also
 	// holds the SV allele is recorded, not filtered.
 	std::vector <Read*> tmp_svtig;
-	int unaligned = 0, too_short = 0, low_cov = 0;
+	int unaligned = 0, too_short = 0, low_cov = 0, reference = 0;
 
 	for (auto &t: reads)
 	{
@@ -526,6 +560,13 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 			continue;
 		}
 		r->explained = explained_by_graph(r);
+		if (r->explained && !params.keep_reference && reference_colinear(r->node, gfa))
+		{
+			reference++;
+			if (params.fp_remap_log.is_open())
+				params.fp_remap_log << t.first << "\tFILTERED\treason=reference\tcov=" << r->cov << "\tnode=" << r->node << "\tsize=" << r->svtig_size << "\n";
+			continue;
+		}
 		tmp_svtig.push_back(r);
 	}
 
@@ -558,9 +599,9 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 	for (auto &r : tmp_svtig)
 		if (!r->duplicate) { kept++; in_graph += r->explained; }
 
-	std::cout << "--> " << kept << " svtigs kept (" << in_graph << " present in the graph, " << kept - in_graph << " not); filtered: " << too_short << " short, " << low_cov << " low graph coverage, " << unaligned << " without alignment, " << dup_legit.first << " duplicate\n";
+	std::cout << "--> " << kept << " svtigs kept (" << in_graph << " present in the graph, " << kept - in_graph << " not); filtered: " << too_short << " short, " << low_cov << " low graph coverage, " << reference << " reference-identical, " << unaligned << " without alignment, " << dup_legit.first << " duplicate\n";
 	if (params.fp_logs.is_open()) {
-		params.fp_logs << "--> " << kept << " svtigs kept (" << in_graph << " present in the graph, " << kept - in_graph << " not); filtered: " << too_short << " short, " << low_cov << " low graph coverage, " << unaligned << " without alignment, " << dup_legit.first << " duplicate\n";
+		params.fp_logs << "--> " << kept << " svtigs kept (" << in_graph << " present in the graph, " << kept - in_graph << " not); filtered: " << too_short << " short, " << low_cov << " low graph coverage, " << reference << " reference-identical, " << unaligned << " without alignment, " << dup_legit.first << " duplicate\n";
 		params.fp_logs << "--> " << primary << " primary, " << secondary << " secondary mappings, " << lowmq << " low MAPQ(<" << MINMAPQREMAP << "); svtigs from multiple contig assemblies = " << extra_added << "\n";
 	}
 

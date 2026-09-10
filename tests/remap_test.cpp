@@ -690,6 +690,26 @@ int main() {
         std::cout << "Test 34 passed: haplotype files follow the name prefix" << std::endl;
     }
 
+    // Test 35: reference_colinear - only an unbroken walk over reference nodes counts as the reference itself
+    {
+        std::map<std::string, gfaNode*> gfa;
+        auto add = [&](const std::string& n, int len, const std::string& contig, int off, int rank) {
+            gfa[n] = new gfaNode(n, std::string(len, 'A'), len, contig, off); gfa[n]->rank = rank; };
+        add("r1", 100, "chr1", 0, 0); add("r2", 50, "chr1", 100, 0); add("r3", 200, "chr1", 150, 0);
+        add("a1", 60, "HG002#1#chr1", 5000, 1); add("c1", 100, "chr2", 0, 0); add("u1", 100, "chr1", 350, -1);
+        struct Case { const char* path; bool expect; const char* why; };
+        Case cases[] = {
+            {">r1>r2>r3", true, "forward walk"}, {"<r3<r2<r1", true, "reverse walk"}, {">r2", true, "single node"},
+            {">r1>r3", false, "skipped node = deletion edge"}, {">r1>a1>r3", false, "alt node"},
+            {">r1<r2>r3", false, "inversion"}, {">r3>r1", false, "out of order"}, {">r1>r2>r3>u1", false, "node without SR tag"},
+            {">r1>c1", false, "contig change"}, {">r1>zz", false, "unknown node"}, {"chr1:1-500", false, "stable name path"},
+        };
+        for (auto& c : cases)
+            if (reference_colinear(c.path, gfa) != c.expect) { std::cerr << "Test 35 FAILED: " << c.path << " (" << c.why << ")" << std::endl; return 1; }
+        for (auto& kv : gfa) delete kv.second;
+        std::cout << "Test 35 passed: reference-colinear paths" << std::endl;
+    }
+
     std::cout << "All remap tests passed" << std::endl;
     return 0;
 }

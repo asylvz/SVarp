@@ -125,6 +125,7 @@ build/svarp \
 	--pc                        : GraphAligner --precise-clipping for remapping (default: GraphAligner default)
 	--no-remap (-r)             : Skip remapping (not suggested)
 	--keep-remap                : Keep <sample>_svtigs_tmp.fa and <sample>_remap.gaf (the inputs of the final filter)
+	--keep-reference-svtigs     : Also write svtigs whose graph path is the plain reference (dropped by default)
 	--write-unmapped            : Write the names of reads without a GAF record to <out>/<sample>_unmapped_reads.txt
 	--debug (-u)                : Keep all intermediate files and log every command
 	--version (-v)              : Print version
@@ -140,8 +141,11 @@ Each header carries the cluster locus and read support plus the result of remapp
 `graph_cov` is the fraction of the svtig covered by graph alignments, `max_gap` the largest uncovered stretch and
 `max_indel` the largest indel inside an alignment (bp). `graph_explained=yes` means the graph already holds this
 sequence without an SV-sized (>=50 bp) difference; `no` marks an allele the graph lacks. Only svtigs anchored in the
-graph (`graph_cov` >= `--min-graph-cov`) and at least `--min-svtig-len` long are written; every dropped svtig is listed
-with its reason in `<sample>_remap.log`, every cluster in `<sample>_assembly.log`.
+graph (`graph_cov` >= `--min-graph-cov`) and at least `--min-svtig-len` long are written. Svtigs whose path is the
+plain reference (reference nodes only, walked in order without a skipped node or a turn, and no SV-sized difference)
+spell the reference sequence and carry no SV; they are dropped unless `--keep-reference-svtigs` is given. Every dropped
+svtig is listed with its reason (`short`, `low_graph_cov`, `reference`, `no_alignment`, `DUPLICATE`) in
+`<sample>_remap.log`, every cluster in `<sample>_assembly.log`.
 
 ## Citation
 

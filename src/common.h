@@ -45,6 +45,7 @@ typedef struct _parameters
 	bool skip_untagged = true; //clusters of untagged reads are assembled and written only with --keep-untagged
 	bool write_unmapped = false; //list reads without a GAF record
 	bool keep_remap = false; //keep svtigs_tmp.fa and the remap GAF
+	bool keep_reference = false; //also write svtigs identical to the reference path
 	std::string fasta;
 	std::string phase_tags;
 	std::string output_path;
