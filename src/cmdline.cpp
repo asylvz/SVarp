@@ -9,7 +9,7 @@
 int parse_command_line(int argc, char** argv, parameters& params)
 {
 	int index, o;
-	std::string support, dist_threshold, threads, as, pc, map_ratio, min_clip, asm_jobs, min_identity, min_svtig_len;
+	std::string support, dist_threshold, threads, as, pc, map_ratio, min_clip, asm_jobs, min_identity, min_svtig_len, trim_identity;
 	
 	static struct option long_options[] = 
 	{	
@@ -28,6 +28,7 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		{"min-clip" , required_argument, NULL, 'k'},
 		{"asm-jobs" , required_argument, NULL, 'l'},
 		{"min-identity" , required_argument, NULL, 'y'},
+		{"trim-identity" , required_argument, NULL, 'T'},
 		{"out" , required_argument, NULL, 'o'},
 		{"phase" , required_argument, NULL, 'p'},
 		{"no-remap" , no_argument, 0, 'r'},
@@ -43,7 +44,7 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		{NULL, 0, NULL, 0}
 	};
 
-	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jk:l:mn:o:p:q:rs:t:uvw:xy:zR", long_options, &index)) != -1)
+	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jk:l:mn:o:p:q:rs:t:uvw:xy:zRT:", long_options, &index)) != -1)
 	{
 		switch(o)
 		{
@@ -97,6 +98,9 @@ int parse_command_line(int argc, char** argv, parameters& params)
 				break;
 			case 'l':
 				asm_jobs = optarg;
+				break;
+			case 'T':
+				trim_identity = optarg;
 				break;
 			case 'y':
 				min_identity = optarg;
@@ -287,6 +291,21 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		}
 	}
 
+	if(!trim_identity.empty())
+	{
+		try {
+			params.trim_identity = stod(trim_identity);
+		} catch (const std::exception&) {
+			std::cerr << "[SVARP CMDLINE ERROR] trim_identity must be a float: " << trim_identity << std::endl;
+			return RETURN_ERROR;
+		}
+		if (params.trim_identity < 0 || params.trim_identity > 1)
+		{
+			std::cerr << "[SVARP CMDLINE ERROR] trim_identity must be in [0, 1]" << std::endl;
+			return RETURN_ERROR;
+		}
+	}
+
 	if(!map_ratio.empty())
 	{
 		try {
@@ -468,6 +487,7 @@ void init_logs(parameters& params)
 	std::cout << "  Parallel assembly jobs: " << params.asm_jobs << "\n";
 	std::cout << "  Precise clipping (GraphAligner): " << (params.min_precise_clipping > 0 ? std::to_string(params.min_precise_clipping) : std::string("default")) << "\n";
 	std::cout << "  Minimum identity of remap records: " << params.min_identity << "\n";
+	std::cout << "  Trim identity of svtig ends: " << params.trim_identity << "\n";
 	std::cout << "  Alignment score (GraphAligner): " << params.min_alignment_score << "\n";
 	std::cout << "  Read type: " << params.read_type << "\n";
 	std::cout << "  Threads: " << params.threads << "\n";
@@ -499,6 +519,7 @@ void init_logs(parameters& params)
 		params.fp_logs << "  Parallel assembly jobs: " << params.asm_jobs << "\n";
 		params.fp_logs << "  Precise clipping (GraphAligner): " << (params.min_precise_clipping > 0 ? std::to_string(params.min_precise_clipping) : std::string("default")) << "\n";
 		params.fp_logs << "  Minimum identity of remap records: " << params.min_identity << "\n";
+		params.fp_logs << "  Trim identity of svtig ends: " << params.trim_identity << "\n";
 		params.fp_logs << "  Alignment score (GraphAligner): " << params.min_alignment_score << "\n";
 		params.fp_logs << "  Read type: " << params.read_type << "\n";
 		params.fp_logs << "  Threads: " << params.threads << "\n";
@@ -549,6 +570,7 @@ void print_help()
 	std::cerr << "\t--min-clip                  : Unaligned read end (bp) that counts as a breakpoint on a single alignment (default=500)"<<std::endl;
 	std::cerr << "\t--asm-jobs                  : Clusters assembled in parallel (default=min(threads, 8))"<<std::endl;
 	std::cerr << "\t--min-identity              : Remap records below this identity do not count as graph coverage (default=0.90)"<<std::endl;
+	std::cerr << "\t--trim-identity             : Trim svtig ends whose 1 kb windows align to the graph below this identity; 0 disables (default=0.90)"<<std::endl;
 	std::cerr << "\t--as                        : GraphAligner minimum alignment score for remapping (default=1000)"<<std::endl;
 	std::cerr << "\t--pc                        : GraphAligner --precise-clipping for remapping (default: GraphAligner default)"<<std::endl;
 	std::cerr << "\t--keep-remap                : Keep <sample>_svtigs_tmp.fa and <sample>_remap.gaf (the inputs of the final filter)"<<std::endl;

@@ -4,6 +4,8 @@
 #include <vector>
 #include <set>
 #include <fstream>
+#include <sstream>
+#include <algorithm>
 #include <filesystem>
 #include <cstdio>
 #include <htslib/faidx.h>
@@ -731,6 +733,84 @@ int main() {
         for (auto& p : svtigs) delete p.second;
         std::filesystem::remove_all(dir);
         std::cout << "Test 36 passed: --no-remap output" << std::endl;
+    }
+
+    // Test 37: indel_runs merges like merged_indel and records where each run sits on the query
+    {
+        struct C { const char* cg; int expect; };
+        C cases[] = { {"100=30I5=25I100=", 55}, {"100=30I25=25I100=", 30}, {"50=60D50=", 60}, {"10=5I3=5D10=", 5}, {"200=", 0}, {"30=10I2=10I2=10I30=", 30} };
+        for (auto& c : cases) {
+            std::vector<IndelRun> runs; indel_runs(c.cg, 0, 20, runs);
+            int mx = 0; for (auto& r : runs) mx = std::max(mx, r.len);
+            if (mx != c.expect || mx != merged_indel(c.cg)) { std::cerr << "Test 37 FAILED: " << c.cg << " max " << mx << std::endl; return 1; }
+        }
+        std::vector<IndelRun> runs; indel_runs("100=30I5=25I100=", 1000, 20, runs);
+        if (runs.size() != 1 || runs[0].qs != 1100 || runs[0].qe != 1160 || runs[0].len != 55) { std::cerr << "Test 37 FAILED: insertion run span" << std::endl; return 1; }
+        runs.clear(); indel_runs("50=60D50=", 200, 20, runs);
+        if (runs.size() != 1 || runs[0].qs != 250 || runs[0].qe != 250 || runs[0].len != 60) { std::cerr << "Test 37 FAILED: deletion run span" << std::endl; return 1; }
+        runs.clear(); indel_runs("10=5I3=5D10=", 0, 20, runs);
+        if (runs.size() != 2 || runs[0].qs != 10 || runs[0].qe != 15 || runs[1].qs != 18 || runs[1].qe != 18) { std::cerr << "Test 37 FAILED: mixed runs" << std::endl; return 1; }
+        std::cout << "Test 37 passed: indel runs" << std::endl;
+    }
+
+    // Test 38: window identity and trim bounds - noisy or unaligned windows fall off the ends only
+    {
+        std::string noisy; for (int i = 0; i < 333; i++) noisy += "5=1X"; noisy += "2=";   // 2000 bp at 0.83 identity
+        Read r; r.svtig_size = 6000;
+        window_identity(noisy + "4000=", 0, &r);
+        if (r.win_match.size() != 6 || r.win_aligned[0] != 1000 || r.win_match[0] != 834 || r.win_match[3] != 1000) { std::cerr << "Test 38 FAILED: windows " << r.win_match[0] << "/" << r.win_aligned[0] << std::endl; return 1; }
+        auto b = trim_bounds(&r, 0.90);
+        if (b.first != 2000 || b.second != 6000) { std::cerr << "Test 38 FAILED: noisy start " << b.first << "-" << b.second << std::endl; return 1; }
+        b = trim_bounds(&r, 0.80);
+        if (b.first != 0 || b.second != 6000) { std::cerr << "Test 38 FAILED: lenient threshold keeps all" << std::endl; return 1; }
+        Read u; u.svtig_size = 6000; window_identity("5000=", 0, &u);
+        b = trim_bounds(&u, 0.90);
+        if (b.first != 0 || b.second != 5000) { std::cerr << "Test 38 FAILED: unaligned end " << b.first << "-" << b.second << std::endl; return 1; }
+        Read m; m.svtig_size = 6000; window_identity("1000=", 2500, &m); window_identity("1000=", 4000, &m);   // good windows in the middle only
+        b = trim_bounds(&m, 0.90);
+        if (b.first != 2000 || b.second != 5000) { std::cerr << "Test 38 FAILED: middle " << b.first << "-" << b.second << std::endl; return 1; }
+        Read z; z.svtig_size = 3000; window_identity(noisy, 0, &z);
+        b = trim_bounds(&z, 0.90);
+        if (b.first != 0 || b.second != 0) { std::cerr << "Test 38 FAILED: all noisy should leave nothing" << std::endl; return 1; }
+        Read n; n.svtig_size = 3000;
+        b = trim_bounds(&n, 0.90);
+        if (b.first != 0 || b.second != 3000) { std::cerr << "Test 38 FAILED: no record means no trimming" << std::endl; return 1; }
+        // deletions count as aligned bases of the window they fall in, insertions and mismatches as aligned but not matched
+        Read d; d.svtig_size = 1000; window_identity("400=100D100X100I400=", 0, &d);
+        if (d.win_aligned[0] != 1100 || d.win_match[0] != 800) { std::cerr << "Test 38 FAILED: op accounting " << d.win_match[0] << "/" << d.win_aligned[0] << std::endl; return 1; }
+        std::cout << "Test 38 passed: trim bounds" << std::endl;
+    }
+
+    // Test 39: apply_trim moves intervals, size and indels to the kept part; header and FASTA follow
+    {
+        Read r; r.svtig_size = 6000; r.ivals = {{0, 2500}, {2400, 6000}};
+        r.runs = {{500, 560, 60}, {3000, 3000, 40}, {5990, 6080, 90}};
+        apply_trim(&r, 2000, 6000);
+        if (!r.trimmed || r.svtig_size != 4000 || r.trim_start != 2000 || r.trim_end != 6000) { std::cerr << "Test 39 FAILED: sizes" << std::endl; return 1; }
+        if (r.ivals.size() != 2 || r.ivals[0] != std::make_pair(0, 500) || r.ivals[1] != std::make_pair(400, 4000)) { std::cerr << "Test 39 FAILED: intervals" << std::endl; return 1; }
+        if (r.max_indel != 90) { std::cerr << "Test 39 FAILED: max_indel " << r.max_indel << " (60 lies in the cut part)" << std::endl; return 1; }
+        graph_fit(&r);
+        if (r.cov < 0.999 || r.max_gap != 0) { std::cerr << "Test 39 FAILED: graph_fit after trim" << std::endl; return 1; }
+        Read w; w.svtig_size = 6000; w.ivals = {{0, 6000}}; w.runs = {{500, 560, 60}};
+        apply_trim(&w, 0, 6000);
+        if (w.trimmed || w.trim_end != 0 || w.svtig_size != 6000 || w.max_indel != 60) { std::cerr << "Test 39 FAILED: untrimmed read changed" << std::endl; return 1; }
+
+        const char* fa = "/tmp/test_svarp_trim.fa";
+        std::string seq; for (int i = 0; i < 6000; i++) seq += "ACGT"[(i / 7) % 4];
+        { std::ofstream f(fa); f << ">H1-s5_1\n" << seq << "\n"; }
+        faidx_t* fai = fai_load(fa);
+        if (!fai) { std::cerr << "Test 39 FAILED: fai_load" << std::endl; return 1; }
+        SVtig* sv = make_svtig("H1-s5_1"); sv->output = true; sv->map_ratio = 1.0; sv->remap_path = ">s5"; sv->trim_start = 2000; sv->trim_end = 6000;
+        std::string hdr = svtig_header(sv);
+        if (hdr.find(" trim=2000-6000") == std::string::npos) { std::cerr << "Test 39 FAILED: header " << hdr << std::endl; return 1; }
+        std::ostringstream out; write_final_svtigs_fasta(fai, sv, out);
+        std::string line, body; std::istringstream in(out.str()); std::getline(in, line);
+        while (std::getline(in, line)) body += line;
+        if (body != seq.substr(2000)) { std::cerr << "Test 39 FAILED: written " << body.size() << " bp" << std::endl; return 1; }
+        sv->trim_end = 0; std::ostringstream full; write_final_svtigs_fasta(fai, sv, full);
+        if (svtig_header(sv).find("trim=") != std::string::npos || full.str().size() < 6000) { std::cerr << "Test 39 FAILED: untrimmed output" << std::endl; return 1; }
+        fai_destroy(fai); std::remove(fa); std::remove("/tmp/test_svarp_trim.fa.fai"); delete sv;
+        std::cout << "Test 39 passed: trimming applied to output" << std::endl;
     }
 
     std::cout << "All remap tests passed" << std::endl;

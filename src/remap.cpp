@@ -167,6 +167,8 @@ std::string svtig_header(const SVtig* svtig)
 		    << " graph_explained=" << (svtig->graph_explained ? "yes" : "no");
 		if (!svtig->alt_nodes.empty())
 			out << " alt_nodes=" << svtig->alt_nodes;
+		if (svtig->trim_end > 0)
+			out << " trim=" << svtig->trim_start << "-" << svtig->trim_end;
 	}
 
 	return out.str();
@@ -182,7 +184,9 @@ int write_final_svtigs_fasta(faidx_t*& fasta_index, SVtig* svtig, std::ostream& 
 	hts_pos_t n = faidx_seq_len64(fasta_index, (svtig->name).c_str());
 	if (n <= 0)
 		return RETURN_ERROR;
-	char *tmp_seq = faidx_fetch_seq64(fasta_index, (svtig->name).c_str(), 0, n - 1, &loc_length);
+	hts_pos_t s = 0, e = n - 1;
+	if (svtig->trim_end > 0 && svtig->trim_end <= n) { s = svtig->trim_start; e = svtig->trim_end - 1; }
+	char *tmp_seq = faidx_fetch_seq64(fasta_index, (svtig->name).c_str(), s, e, &loc_length);
 	if (tmp_seq == nullptr)
 		return RETURN_ERROR;
 	std::string seq(tmp_seq);
@@ -231,6 +235,122 @@ int merged_indel(const std::string& cigar, int max_gap)
 bool cigar_has_sv(const std::string& cigar)
 {
 	return merged_indel(cigar) >= MINSVSIZE;
+}
+
+
+// Same merging as merged_indel, keeping the query span of every run so indels
+// can be attributed to the kept part of a trimmed svtig.
+void indel_runs(const std::string& cigar, int query_start, int max_gap, std::vector<IndelRun>& runs)
+{
+	std::vector<int> len;
+	std::vector<char> op;
+	int n = decompose_cigars(cigar, len, op);
+	int q = query_start, gap = 0;
+	char cur_op = 0;
+	IndelRun cur{0, 0, 0};
+	for (int i = 0; i < n; i++)
+	{
+		if (op[i] == INSERTION || op[i] == DELETION)
+		{
+			if (op[i] == cur_op && gap <= max_gap)
+				cur.len += len[i];
+			else
+			{
+				if (cur.len > 0) runs.push_back(cur);
+				cur_op = op[i];
+				cur = {q, q, len[i]};
+			}
+			gap = 0;
+			if (op[i] == INSERTION) q += len[i];
+			cur.qe = q;
+		}
+		else
+		{
+			gap += len[i];
+			q += len[i];
+		}
+	}
+	if (cur.len > 0) runs.push_back(cur);
+}
+
+
+// Identity of the svtig against the graph per TRIMWINDOW bp of its sequence,
+// summed over the counted records.
+void window_identity(const std::string& cigar, int query_start, Read* r)
+{
+	if (r->svtig_size <= 0) return;
+	size_t nw = (r->svtig_size + TRIMWINDOW - 1) / TRIMWINDOW;
+	if (r->win_match.size() != nw)
+	{
+		r->win_match.assign(nw, 0);
+		r->win_aligned.assign(nw, 0);
+	}
+	std::vector<int> len;
+	std::vector<char> op;
+	int n = decompose_cigars(cigar, len, op);
+	int q = query_start;
+	for (int i = 0; i < n; i++)
+	{
+		if (q < 0 || q >= r->svtig_size) break;
+		if (op[i] == DELETION)
+		{
+			r->win_aligned[q / TRIMWINDOW] += len[i];
+			continue;
+		}
+		int left = len[i];
+		while (left > 0 && q < r->svtig_size)
+		{
+			int w = q / TRIMWINDOW, step = std::min(left, (w + 1) * TRIMWINDOW - q);
+			r->win_aligned[w] += step;
+			if (op[i] != INSERTION && op[i] != MISMATCH) r->win_match[w] += step;
+			q += step;
+			left -= step;
+		}
+	}
+}
+
+
+// Kept part of the svtig: windows are dropped from both ends while fewer than
+// half their bases align or the aligned bases fall below min_identity.
+std::pair<int, int> trim_bounds(const Read* r, double min_identity)
+{
+	int nw = r->win_match.size();
+	if (nw == 0) return {0, r->svtig_size};
+	auto good = [&](int w) {
+		long need = std::min(TRIMWINDOW, r->svtig_size - w * TRIMWINDOW);
+		return r->win_aligned[w] * 2 >= need && r->win_match[w] >= min_identity * r->win_aligned[w];
+	};
+	int lo = 0;
+	while (lo < nw && !good(lo)) lo++;
+	int hi = nw - 1;
+	while (hi >= lo && !good(hi)) hi--;
+	if (lo > hi) return {0, 0};
+	return {lo * TRIMWINDOW, std::min(r->svtig_size, (hi + 1) * TRIMWINDOW)};
+}
+
+
+// Restrict the read to [lo, hi): coverage intervals, size and indels follow.
+void apply_trim(Read* r, int lo, int hi)
+{
+	bool trimmed = (lo > 0 || hi < r->svtig_size);
+	r->trimmed = trimmed;
+	r->trim_start = lo;
+	r->trim_end = trimmed ? hi : 0;
+	if (trimmed)
+	{
+		std::vector<std::pair<int, int>> kept;
+		for (auto& iv : r->ivals)
+		{
+			int s = std::max(iv.first, lo), e = std::min(iv.second, hi);
+			if (e > s) kept.push_back({s - lo, e - lo});
+		}
+		r->ivals = kept;
+		r->svtig_size = std::max(0, hi - lo);
+	}
+	r->max_indel = 0;
+	for (auto& run : r->runs)
+		if (run.qs < hi && std::max(run.qe, run.qs + 1) > lo && run.len > r->max_indel)
+			r->max_indel = run.len;
 }
 
 
@@ -358,6 +478,8 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 						tmp->max_gap = r->max_gap;
 						tmp->max_indel = r->max_indel;
 						tmp->graph_explained = r->explained;
+						tmp->trim_start = r->trim_start;
+						tmp->trim_end = r->trim_end;
 						final_svtigs.insert(std::pair<std::string, SVtig*>(r->rname, tmp));
 						extra_added++;
 					}
@@ -375,6 +497,8 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 						it_dup->second->max_gap = r->max_gap;
 						it_dup->second->max_indel = r->max_indel;
 						it_dup->second->graph_explained = r->explained;
+						it_dup->second->trim_start = r->trim_start;
+						it_dup->second->trim_end = r->trim_end;
 					}
 					else
 						std::cerr<<"Error - SVtig= "<<r->rname<<" not found...\n";
@@ -532,7 +656,9 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 		if (g.identity < 0 || g.identity >= params.min_identity)
 		{
 			r->ivals.push_back(std::make_pair(g.query_start, g.query_end));
-			if (indel > r->max_indel) r->max_indel = indel;
+			indel_runs(g.cigar, g.query_start, 20, r->runs);
+			indel_runs(wfa_cigar, g.query_start, 20, r->runs);
+			window_identity(g.cigar, g.query_start, r);
 		}
 	}
 
@@ -541,22 +667,26 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 	std::vector <Read*> tmp_svtig;
 	int unaligned = 0, too_short = 0, low_cov = 0, reference = 0;
 
+	auto trim_tag = [](const Read* r) { return r->trimmed ? "\ttrim=" + std::to_string(r->trim_start) + "-" + std::to_string(r->trim_start + r->svtig_size) : std::string(); };
 	for (auto &t: reads)
 	{
 		Read* r = t.second;
+		// noisy ends: windows aligning below trim_identity are cut before the gates
+		std::pair<int, int> keep = params.trim_identity > 0 ? trim_bounds(r, params.trim_identity) : std::make_pair(0, r->svtig_size);
+		apply_trim(r, keep.first, keep.second);
 		graph_fit(r);
-		if (r->svtig_size < params.min_svtig_len)
+		if (r->svtig_size <= 0 || r->svtig_size < params.min_svtig_len)
 		{
 			too_short++;
 			if (params.fp_remap_log.is_open())
-				params.fp_remap_log << t.first << "\tFILTERED\treason=short\tsize=" << r->svtig_size << "\n";
+				params.fp_remap_log << t.first << "\tFILTERED\treason=short\tsize=" << r->svtig_size << trim_tag(r) << "\n";
 			continue;
 		}
 		if (r->cov < params.min_graph_cov)
 		{
 			low_cov++;
 			if (params.fp_remap_log.is_open())
-				params.fp_remap_log << t.first << "\tFILTERED\treason=low_graph_cov\tcov=" << r->cov << "\tmax_gap=" << r->max_gap << "\tmax_indel=" << r->max_indel << "\tsize=" << r->svtig_size << "\n";
+				params.fp_remap_log << t.first << "\tFILTERED\treason=low_graph_cov\tcov=" << r->cov << "\tmax_gap=" << r->max_gap << "\tmax_indel=" << r->max_indel << "\tsize=" << r->svtig_size << trim_tag(r) << "\n";
 			continue;
 		}
 		r->explained = explained_by_graph(r);
@@ -564,7 +694,7 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 		{
 			reference++;
 			if (params.fp_remap_log.is_open())
-				params.fp_remap_log << t.first << "\tFILTERED\treason=reference\tcov=" << r->cov << "\tnode=" << r->node << "\tsize=" << r->svtig_size << "\n";
+				params.fp_remap_log << t.first << "\tFILTERED\treason=reference\tcov=" << r->cov << "\tnode=" << r->node << "\tsize=" << r->svtig_size << trim_tag(r) << "\n";
 			continue;
 		}
 		tmp_svtig.push_back(r);
@@ -589,9 +719,9 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 	if (params.fp_remap_log.is_open()) {
 		for (auto &r : tmp_svtig) {
 			if (r->duplicate)
-				params.fp_remap_log << r->rname << "\tDUPLICATE\tnode=" << r->node << "\tstart=" << r->start << "\tend=" << r->end << "\tsize=" << r->svtig_size << "\n";
+				params.fp_remap_log << r->rname << "\tDUPLICATE\tnode=" << r->node << "\tstart=" << r->start << "\tend=" << r->end << "\tsize=" << r->svtig_size << trim_tag(r) << "\n";
 			else
-				params.fp_remap_log << r->rname << "\tKEPT\tgraph_explained=" << (r->explained ? "yes" : "no") << "\tcov=" << r->cov << "\tmax_gap=" << r->max_gap << "\tmax_indel=" << r->max_indel << "\tnode=" << r->node << "\tsize=" << r->svtig_size << "\n";
+				params.fp_remap_log << r->rname << "\tKEPT\tgraph_explained=" << (r->explained ? "yes" : "no") << "\tcov=" << r->cov << "\tmax_gap=" << r->max_gap << "\tmax_indel=" << r->max_indel << "\tnode=" << r->node << "\tsize=" << r->svtig_size << trim_tag(r) << "\n";
 		}
 	}
 

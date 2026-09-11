@@ -121,6 +121,7 @@ build/svarp \
 	--min-graph-cov             : Fraction of an svtig covered by graph alignments (identity >= --min-identity) needed to keep it (default=0.90)
 	--min-svtig-len             : Shortest svtig written, in bp (default=5000)
 	--min-identity              : Remap records below this identity do not count as graph coverage (default=0.90)
+	--trim-identity             : Trim svtig ends whose 1 kb windows align to the graph below this identity; 0 disables (default=0.90)
 	--as                        : GraphAligner minimum alignment score for remapping (default=1000)
 	--pc                        : GraphAligner --precise-clipping for remapping (default: GraphAligner default)
 	--no-remap (-r)             : Skip remapping (not suggested)
@@ -140,7 +141,9 @@ Each header carries the cluster locus and read support plus the result of remapp
 
 `graph_cov` is the fraction of the svtig covered by graph alignments, `max_gap` the largest uncovered stretch and
 `max_indel` the largest indel inside an alignment (bp). `graph_explained=yes` means the graph already holds this
-sequence without an SV-sized (>=50 bp) difference; `no` marks an allele the graph lacks. Only svtigs anchored in the
+sequence without an SV-sized (>=50 bp) difference; `no` marks an allele the graph lacks. Contig ends that align to the
+graph below `--trim-identity` (per 1 kb window) are noisy consensus and are cut before these values are computed; a
+trimmed svtig carries `trim=<start>-<end>`, the kept part of the assembled contig. Only svtigs anchored in the
 graph (`graph_cov` >= `--min-graph-cov`) and at least `--min-svtig-len` long are written. Svtigs whose path is the
 plain reference (reference nodes only, walked in order without a skipped node or a turn, and no SV-sized difference)
 spell the reference sequence and carry no SV; they are dropped unless `--keep-reference-svtigs` is given. Every dropped

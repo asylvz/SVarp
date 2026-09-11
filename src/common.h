@@ -66,6 +66,7 @@ typedef struct _parameters
 	double min_graph_cov = 0.90; //svtig fraction covered by graph alignments needed to keep it
 	int min_svtig_len = 5000; //shortest svtig written (bp)
 	double min_identity = 0.90; //remap records below this identity do not count as coverage
+	double trim_identity = 0.90; //svtig ends whose 1 kb windows align below this identity are trimmed; 0 disables
 
 	//Read type: ont, hifi, clr
 	std::string read_type;
