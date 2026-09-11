@@ -38,6 +38,7 @@ typedef struct _read
 	int trim_start = 0; //kept part of the assembled sequence, query coordinates
 	int trim_end = 0; //0 when nothing was trimmed
 	bool trimmed = false;
+	double identity = -1; //matched over aligned bases of the kept part
 	std::vector<long> win_match, win_aligned; //per TRIMWINDOW bp, over counted records
 	std::vector<IndelRun> runs; //merged indels of counted records
 

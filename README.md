@@ -139,8 +139,9 @@ Each header carries the cluster locus and read support plus the result of remapp
 
 	>H1-s1065813_569 contig=CHM13#0#chr16 pos=4106 support=6 path=>s1065813>s1065814 graph_cov=0.998 max_gap=0 max_indel=12 graph_explained=yes
 
-`graph_cov` is the fraction of the svtig covered by graph alignments, `max_gap` the largest uncovered stretch and
-`max_indel` the largest indel inside an alignment (bp). `graph_explained=yes` means the graph already holds this
+`graph_cov` is the fraction of the svtig covered by graph alignments, `graph_identity` the identity of the written
+sequence against those alignments, `max_gap` the largest uncovered stretch and `max_indel` the largest indel inside an
+alignment (bp). `graph_explained=yes` means the graph already holds this
 sequence without an SV-sized (>=50 bp) difference; `no` marks an allele the graph lacks. Contig ends that align to the
 graph below `--trim-identity` (per 1 kb window) are noisy consensus and are cut before these values are computed; a
 trimmed svtig carries `trim=<start>-<end>`, the kept part of the assembled contig. Only svtigs anchored in the

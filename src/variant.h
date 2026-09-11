@@ -52,6 +52,7 @@ public:
 	//Non-reference nodes on remap_path, "first-last:contig" joined by ';'
 	std::string alt_nodes;
 	bool graph_explained = false; //the graph holds this sequence without an SV-sized difference
+	double graph_identity = -1; //identity of the written sequence against its graph alignments; -1 if unknown
 	int trim_start = 0; //kept part of the assembled sequence; trim_end 0 = whole contig
 	int trim_end = 0;
 };

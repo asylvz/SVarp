@@ -6,6 +6,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <cstdio>
 #include <htslib/faidx.h>
@@ -786,7 +787,12 @@ int main() {
         Read r; r.svtig_size = 6000; r.ivals = {{0, 2500}, {2400, 6000}};
         r.runs = {{500, 560, 60}, {3000, 3000, 40}, {5990, 6080, 90}};
         apply_trim(&r, 2000, 6000);
-        if (!r.trimmed || r.svtig_size != 4000 || r.trim_start != 2000 || r.trim_end != 6000) { std::cerr << "Test 39 FAILED: sizes" << std::endl; return 1; }
+        if (!r.trimmed || r.svtig_size != 4000 || r.trim_start != 2000 || r.trim_end != 6000 || r.identity != -1) { std::cerr << "Test 39 FAILED: sizes" << std::endl; return 1; }
+        std::string noisy2; for (int i = 0; i < 333; i++) noisy2 += "5=1X"; noisy2 += "2=";
+        Read q; q.svtig_size = 6000; window_identity(noisy2 + "4000=", 0, &q); apply_trim(&q, 2000, 6000);
+        if (q.identity < 0.9999) { std::cerr << "Test 39 FAILED: identity of the kept part " << q.identity << std::endl; return 1; }
+        Read q2; q2.svtig_size = 6000; window_identity(noisy2 + "4000=", 0, &q2); apply_trim(&q2, 0, 6000);
+        if (std::abs(q2.identity - 5667.0 / 6000) > 1e-6) { std::cerr << "Test 39 FAILED: identity of the whole contig " << q2.identity << std::endl; return 1; }
         if (r.ivals.size() != 2 || r.ivals[0] != std::make_pair(0, 500) || r.ivals[1] != std::make_pair(400, 4000)) { std::cerr << "Test 39 FAILED: intervals" << std::endl; return 1; }
         if (r.max_indel != 90) { std::cerr << "Test 39 FAILED: max_indel " << r.max_indel << " (60 lies in the cut part)" << std::endl; return 1; }
         graph_fit(&r);
@@ -800,9 +806,9 @@ int main() {
         { std::ofstream f(fa); f << ">H1-s5_1\n" << seq << "\n"; }
         faidx_t* fai = fai_load(fa);
         if (!fai) { std::cerr << "Test 39 FAILED: fai_load" << std::endl; return 1; }
-        SVtig* sv = make_svtig("H1-s5_1"); sv->output = true; sv->map_ratio = 1.0; sv->remap_path = ">s5"; sv->trim_start = 2000; sv->trim_end = 6000;
+        SVtig* sv = make_svtig("H1-s5_1"); sv->output = true; sv->map_ratio = 1.0; sv->remap_path = ">s5"; sv->trim_start = 2000; sv->trim_end = 6000; sv->graph_identity = 0.975;
         std::string hdr = svtig_header(sv);
-        if (hdr.find(" trim=2000-6000") == std::string::npos) { std::cerr << "Test 39 FAILED: header " << hdr << std::endl; return 1; }
+        if (hdr.find(" trim=2000-6000") == std::string::npos || hdr.find(" graph_cov=1 graph_identity=0.975 max_gap=") == std::string::npos) { std::cerr << "Test 39 FAILED: header " << hdr << std::endl; return 1; }
         std::ostringstream out; write_final_svtigs_fasta(fai, sv, out);
         std::string line, body; std::istringstream in(out.str()); std::getline(in, line);
         while (std::getline(in, line)) body += line;

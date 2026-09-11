@@ -163,7 +163,10 @@ std::string svtig_header(const SVtig* svtig)
 
 	if (svtig->map_ratio >= 0)
 	{
-		out << " path=" << svtig->remap_path << " graph_cov=" << svtig->map_ratio << " max_gap=" << svtig->max_gap << " max_indel=" << svtig->max_indel
+		out << " path=" << svtig->remap_path << " graph_cov=" << svtig->map_ratio;
+		if (svtig->graph_identity >= 0)
+			out << " graph_identity=" << svtig->graph_identity;
+		out << " max_gap=" << svtig->max_gap << " max_indel=" << svtig->max_indel
 		    << " graph_explained=" << (svtig->graph_explained ? "yes" : "no");
 		if (!svtig->alt_nodes.empty())
 			out << " alt_nodes=" << svtig->alt_nodes;
@@ -347,6 +350,13 @@ void apply_trim(Read* r, int lo, int hi)
 		r->ivals = kept;
 		r->svtig_size = std::max(0, hi - lo);
 	}
+	long m = 0, al = 0;
+	for (int w = lo / TRIMWINDOW; w < (int) r->win_match.size() && w * TRIMWINDOW < hi; w++)
+	{
+		m += r->win_match[w];
+		al += r->win_aligned[w];
+	}
+	r->identity = al > 0 ? static_cast<double>(m) / al : -1;
 	r->max_indel = 0;
 	for (auto& run : r->runs)
 		if (run.qs < hi && std::max(run.qe, run.qs + 1) > lo && run.len > r->max_indel)
@@ -478,6 +488,7 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 						tmp->max_gap = r->max_gap;
 						tmp->max_indel = r->max_indel;
 						tmp->graph_explained = r->explained;
+						tmp->graph_identity = r->identity;
 						tmp->trim_start = r->trim_start;
 						tmp->trim_end = r->trim_end;
 						final_svtigs.insert(std::pair<std::string, SVtig*>(r->rname, tmp));
@@ -497,6 +508,7 @@ std::pair<int, int> remove_duplicates(std::vector <Read*>& tmp_svtig, std::map <
 						it_dup->second->max_gap = r->max_gap;
 						it_dup->second->max_indel = r->max_indel;
 						it_dup->second->graph_explained = r->explained;
+						it_dup->second->graph_identity = r->identity;
 						it_dup->second->trim_start = r->trim_start;
 						it_dup->second->trim_end = r->trim_end;
 					}
@@ -721,7 +733,7 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 			if (r->duplicate)
 				params.fp_remap_log << r->rname << "\tDUPLICATE\tnode=" << r->node << "\tstart=" << r->start << "\tend=" << r->end << "\tsize=" << r->svtig_size << trim_tag(r) << "\n";
 			else
-				params.fp_remap_log << r->rname << "\tKEPT\tgraph_explained=" << (r->explained ? "yes" : "no") << "\tcov=" << r->cov << "\tmax_gap=" << r->max_gap << "\tmax_indel=" << r->max_indel << "\tnode=" << r->node << "\tsize=" << r->svtig_size << trim_tag(r) << "\n";
+				params.fp_remap_log << r->rname << "\tKEPT\tgraph_explained=" << (r->explained ? "yes" : "no") << "\tcov=" << r->cov << "\tidentity=" << r->identity << "\tmax_gap=" << r->max_gap << "\tmax_indel=" << r->max_indel << "\tnode=" << r->node << "\tsize=" << r->svtig_size << trim_tag(r) << "\n";
 		}
 	}
 
