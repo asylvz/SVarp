@@ -135,21 +135,31 @@ build/svarp \
 ## Output
 
 Svtigs are written per haplotype (`<sample>_svtigs_H1.fa`, `_H2.fa`; `_untagged.fa` with `--keep-untagged`).
-Each header carries the cluster locus and read support plus the result of remapping the svtig onto the graph:
+FASTA has no file header, so each record header carries the cluster locus, the read support and the result of
+remapping the svtig onto the graph:
 
-	>H1-s1065813_569 contig=CHM13#0#chr16 pos=4106 support=6 path=>s1065813>s1065814 graph_cov=0.998 max_gap=0 max_indel=12 graph_explained=yes
+	>H1-s1065813_569 contig=CHM13#0#chr16 pos=4106 support=6 path=>s1065813>s1065814 graph_cov=0.998 graph_identity=0.981 max_gap=0 max_indel=12 graph_explained=yes trim=1000-14532
 
-`graph_cov` is the fraction of the svtig covered by graph alignments, `graph_identity` the identity of the written
-sequence against those alignments, `max_gap` the largest uncovered stretch and `max_indel` the largest indel inside an
-alignment (bp). `graph_explained=yes` means the graph already holds this
-sequence without an SV-sized (>=50 bp) difference; `no` marks an allele the graph lacks. Contig ends that align to the
-graph below `--trim-identity` (per 1 kb window) are noisy consensus and are cut before these values are computed; a
-trimmed svtig carries `trim=<start>-<end>`, the kept part of the assembled contig. Only svtigs anchored in the
-graph (`graph_cov` >= `--min-graph-cov`) and at least `--min-svtig-len` long are written. Svtigs whose path is the
-plain reference (reference nodes only, walked in order without a skipped node or a turn, and no SV-sized difference)
-spell the reference sequence and carry no SV; they are dropped unless `--keep-reference-svtigs` is given. Every dropped
-svtig is listed with its reason (`short`, `low_graph_cov`, `reference`, `no_alignment`, `DUPLICATE`) in
-`<sample>_remap.log`, every cluster in `<sample>_assembly.log`.
+| Field | Meaning |
+|---|---|
+| `contig`, `pos` | graph contig and position of the read cluster the svtig was assembled from |
+| `support` | reads in the cluster |
+| `path` | graph path of the representative GraphAligner record |
+| `graph_cov` | fraction of the svtig covered by graph alignments with identity >= `--min-identity` |
+| `graph_identity` | matched over aligned bases of the written sequence against those alignments |
+| `max_gap` | longest stretch inside the svtig that no alignment covers (bp); an insertion the graph lacks appears here |
+| `max_indel` | longest insertion or deletion inside an alignment (bp), pieces separated by <= 20 matched bases merged |
+| `graph_explained` | `yes`: `max_gap` and `max_indel` both < 50 bp, the graph already holds this sequence; `no`: an allele the graph lacks |
+| `alt_nodes` | non-reference nodes on the path, `first-last:contig` joined by `;`; absent when the path is reference only |
+| `trim` | kept part of the assembled contig (`start-end`, 0-based, end exclusive), present when noisy ends were cut |
+
+Contig ends whose 1 kb windows align to the graph below `--trim-identity` are noisy consensus; they are cut before
+the values above are computed. Only svtigs anchored in the graph (`graph_cov` >= `--min-graph-cov`) and at least
+`--min-svtig-len` long after trimming are written. Svtigs whose path is the plain reference (reference nodes only,
+walked in order without a skipped node or a turn, and no SV-sized difference) spell the reference sequence and carry
+no SV; they are dropped unless `--keep-reference-svtigs` is given. Every dropped svtig is listed with its reason
+(`short`, `low_graph_cov`, `reference`, `no_alignment`, `DUPLICATE`) in `<sample>_remap.log`, every cluster in
+`<sample>_assembly.log`.
 
 ## Citation
 
