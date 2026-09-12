@@ -149,7 +149,7 @@ remapping the svtig onto the graph:
 | `graph_identity` | matched over aligned bases of the written sequence against those alignments |
 | `max_gap` | longest stretch inside the svtig that no alignment covers (bp); an insertion the graph lacks appears here |
 | `max_indel` | longest insertion or deletion inside an alignment (bp), pieces separated by <= 20 matched bases merged |
-| `graph_explained` | `yes`: `max_gap` and `max_indel` both < 50 bp, the graph already holds this sequence; `no`: an allele the graph lacks |
+| `graph_explained` | `yes`: `max_gap` and `max_indel` both < 50 bp, a graph path reproduces the svtig; `no`: no aligned path does, so the allele may be absent from the graph or lie on a path the aligner did not take |
 | `alt_nodes` | non-reference nodes on the path, `first-last:contig` joined by `;`; absent when the path is reference only |
 | `trim` | kept part of the assembled contig (`start-end`, 0-based, end exclusive), present when noisy ends were cut |
 
