@@ -772,8 +772,12 @@ int write_final_svtigs(faidx_t*& fasta_index, std::map <std::string, SVtig*>& fi
 			file_name = itr->second->name;
 			std::string hap = haplotype_of(file_name);
 			if ((haplotype != "None" && hap == haplotype) || (haplotype == "None" && hap != "H1" && hap != "H2"))
+			{
 				if (write_final_svtigs_fasta(fasta_index, itr->second, fp_write) == RETURN_SUCCESS)
 					cnt++;
+				else
+					std::cerr << "[warning] " << file_name << " kept but not found in the svtig FASTA, not written\n";
+			}
 
     		//params.fp_logs << file_name <<" contig="<<itr->second->contig<<" pos="<<itr->second->pos<<" support="<<itr->second->reads.size() << "\n";
 			//for (auto r : itr->second->reads)
@@ -840,6 +844,10 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 	std::cout<<"\nFiltering svtigs"<<std::endl;
 	std::string svtigs_tmp_path = params.log_path + params.sample_name + "_svtigs_tmp.fa";
 
+	// svtigs_tmp.fa is rewritten every run; an index left behind by an earlier
+	// run in the same directory would point into the wrong file
+	if (fai_build(svtigs_tmp_path.c_str()) != 0)
+		error("Error indexing the svtig FASTA for remapping");
 	faidx_t* fasta_index = fai_load(svtigs_tmp_path.c_str());
 	if (!fasta_index)
 		error("Error loading FASTA index for remapping: file not found or corrupted");
