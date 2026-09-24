@@ -17,6 +17,7 @@ Svtig output (Step 5)
 - Svtigs are remapped with GraphAligner and kept when anchored in the graph (`--min-graph-cov`, records with identity >= `--min-identity`) and at least `--min-svtig-len` long.
 - Noisy contig ends, 1 kb windows aligning below `--trim-identity`, are trimmed before these gates (`trim=` in the header).
 - `graph_explained=yes|no` records whether a graph path reproduces the svtig within 50 bp (`max_gap`, `max_indel`); it does not filter.
+- A deletion or duplication that GraphAligner splits into two records is read from the jump of the path coordinates between them and counts towards `max_indel`.
 - Svtigs whose path is the plain reference are dropped (`--keep-reference-svtigs` keeps them).
 - Headers carry `path`, `graph_cov`, `graph_identity`, `max_gap`, `max_indel`, `graph_explained`, `alt_nodes` and `trim`.
 - `--no-remap` writes every assembled contig.

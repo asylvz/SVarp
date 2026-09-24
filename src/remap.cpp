@@ -364,6 +364,67 @@ void apply_trim(Read* r, int lo, int hi)
 }
 
 
+// Nodes at both ends of a record and the offset of each end inside its node,
+// measured along the path direction. False when a node is unknown or the
+// path coordinates do not fit the path.
+bool path_ends(const std::string& path, int path_start, int path_end, std::map<std::string, gfaNode*>& gfa, RecordEnds& e)
+{
+	if (path.empty() || (path[0] != '>' && path[0] != '<') || path_start < 0 || path_end <= path_start)
+		return false;
+	long cum = 0;
+	size_t p = 0;
+	bool have_first = false;
+	while (p < path.size())
+	{
+		char strand = path[p++];
+		size_t q = p;
+		while (q < path.size() && path[q] != '>' && path[q] != '<') ++q;
+		auto it = gfa.find(path.substr(p, q - p));
+		p = q;
+		if (it == gfa.end())
+			return false;
+		const gfaNode* n = it->second;
+		if (!have_first && path_start < cum + n->len)
+		{
+			e.first = n->name; e.first_off = path_start - cum; e.first_dir = strand;
+			have_first = true;
+		}
+		if (path_end <= cum + n->len)
+		{
+			e.last = n->name; e.last_off = path_end - cum; e.last_dir = strand;
+			return have_first;
+		}
+		cum += n->len;
+	}
+	return false;
+}
+// Position on the node's contig of an offset taken along the oriented node
+static long contig_pos(const gfaNode* n, char dir, int off)
+{
+	return n->offset + (dir == '>' ? off : n->len - off);
+}
+// A deletion or duplication that the aligner splits into two records leaves the
+// query contiguous and both CIGARs clean; it shows only as a jump of the path
+// coordinates between the records. Jumps of SV size are added as indel runs.
+void hidden_indels(Read* r, std::map<std::string, gfaNode*>& gfa)
+{
+	std::sort(r->recs.begin(), r->recs.end(), [](const RecordEnds& a, const RecordEnds& b) { return a.qs < b.qs; });
+	for (size_t i = 1; i < r->recs.size(); i++)
+	{
+		const RecordEnds& a = r->recs[i - 1];
+		const RecordEnds& b = r->recs[i];
+		if (b.qe <= a.qe || a.last_dir != b.first_dir)
+			continue;
+		auto na = gfa.find(a.last), nb = gfa.find(b.first);
+		if (na == gfa.end() || nb == gfa.end() || na->second->contig.empty() || na->second->contig != nb->second->contig)
+			continue;
+		long ca = contig_pos(na->second, a.last_dir, a.last_off), cb = contig_pos(nb->second, b.first_dir, b.first_off);
+		long jump = (a.last_dir == '>') ? cb - ca : ca - cb;
+		long hidden = jump - (b.qs - a.qe);
+		if (hidden >= MINSVSIZE || hidden <= -MINSVSIZE)
+			r->runs.push_back({a.qe, std::max(a.qe, b.qs), static_cast<int>(hidden < 0 ? -hidden : hidden)});
+	}
+}
 // Coverage of the svtig by its counted graph alignments: union of query
 // intervals, largest uncovered stretch between them, largest indel inside them.
 void graph_fit(Read* r)
@@ -671,6 +732,9 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 			indel_runs(g.cigar, g.query_start, 20, r->runs);
 			indel_runs(wfa_cigar, g.query_start, 20, r->runs);
 			window_identity(g.cigar, g.query_start, r);
+			RecordEnds e{g.query_start, g.query_end, "", 0, 0, "", 0, 0};
+			if (g.is_primary && !LowMQ && path_ends(g.path, g.path_start, g.path_end, gfa, e))
+				r->recs.push_back(e);
 		}
 	}
 
@@ -684,6 +748,7 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 	{
 		Read* r = t.second;
 		// noisy ends: windows aligning below trim_identity are cut before the gates
+		hidden_indels(r, gfa);
 		std::pair<int, int> keep = params.trim_identity > 0 ? trim_bounds(r, params.trim_identity) : std::make_pair(0, r->svtig_size);
 		apply_trim(r, keep.first, keep.second);
 		graph_fit(r);

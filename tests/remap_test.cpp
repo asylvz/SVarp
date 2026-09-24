@@ -819,6 +819,48 @@ int main() {
         std::cout << "Test 39 passed: trimming applied to output" << std::endl;
     }
 
+    // Test 40: hidden_indels - a deletion or duplication split into two records shows as a jump of the path coordinates
+    {
+        std::map<std::string, gfaNode*> gfa;
+        auto add = [&](const std::string& n, int len, const std::string& contig, int off, int rank) {
+            gfa[n] = new gfaNode(n, std::string(len, 'A'), len, contig, off); gfa[n]->rank = rank; };
+        add("r1", 1000, "chr1", 0, 0); add("r2", 1000, "chr1", 1000, 0); add("c1", 1000, "chr2", 0, 0); add("u1", 1000, "", 0, -1);
+        RecordEnds e{0, 0, "", 0, 0, "", 0, 0};
+        if (!path_ends(">r1>r2", 1100, 1900, gfa, e) || e.first != "r2" || e.first_off != 100 || e.last != "r2" || e.last_off != 900 || e.first_dir != '>') { std::cerr << "Test 40 FAILED: path_ends inside second node" << std::endl; return 1; }
+        if (!path_ends(">r1>r2", 600, 1900, gfa, e) || e.first != "r1" || e.first_off != 600 || e.last != "r2" || e.last_off != 900) { std::cerr << "Test 40 FAILED: path_ends across nodes" << std::endl; return 1; }
+        if (path_ends(">zz>r1", 0, 500, gfa, e) || path_ends(">r1", 0, 1500, gfa, e) || path_ends("chr1:1-500", 0, 100, gfa, e)) { std::cerr << "Test 40 FAILED: path_ends should reject unknown node, overrun and stable names" << std::endl; return 1; }
+        auto rec = [&](int qs, int qe, const char* path, int ps, int pe) { RecordEnds x{qs, qe, "", 0, 0, "", 0, 0}; if (!path_ends(path, ps, pe, gfa, x)) { std::cerr << "Test 40 FAILED: path_ends " << path << std::endl; exit(1); } return x; };
+        // forward: record 1 ends at chr1:600, record 2 starts at chr1:1100, query contiguous -> 500 bp deletion
+        Read del; del.svtig_size = 1400; del.recs = {rec(0, 600, ">r1", 0, 600), rec(600, 1400, ">r1>r2", 1100, 1900)};
+        hidden_indels(&del, gfa);
+        if (del.runs.size() != 1 || del.runs[0].len != 500 || del.runs[0].qs != 600) { std::cerr << "Test 40 FAILED: forward deletion between records" << std::endl; return 1; }
+        apply_trim(&del, 0, 1400);
+        if (del.max_indel != 500 || explained_by_graph(&del)) { std::cerr << "Test 40 FAILED: hidden deletion should leave the svtig unexplained" << std::endl; return 1; }
+        // reverse strand: <r2 then <r2<r1, ends at chr1:1600, next starts at chr1:1100 -> 500 bp deletion
+        Read rev; rev.svtig_size = 1000; rev.recs = {rec(0, 400, "<r2", 0, 400), rec(400, 1000, "<r2<r1", 900, 1500)};
+        hidden_indels(&rev, gfa);
+        if (rev.runs.size() != 1 || rev.runs[0].len != 500) { std::cerr << "Test 40 FAILED: reverse-strand deletion between records" << std::endl; return 1; }
+        // records overlapping on the query by 300 bp with a path jump of 800 bp -> 1100 bp
+        Read ov; ov.svtig_size = 1400; ov.recs = {rec(0, 600, ">r1", 0, 600), rec(300, 1400, ">r1>r2", 1400, 2000)};
+        hidden_indels(&ov, gfa);
+        if (ov.runs.size() != 1 || ov.runs[0].len != 1100 || ov.runs[0].qs != 600 || ov.runs[0].qe != 600) { std::cerr << "Test 40 FAILED: overlap added to the jump" << std::endl; return 1; }
+        // duplication: query advances while the path goes back 100 bp
+        Read dup; dup.svtig_size = 1200; dup.recs = {rec(0, 600, ">r1", 0, 600), rec(600, 1200, ">r1", 500, 1000)};
+        hidden_indels(&dup, gfa);
+        if (dup.runs.size() != 1 || dup.runs[0].len != 100) { std::cerr << "Test 40 FAILED: duplication between records, got " << (dup.runs.empty() ? -1 : dup.runs[0].len) << std::endl; return 1; }
+        // contiguous records, a contained record, a strand change, another contig and a node without SN leave no run
+        Read none; none.svtig_size = 2000;
+        none.recs = {rec(0, 600, ">r1", 0, 600), rec(600, 1200, ">r1>r2", 600, 1200), rec(700, 900, ">r2", 100, 300), rec(1200, 1500, "<r2", 0, 300), rec(1500, 1800, ">c1", 0, 300), rec(1800, 2000, ">u1", 0, 200)};
+        hidden_indels(&none, gfa);
+        if (!none.runs.empty()) { std::cerr << "Test 40 FAILED: " << none.runs.size() << " spurious runs" << std::endl; return 1; }
+        // a jump below SV size is ignored
+        Read small; small.svtig_size = 1200; small.recs = {rec(0, 600, ">r1", 0, 600), rec(600, 1200, ">r1", 640, 1000)};
+        hidden_indels(&small, gfa);
+        if (!small.runs.empty()) { std::cerr << "Test 40 FAILED: 40 bp jump counted" << std::endl; return 1; }
+        for (auto& kv : gfa) delete kv.second;
+        std::cout << "Test 40 passed: indels hidden between split records" << std::endl;
+    }
+
     std::cout << "All remap tests passed" << std::endl;
     return 0;
 }

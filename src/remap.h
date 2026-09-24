@@ -14,6 +14,8 @@ struct faidx_t;
 #define TRIMWINDOW 1000 //svtig window (bp) for the end-trimming identity check
 
 struct IndelRun { int qs; int qe; int len; }; //merged indel and the query span it occupies
+//Ends of one record: query span and the node and offset (path direction) where it starts and stops
+struct RecordEnds { int qs; int qe; std::string first; int first_off; char first_dir; std::string last; int last_off; char last_dir; };
 
 
 typedef struct _read
@@ -41,6 +43,7 @@ typedef struct _read
 	double identity = -1; //matched over aligned bases of the kept part
 	std::vector<long> win_match, win_aligned; //per TRIMWINDOW bp, over counted records
 	std::vector<IndelRun> runs; //merged indels of counted records
+	std::vector<RecordEnds> recs; //ends of the good records, for jumps between them
 
 }Read;
 
@@ -48,6 +51,8 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 std::pair<int, int> remove_duplicates(std::vector<Read*>& tmp_svtig, std::map<std::string, SVtig*>& final_svtigs, int& extra_added);
 int merged_indel(const std::string& cigar, int max_gap = 20);
 void indel_runs(const std::string& cigar, int query_start, int max_gap, std::vector<IndelRun>& runs);
+bool path_ends(const std::string& path, int path_start, int path_end, std::map<std::string, gfaNode*>& gfa, RecordEnds& e);
+void hidden_indels(Read* r, std::map<std::string, gfaNode*>& gfa);
 void window_identity(const std::string& cigar, int query_start, Read* r);
 std::pair<int, int> trim_bounds(const Read* r, double min_identity);
 void apply_trim(Read* r, int lo, int hi);
