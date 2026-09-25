@@ -151,11 +151,12 @@ remapping the svtig onto the graph:
 | `max_indel` | longest insertion or deletion inside an alignment (bp), pieces separated by <= 20 matched bases merged |
 | `graph_explained` | `yes`: `max_gap` and `max_indel` both < 50 bp, a graph path reproduces the svtig; `no`: no aligned path does, so the allele may be absent from the graph or lie on a path the aligner did not take |
 | `alt_nodes` | non-reference nodes on the path, `first-last:contig` joined by `;`; absent when the path is reference only |
-| `trim` | kept part of the assembled contig (`start-end`, 0-based, end exclusive), present when noisy ends were cut |
+| `trim` | graph-aligned core of the contig (`start-end`, 0-based, end exclusive) on which the gates were judged; the sequence is written in full |
 
-Contig ends whose 1 kb windows align to the graph below `--trim-identity` are noisy consensus; they are cut before
-the values above are computed. Only svtigs anchored in the graph (`graph_cov` >= `--min-graph-cov`) and at least
-`--min-svtig-len` long after trimming are written. Svtigs whose path is the plain reference (reference nodes only,
+Contig ends whose 1 kb windows align to the graph below `--trim-identity` are left out when the values above are
+computed, but the contig is written in full: an end the graph does not align often carries the very sequence the
+graph lacks. Only svtigs anchored in the graph (`graph_cov` >= `--min-graph-cov`) and at least `--min-svtig-len`
+long within the aligned core are written. Svtigs aligned end to end along the plain reference (reference nodes only,
 walked in order without a skipped node or a turn, and no SV-sized difference) spell the reference sequence and carry
 no SV; they are dropped unless `--keep-reference-svtigs` is given. Every dropped svtig is listed with its reason
 (`short`, `low_graph_cov`, `reference`, `no_alignment`, `DUPLICATE`) in `<sample>_remap.log`, every cluster in

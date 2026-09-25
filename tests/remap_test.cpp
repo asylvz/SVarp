@@ -782,7 +782,7 @@ int main() {
         std::cout << "Test 38 passed: trim bounds" << std::endl;
     }
 
-    // Test 39: apply_trim moves intervals, size and indels to the kept part; header and FASTA follow
+    // Test 39: apply_trim moves intervals, size and indels to the kept part; the header records it, the FASTA stays whole
     {
         Read r; r.svtig_size = 6000; r.ivals = {{0, 2500}, {2400, 6000}};
         r.runs = {{500, 560, 60}, {3000, 3000, 40}, {5990, 6080, 90}};
@@ -812,11 +812,11 @@ int main() {
         std::ostringstream out; write_final_svtigs_fasta(fai, sv, out);
         std::string line, body; std::istringstream in(out.str()); std::getline(in, line);
         while (std::getline(in, line)) body += line;
-        if (body != seq.substr(2000)) { std::cerr << "Test 39 FAILED: written " << body.size() << " bp" << std::endl; return 1; }
+        if (body != seq) { std::cerr << "Test 39 FAILED: written " << body.size() << " bp, whole contig expected" << std::endl; return 1; }
         sv->trim_end = 0; std::ostringstream full; write_final_svtigs_fasta(fai, sv, full);
         if (svtig_header(sv).find("trim=") != std::string::npos || full.str().size() < 6000) { std::cerr << "Test 39 FAILED: untrimmed output" << std::endl; return 1; }
         fai_destroy(fai); std::remove(fa); std::remove("/tmp/test_svarp_trim.fa.fai"); delete sv;
-        std::cout << "Test 39 passed: trimming applied to output" << std::endl;
+        std::cout << "Test 39 passed: trim recorded in the header, whole contig written" << std::endl;
     }
 
     // Test 40: hidden_indels - a deletion or duplication split into two records shows as a jump of the path coordinates

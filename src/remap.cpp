@@ -187,9 +187,8 @@ int write_final_svtigs_fasta(faidx_t*& fasta_index, SVtig* svtig, std::ostream& 
 	hts_pos_t n = faidx_seq_len64(fasta_index, (svtig->name).c_str());
 	if (n <= 0)
 		return RETURN_ERROR;
-	hts_pos_t s = 0, e = n - 1;
-	if (svtig->trim_end > 0 && svtig->trim_end <= n) { s = svtig->trim_start; e = svtig->trim_end - 1; }
-	char *tmp_seq = faidx_fetch_seq64(fasta_index, (svtig->name).c_str(), s, e, &loc_length);
+	// the whole contig is written; trim= in the header marks the graph-aligned core the gates were judged on
+	char *tmp_seq = faidx_fetch_seq64(fasta_index, (svtig->name).c_str(), 0, n - 1, &loc_length);
 	if (tmp_seq == nullptr)
 		return RETURN_ERROR;
 	std::string seq(tmp_seq);
@@ -767,7 +766,8 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 			continue;
 		}
 		r->explained = explained_by_graph(r);
-		if (r->explained && !params.keep_reference && reference_colinear(r->node, gfa))
+		// a trimmed contig has an end the graph did not align, which may hold the variant
+		if (r->explained && !r->trimmed && !params.keep_reference && reference_colinear(r->node, gfa))
 		{
 			reference++;
 			if (params.fp_remap_log.is_open())
