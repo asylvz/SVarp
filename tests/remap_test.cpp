@@ -682,7 +682,7 @@ int main() {
         int ok = 1;
         for (const char* hap : {"H1", "H2", "None"}) {
             std::string out = std::string("/tmp/test_svarp_final_") + hap + ".fa";
-            int n = write_final_svtigs(fai, svtigs, out, hap);
+            int n = write_final_svtigs(fai, svtigs, out, hap, false);
             std::ifstream in(out); std::string line; std::getline(in, line);
             if (n != 1 || line.rfind(std::string(">") + hap + "-", 0) != 0) { std::cerr << "Test 34 FAILED: " << hap << " file got " << n << " svtigs, first " << line << std::endl; ok = 0; }
             std::remove(out.c_str());
@@ -782,7 +782,7 @@ int main() {
         std::cout << "Test 38 passed: trim bounds" << std::endl;
     }
 
-    // Test 39: apply_trim moves intervals, size and indels to the kept part; the header records it, the FASTA stays whole
+    // Test 39: apply_trim moves intervals, size and indels to the kept part; header and FASTA follow, --write-full keeps the whole contig
     {
         Read r; r.svtig_size = 6000; r.ivals = {{0, 2500}, {2400, 6000}};
         r.runs = {{500, 560, 60}, {3000, 3000, 40}, {5990, 6080, 90}};
@@ -809,14 +809,17 @@ int main() {
         SVtig* sv = make_svtig("H1-s5_1"); sv->output = true; sv->map_ratio = 1.0; sv->remap_path = ">s5"; sv->trim_start = 2000; sv->trim_end = 6000; sv->graph_identity = 0.975;
         std::string hdr = svtig_header(sv);
         if (hdr.find(" trim=2000-6000") == std::string::npos || hdr.find(" graph_cov=1 graph_identity=0.975 max_gap=") == std::string::npos) { std::cerr << "Test 39 FAILED: header " << hdr << std::endl; return 1; }
-        std::ostringstream out; write_final_svtigs_fasta(fai, sv, out);
+        std::ostringstream out; write_final_svtigs_fasta(fai, sv, out, false);
         std::string line, body; std::istringstream in(out.str()); std::getline(in, line);
         while (std::getline(in, line)) body += line;
-        if (body != seq) { std::cerr << "Test 39 FAILED: written " << body.size() << " bp, whole contig expected" << std::endl; return 1; }
-        sv->trim_end = 0; std::ostringstream full; write_final_svtigs_fasta(fai, sv, full);
+        if (body != seq.substr(2000)) { std::cerr << "Test 39 FAILED: written " << body.size() << " bp, trimmed core expected" << std::endl; return 1; }
+        std::ostringstream whole; write_final_svtigs_fasta(fai, sv, whole, true); std::string wl, wb; std::istringstream win(whole.str()); std::getline(win, wl);
+        while (std::getline(win, wl)) wb += wl;
+        if (wb != seq) { std::cerr << "Test 39 FAILED: --write-full should write the whole contig" << std::endl; return 1; }
+        sv->trim_end = 0; std::ostringstream full; write_final_svtigs_fasta(fai, sv, full, false);
         if (svtig_header(sv).find("trim=") != std::string::npos || full.str().size() < 6000) { std::cerr << "Test 39 FAILED: untrimmed output" << std::endl; return 1; }
         fai_destroy(fai); std::remove(fa); std::remove("/tmp/test_svarp_trim.fa.fai"); delete sv;
-        std::cout << "Test 39 passed: trim recorded in the header, whole contig written" << std::endl;
+        std::cout << "Test 39 passed: trimmed core written, whole contig with --write-full" << std::endl;
     }
 
     // Test 40: hidden_indels - a deletion or duplication split into two records shows as a jump of the path coordinates

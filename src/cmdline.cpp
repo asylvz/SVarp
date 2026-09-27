@@ -41,10 +41,11 @@ int parse_command_line(int argc, char** argv, parameters& params)
 		{"write-unmapped" , no_argument, NULL, 'x'},
 		{"keep-remap" , no_argument, NULL, 'z'},
 		{"keep-reference-svtigs" , no_argument, NULL, 'R'},
+		{"write-full" , no_argument, NULL, 'F'},
 		{NULL, 0, NULL, 0}
 	};
 
-	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jk:l:mn:o:p:q:rs:t:uvw:xy:zRT:", long_options, &index)) != -1)
+	while((o = getopt_long( argc, argv, "a:b:c:d:e:f:g:hi:jk:l:mn:o:p:q:rs:t:uvw:xy:zRT:F", long_options, &index)) != -1)
 	{
 		switch(o)
 		{
@@ -86,6 +87,9 @@ int parse_command_line(int argc, char** argv, parameters& params)
 				break;
 			case 'R':
 				params.keep_reference = true;
+				break;
+			case 'F':
+				params.write_full = true;
 				break;
 			case 'm':
 				params.asm_mode = true;
@@ -525,6 +529,7 @@ void init_logs(parameters& params)
 		params.fp_logs << "  Threads: " << params.threads << "\n";
 		params.fp_logs << "  Keep remap files: " << (params.keep_remap ? "yes" : "no") << "\n";
 		params.fp_logs << "  Reference-identical svtigs: " << (params.keep_reference ? "kept" : "dropped") << "\n";
+		params.fp_logs << "  Svtig sequences: " << (params.write_full ? "whole contigs" : "graph-aligned core") << "\n";
 		params.fp_logs << "  Debug: " << (params.debug ? "yes" : "no") << "\n";
 		params.fp_logs << "\nInput files:\n";
 		params.fp_logs << "  GAF:   " << params.gaf << "\n";
@@ -575,6 +580,7 @@ void print_help()
 	std::cerr << "\t--pc                        : GraphAligner --precise-clipping for remapping (default: GraphAligner default)"<<std::endl;
 	std::cerr << "\t--keep-remap                : Keep <sample>_svtigs_tmp.fa and <sample>_remap.gaf (the inputs of the final filter)"<<std::endl;
 	std::cerr << "\t--keep-reference-svtigs     : Also write svtigs whose graph path is the plain reference (dropped by default)"<<std::endl;
+	std::cerr << "\t--write-full                : Write whole svtigs; by default the ends trimmed by --trim-identity are left out"<<std::endl;
 	std::cerr << "\t--debug (-u)                : Keep all intermediate files and log every command"<<std::endl;
 	//std::cerr << "\t--assembler                 : (Experimental) Assembler can be either \"Shasta\", \"wtdbg2\" or \"bsalign\" (default:wtdbg2) "<<std::endl;
 	//std::cerr << "\t--asm                       : (Experimental) Runs in assembly mode. You can provide assembly to find the variations. This outputs exact breakpoints instead of SVtigs"<<std::endl;

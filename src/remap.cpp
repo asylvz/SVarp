@@ -178,7 +178,7 @@ std::string svtig_header(const SVtig* svtig)
 }
 
 
-int write_final_svtigs_fasta(faidx_t*& fasta_index, SVtig* svtig, std::ostream& fp_write)
+int write_final_svtigs_fasta(faidx_t*& fasta_index, SVtig* svtig, std::ostream& fp_write, bool full)
 {
 
 	hts_pos_t loc_length;
@@ -187,8 +187,10 @@ int write_final_svtigs_fasta(faidx_t*& fasta_index, SVtig* svtig, std::ostream& 
 	hts_pos_t n = faidx_seq_len64(fasta_index, (svtig->name).c_str());
 	if (n <= 0)
 		return RETURN_ERROR;
-	// the whole contig is written; trim= in the header marks the graph-aligned core the gates were judged on
-	char *tmp_seq = faidx_fetch_seq64(fasta_index, (svtig->name).c_str(), 0, n - 1, &loc_length);
+	// the graph-aligned core (trim= in the header) unless whole contigs were asked for
+	hts_pos_t s = 0, e = n - 1;
+	if (!full && svtig->trim_end > 0 && svtig->trim_end <= n) { s = svtig->trim_start; e = svtig->trim_end - 1; }
+	char *tmp_seq = faidx_fetch_seq64(fasta_index, (svtig->name).c_str(), s, e, &loc_length);
 	if (tmp_seq == nullptr)
 		return RETURN_ERROR;
 	std::string seq(tmp_seq);
@@ -819,7 +821,7 @@ int read_remappings(parameters& params, std::map<std::string, gfaNode*>& gfa, st
 }
 
 
-int write_final_svtigs(faidx_t*& fasta_index, std::map <std::string, SVtig*>& final_svtigs, std::string& out_file, std::string haplotype)
+int write_final_svtigs(faidx_t*& fasta_index, std::map <std::string, SVtig*>& final_svtigs, std::string& out_file, std::string haplotype, bool full)
 {
 	int cnt = 0;
 	std::map<std::string, SVtig*>::iterator itr;
@@ -838,7 +840,7 @@ int write_final_svtigs(faidx_t*& fasta_index, std::map <std::string, SVtig*>& fi
 			std::string hap = haplotype_of(file_name);
 			if ((haplotype != "None" && hap == haplotype) || (haplotype == "None" && hap != "H1" && hap != "H2"))
 			{
-				if (write_final_svtigs_fasta(fasta_index, itr->second, fp_write) == RETURN_SUCCESS)
+				if (write_final_svtigs_fasta(fasta_index, itr->second, fp_write, full) == RETURN_SUCCESS)
 					cnt++;
 				else
 					std::cerr << "[warning] " << file_name << " kept but not found in the svtig FASTA, not written\n";
@@ -955,7 +957,7 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 	if ((params.phase_tags).empty())
 	{
 		svtigs_path = params.log_path + params.sample_name + "_svtigs.fa";
-		int h1 = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "None");
+		int h1 = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "None", params.write_full);
 
 		std::cout<<"--> "<<h1<<" svtigs after filtering\n";
 		if (params.fp_logs.is_open())
@@ -964,15 +966,15 @@ int filter_svtigs(parameters& params, std::map<std::string, gfaNode*>& gfa, std:
 	else
 	{
 		svtigs_path = params.log_path + params.sample_name + "_svtigs_H1.fa";
-		int h1 = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "H1");
+		int h1 = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "H1", params.write_full);
 
 		svtigs_path = params.log_path + params.sample_name + "_svtigs_H2.fa";
-		int h2 = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "H2");
+		int h2 = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "H2", params.write_full);
 		
 		if (!params.skip_untagged)	
 		{
 			svtigs_path = params.log_path + params.sample_name + "_svtigs_untagged.fa";
-			int untagged = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "None");
+			int untagged = write_final_svtigs(fasta_index, final_svtigs, svtigs_path, "None", params.write_full);
 			
 			std::cout<<"--> "<<h1<<" haplotype 1, " <<h2<<" haplotype 2 and "<<untagged<<" untagged svtigs after filtering\n";
 			if (params.fp_logs.is_open())

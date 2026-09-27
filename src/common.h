@@ -46,6 +46,7 @@ typedef struct _parameters
 	bool write_unmapped = false; //list reads without a GAF record
 	bool keep_remap = false; //keep svtigs_tmp.fa and the remap GAF
 	bool keep_reference = false; //also write svtigs identical to the reference path
+	bool write_full = false; //write whole svtigs instead of the graph-aligned core
 	std::string fasta;
 	std::string phase_tags;
 	std::string output_path;
