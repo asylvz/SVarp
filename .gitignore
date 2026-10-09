@@ -1,0 +1,27 @@
+# build artefacts and vendored dependencies
+build/
+dep/
+*.o
+*.a
+
+# local working notes and review files, never published
+CODE_REVIEW*
+DEV_COMMIT
+notes/
+.claude/
+*.md.bak
+
+# large inputs and alignments
+*.cram
+*.crai
+*.bam
+*.bai
+*.gaf
+*.gaf.gz
+*.gfa
+*.gfa.gz
+*.fa.fai
+
+# OS and editor files
+.DS_Store
+*.swp
